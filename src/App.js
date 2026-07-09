@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Square, Circle, Edit2, KeyRound, AlignLeft } from 'lucide-react';
+import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Square, Circle, Edit2, KeyRound, AlignLeft, Sparkles, Scale } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence } from 'firebase/firestore';
@@ -22,13 +22,14 @@ try {
   auth = getAuth(app);
   db = getFirestore(app);
 
-  // オフラインデータの永続化（キャッシュ保存とオフライン同期）を有効にする
   enableIndexedDbPersistence(db).catch((err) => {
     console.warn("Offline persistence error:", err.code);
   });
 } catch (error) {
   console.error("Firebase initialization error:", error);
 }
+
+const MUSCLE_CATEGORIES = ['胸', '背中', '肩', '腕', '脚', 'その他'];
 
 // ストップウォッチ用コンポーネント
 function TimerDisplay({ startTime, isStopped = false }) {
@@ -60,7 +61,6 @@ function TimerDisplay({ startTime, isStopped = false }) {
   );
 }
 
-// ユーティリティ: 時間のフォーマット
 const formatDuration = (ms) => {
   if (!ms) return '';
   const totalMinutes = Math.floor(ms / 60000);
@@ -77,6 +77,36 @@ const formatTimeFromTimestamp = (timestamp) => {
     if (!timestamp) return '';
     const date = new Date(timestamp);
     return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+};
+
+// 総負荷量の計算
+const calculateTotalVolume = (items) => {
+  let volume = 0;
+  items.forEach(item => {
+    item.sets.forEach(set => {
+      if (item.weightType === 'lr') {
+        volume += (Number(set.lWeight || 0) * Number(set.lReps || 0));
+        volume += (Number(set.rWeight || 0) * Number(set.rReps || 0));
+      } else if (item.weightType === 'oneSide') {
+        volume += (Number(set.weight || 0) * Number(set.reps || 0)) * 2;
+      } else if (item.weightType === 'plate') {
+        volume += (Number(set.weight || 0) * Number(set.reps || 0) * 5); // プレート1枚=5kgとして概算
+      } else {
+        volume += (Number(set.weight || 0) * Number(set.reps || 0));
+      }
+    });
+  });
+  return volume;
+};
+
+const getVolumeMetaphor = (kg) => {
+  if (kg <= 0) return '';
+  if (kg < 500) return `原付バイク約${(kg / 100).toFixed(1)}台分`;
+  if (kg < 2000) return `軽自動車約${(kg / 1000).toFixed(1)}台分`;
+  if (kg < 5000) return `サイ約${(kg / 2000).toFixed(1)}頭分`;
+  if (kg < 10000) return `アフリカゾウ約${(kg / 6000).toFixed(1)}頭分`;
+  if (kg < 50000) return `中型トラック約${(kg / 8000).toFixed(1)}台分`;
+  return `大型トレーラー級！`;
 };
 
 export default function App() {
@@ -178,9 +208,7 @@ export default function App() {
       try {
         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser);
         await setDoc(docRef, { lastActive: Date.now() }, { merge: true });
-      } catch (error) {
-        console.error("Presence update error:", error);
-      }
+      } catch (error) {}
     };
     updatePresence();
     const intervalId = setInterval(updatePresence, 60000);
@@ -234,13 +262,14 @@ export default function App() {
     }, { merge: true });
   };
 
-  const handlePostWorkout = async (gymName, workoutItems) => {
+  const handlePostWorkout = async (gymName, workoutItems, bodyWeight, bodyFat) => {
     if (!firebaseUser || !currentUser || workoutItems.length === 0 || !db) return;
     
     const myInfo = accountsInfo[currentUser];
     const startTime = myInfo?.trainingStartTime || Date.now();
     const endTime = Date.now();
     const duration = endTime - startTime;
+    const volume = calculateTotalVolume(workoutItems);
 
     const newDocId = `workout_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'workouts', newDocId);
@@ -257,6 +286,9 @@ export default function App() {
         date: new Date().toISOString(),
         likes: 0,
         likedByMe: false,
+        bodyWeight: bodyWeight || null,
+        bodyFat: bodyFat || null,
+        volume: volume
       });
 
       const accRef = doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser);
@@ -271,13 +303,12 @@ export default function App() {
 
   const handleUpdateWorkout = async (postId, workoutItems) => {
     if (!firebaseUser || !currentUser || workoutItems.length === 0 || !db) return;
+    const volume = calculateTotalVolume(workoutItems);
     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'workouts', postId);
     try {
-      await setDoc(docRef, { items: workoutItems }, { merge: true });
+      await setDoc(docRef, { items: workoutItems, volume: volume }, { merge: true });
       setEditingPost(null);
-    } catch (error) {
-      console.error("Error updating workout:", error);
-    }
+    } catch (error) {}
   };
 
   const handleDeleteWorkout = async (postId) => {
@@ -287,9 +318,7 @@ export default function App() {
     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'workouts', postId);
     try {
       await deleteDoc(docRef);
-    } catch (error) {
-       console.error("Error deleting workout:", error);
-    }
+    } catch (error) {}
   };
 
   const handleCancelTraining = async () => {
@@ -306,16 +335,13 @@ export default function App() {
     if (!firebaseUser || !currentUser || !db) return;
     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser);
     try {
-      // photoUrlがnullの場合は削除として扱うためmerge設定
       if (photoUrl === null) {
         await setDoc(docRef, { photoUrl: null }, { merge: true });
       } else {
         await setDoc(docRef, { photoUrl }, { merge: true });
       }
       setShowProfileModal(false);
-    } catch (error) {
-      console.error("Error saving photo:", error);
-    }
+    } catch (error) {}
   };
 
   const toggleLike = async (postId, currentLikes, isCurrentlyLiked) => {
@@ -350,9 +376,18 @@ export default function App() {
   const partnerIsTraining = partnerInfo?.isTraining;
   const myInfo = accountsInfo[currentUser] || {};
 
+  const isSameGym = myInfo.isTraining && partnerIsTraining && myInfo.currentGymId && (myInfo.currentGymId === partnerInfo.currentGymId);
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-32 overflow-x-hidden selection:bg-emerald-200">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm flex flex-col">
+        {isSameGym && (
+          <div className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-4 py-2 flex items-center justify-center gap-2 text-white text-xs font-bold animate-pulse shadow-inner">
+            <Sparkles size={16} className="text-yellow-300" />
+            パートナーと同じジムでトレーニング中！🔥
+            <Sparkles size={16} className="text-yellow-300" />
+          </div>
+        )}
         <div className="p-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
             <Activity className="text-emerald-500" />
@@ -382,7 +417,7 @@ export default function App() {
           </div>
         </div>
         
-        {partnerIsTraining && (
+        {partnerIsTraining && !isSameGym && (
           <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-4 py-2 flex items-center justify-center gap-2 text-sm font-bold animate-in slide-in-from-top duration-300">
             <Flame size={16} className="animate-pulse text-amber-300" />
             {partnerName}さんがトレーニング中です！
@@ -552,9 +587,8 @@ function LoginScreen({ onLogin, accountsInfo, onChangePin, isOnline }) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   
-  // パスワード変更用の状態
   const [isChangingPin, setIsChangingPin] = useState(false);
-  const [step, setStep] = useState(1); // 1: Select User, 2: Enter PIN
+  const [step, setStep] = useState(1);
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
 
@@ -574,18 +608,16 @@ function LoginScreen({ onLogin, accountsInfo, onChangePin, isOnline }) {
   const handleSubmitChangePin = async () => {
      if (pin.length !== 4) return;
      if (step === 2) {
-       // 現在のPINの確認
        if (accountsInfo[selectedUser].pin === pin) {
          setCurrentPin(pin);
          setPin('');
          setError('');
-         setStep(3); // 新しいPIN入力へ
+         setStep(3); 
        } else {
          setError('現在のパスワードが間違っています');
          setPin('');
        }
      } else if (step === 3) {
-       // 新しいPINの確認入力へ
        setNewPin(pin);
        setPin('');
        setError('');
@@ -636,7 +668,6 @@ function LoginScreen({ onLogin, accountsInfo, onChangePin, isOnline }) {
     </div>
   );
 
-  // ユーザー選択画面
   if (!selectedUser) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 relative">
@@ -678,7 +709,6 @@ function LoginScreen({ onLogin, accountsInfo, onChangePin, isOnline }) {
     );
   }
 
-  // PIN入力画面
   let pinPrompt = isRegistered(selectedUser) ? 'PINコードを入力' : '初回のPINコード(4桁)を設定';
   if (isChangingPin) {
     if (step === 2) pinPrompt = '現在のPINコードを入力';
@@ -728,15 +758,6 @@ function TimelineView({ posts, onToggleLike, currentUser, onDelete, onEdit, acco
     const timeStr = `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
     return `${date.getMonth() + 1}/${date.getDate()} ${timeStr}`;
   };
-
-  const getWeightLabel = (weightType) => {
-    switch(weightType) {
-      case 'oneSide': return '片側';
-      case 'plate': return '枚';
-      case 'total':
-      default: return 'kg';
-    }
-  }
 
   return (
     <div className="space-y-4">
@@ -794,8 +815,32 @@ function TimelineView({ posts, onToggleLike, currentUser, onDelete, onEdit, acco
                 )}
               </div>
 
+              {/* 体重・体脂肪率バッジ */}
+              {(post.bodyWeight || post.bodyFat) && (
+                <div className="pl-3 mb-3 flex gap-2">
+                  <div className="flex items-center gap-1.5 bg-indigo-50 text-indigo-600 text-xs font-bold px-2.5 py-1 rounded-md border border-indigo-100">
+                    <Scale size={14} />
+                    {post.bodyWeight && `${post.bodyWeight}kg`}
+                    {post.bodyWeight && post.bodyFat && ' / '}
+                    {post.bodyFat && `${post.bodyFat}%`}
+                  </div>
+                </div>
+              )}
+
+              {/* 総負荷量バッジ */}
+              {post.volume > 0 && (
+                <div className="pl-3 mb-4">
+                  <div className="inline-flex items-center gap-2 bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200">
+                    <Flame size={14} className="text-orange-500" />
+                    総負荷量: {post.volume.toLocaleString()}kg
+                    <span className="text-slate-400 font-normal">（{getVolumeMetaphor(post.volume)}）</span>
+                  </div>
+                </div>
+              )}
+
               <div className="pl-3 space-y-3 mb-4">
                 {post.items && post.items.map((item, idx) => {
+                  const isLR = item.weightType === 'lr';
                   const isPlate = item.weightType === 'plate';
                   
                   return (
@@ -803,25 +848,45 @@ function TimelineView({ posts, onToggleLike, currentUser, onDelete, onEdit, acco
                       <div className="flex items-center gap-2 mb-2">
                         <Dumbbell size={14} className="text-emerald-500" />
                         <span className="font-bold text-slate-800 text-sm">{item.exerciseName}</span>
+                        {item.category && <span className="text-[10px] text-emerald-600 font-bold bg-emerald-100 px-1.5 py-0.5 rounded">{item.category}</span>}
                         {item.maker && <span className="text-[10px] text-slate-400 font-bold bg-slate-200 px-1.5 py-0.5 rounded">{item.maker}</span>}
                       </div>
 
                       <div className="space-y-1">
                         {item.sets.map((set, sIdx) => (
                           <div key={sIdx} className="flex justify-between text-sm items-center border-b border-slate-200/50 pb-1 last:border-0">
-                            <span className="text-slate-500 font-bold w-12 text-xs">Set {sIdx + 1}</span>
-                            <span className="font-bold text-slate-700 flex-1 text-center">
-                              {set.weight} 
-                              <span className="text-xs font-bold text-slate-400 ml-0.5">
-                                {isPlate ? '枚' : (item.weightType === 'oneSide' ? 'kg(片)' : 'kg')}
-                              </span>
-                            </span>
-                            <span className="font-bold text-slate-700 w-16 text-right">{set.reps} <span className="text-xs font-bold text-slate-400">回</span></span>
+                            <span className="text-slate-500 font-bold w-10 text-xs">S {sIdx + 1}</span>
+                            
+                            {isLR ? (
+                              <div className="flex-1 flex gap-2">
+                                <div className="flex-1 flex justify-center items-center gap-1 text-[11px] font-bold text-blue-600 bg-blue-50/50 rounded px-1">
+                                  <span>L:</span>
+                                  <span>{set.lWeight}kg</span>
+                                  <span className="text-blue-300">×</span>
+                                  <span>{set.lReps}回</span>
+                                </div>
+                                <div className="flex-1 flex justify-center items-center gap-1 text-[11px] font-bold text-rose-600 bg-rose-50/50 rounded px-1">
+                                  <span>R:</span>
+                                  <span>{set.rWeight}kg</span>
+                                  <span className="text-rose-300">×</span>
+                                  <span>{set.rReps}回</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <span className="font-bold text-slate-700 flex-1 text-center">
+                                  {set.weight} 
+                                  <span className="text-[10px] font-bold text-slate-400 ml-0.5">
+                                    {isPlate ? '枚' : (item.weightType === 'oneSide' ? 'kg(片)' : 'kg')}
+                                  </span>
+                                </span>
+                                <span className="font-bold text-slate-700 w-16 text-right">{set.reps} <span className="text-[10px] font-bold text-slate-400">回</span></span>
+                              </>
+                            )}
                           </div>
                         ))}
                       </div>
 
-                      {/* メモをセットの下に移動 */}
                       {item.memo && (
                         <div className="mt-2 text-sm text-slate-600 bg-white p-2 rounded border border-slate-200">
                           <AlignLeft size={12} className="inline mr-1 text-slate-400"/>
@@ -837,13 +902,11 @@ function TimelineView({ posts, onToggleLike, currentUser, onDelete, onEdit, acco
                 {isMyPost ? (
                   <div className="flex items-center gap-2 px-3 py-2 text-sm font-bold text-slate-400">
                     <Heart size={16} className={post.likes > 0 ? "text-rose-400" : ""} fill={post.likes > 0 ? "currentColor" : "none"} />
-                    {/* 数字を非表示に変更 */}
                     {post.likes > 0 ? 'ナイス！' : 'ナイス待ち'}
                   </div>
                 ) : (
                   <button onClick={() => onToggleLike(post.id, post.likes || 0, post.likedByMe)} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all text-sm font-bold ${post.likedByMe ? 'bg-rose-50 text-rose-500 border border-rose-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200'}`}>
                     <Heart size={16} fill={post.likedByMe ? "currentColor" : "none"} className={post.likedByMe ? "animate-pulse" : ""} />
-                    {/* 数字を非表示に変更 */}
                     ナイス！
                   </button>
                 )}
@@ -865,13 +928,14 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
   });
 
   const addExerciseItem = () => {
-    const defaultEx = availableExercises.length > 0 ? availableExercises[0] : { name: '', weightType: 'total' };
+    const defaultEx = availableExercises.length > 0 ? availableExercises[0] : { name: '', weightType: 'total', category: 'その他' };
     setWorkoutItems([...workoutItems, { 
       id: Date.now().toString(), 
       exerciseName: defaultEx.name,
       weightType: defaultEx.weightType || 'total',
+      category: defaultEx.category || 'その他',
       memo: '',
-      sets: [{ id: Date.now().toString() + 's', weight: '', reps: '' }] 
+      sets: [{ id: Date.now().toString() + 's', weight: '', reps: '', lWeight: '', lReps: '', rWeight: '', rReps: '' }] 
     }]);
   };
 
@@ -883,6 +947,7 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
        ...item, 
        exerciseName: newName,
        weightType: exData ? (exData.weightType || 'total') : 'total',
+       category: exData ? (exData.category || 'その他') : 'その他',
        maker: exData ? exData.maker : ''
      } : item));
   };
@@ -894,8 +959,8 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
   const addSet = (itemId) => {
     setWorkoutItems(workoutItems.map(item => {
       if (item.id === itemId) {
-        const lastSet = item.sets[item.sets.length - 1] || { weight: '', reps: '' };
-        return { ...item, sets: [...item.sets, { id: Date.now().toString(), weight: lastSet.weight, reps: lastSet.reps }] };
+        const lastSet = item.sets[item.sets.length - 1] || { weight: '', reps: '', lWeight: '', lReps: '', rWeight: '', rReps: '' };
+        return { ...item, sets: [...item.sets, { id: Date.now().toString(), ...lastSet }] };
       }
       return item;
     }));
@@ -918,9 +983,14 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
   };
 
   const handleSave = () => {
-    const isValid = workoutItems.every(item => 
-      item.exerciseName && item.sets.length > 0 && item.sets.every(set => set.weight !== '' && set.reps !== '')
-    );
+    const isValid = workoutItems.every(item => {
+      if (!item.exerciseName || item.sets.length === 0) return false;
+      if (item.weightType === 'lr') {
+        return item.sets.every(set => set.lWeight !== '' && set.lReps !== '' && set.rWeight !== '' && set.rReps !== '');
+      } else {
+        return item.sets.every(set => set.weight !== '' && set.reps !== '');
+      }
+    });
     if (!isValid || workoutItems.length === 0) {
       alert("種目を選択し、すべての重量と回数を入力してください。");
       return;
@@ -972,39 +1042,52 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
               {/* セット入力 */}
               <div className="space-y-2 mb-3 w-full">
                 <div className="flex text-xs text-slate-500 font-bold px-1">
-                  <div className="w-10 sm:w-12 text-center">Set</div>
-                  <div className="flex-1 text-center">{getWeightPlaceholder(item.weightType)}</div>
-                  <div className="flex-1 text-center">Reps</div>
-                  <div className="w-8"></div>
+                  <div className="w-8 text-center">Set</div>
+                  {item.weightType === 'lr' ? (
+                    <div className="flex-1 flex justify-between gap-2 px-1">
+                      <span className="w-1/2 text-center text-[10px] text-blue-500">左 (kg/回)</span>
+                      <span className="w-1/2 text-center text-[10px] text-rose-500">右 (kg/回)</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex-1 text-center">{getWeightPlaceholder(item.weightType)}</div>
+                      <div className="flex-1 text-center">Reps</div>
+                    </>
+                  )}
+                  <div className="w-6"></div>
                 </div>
                 
                 {item.sets.map((set, sIndex) => (
-                  <div key={set.id} className="flex items-center gap-2">
-                    <div className="w-10 sm:w-12 text-center text-slate-400 font-bold text-sm">
+                  <div key={set.id} className="flex items-center gap-1.5">
+                    <div className="w-8 text-center text-slate-400 font-bold text-sm">
                       {sIndex + 1}
                     </div>
-                    <input 
-                      type="number" 
-                      value={set.weight}
-                      onChange={(e) => updateSet(item.id, set.id, 'weight', e.target.value)}
-                      placeholder="0"
-                      className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-lg py-2 px-1 text-center text-slate-800 font-bold focus:outline-none focus:border-emerald-500 text-base"
-                    />
-                    <input 
-                      type="number" 
-                      value={set.reps}
-                      onChange={(e) => updateSet(item.id, set.id, 'reps', e.target.value)}
-                      placeholder="0"
-                      className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-lg py-2 px-1 text-center text-slate-800 font-bold focus:outline-none focus:border-emerald-500 text-base"
-                    />
-                    <button onClick={() => removeSet(item.id, set.id)} disabled={item.sets.length === 1} className="w-8 flex-shrink-0 text-slate-400 hover:text-rose-500 disabled:opacity-30 flex justify-center">
+                    {item.weightType === 'lr' ? (
+                      <div className="flex flex-1 gap-1.5">
+                        <div className="flex flex-1 items-center gap-0.5 border border-blue-200 bg-blue-50 rounded p-1">
+                          <input type="number" value={set.lWeight} onChange={(e) => updateSet(item.id, set.id, 'lWeight', e.target.value)} placeholder="0" className="w-full text-center text-sm font-bold text-slate-800 bg-transparent focus:outline-none" style={{ fontSize: '16px' }}/>
+                          <span className="text-[10px] text-blue-300">×</span>
+                          <input type="number" value={set.lReps} onChange={(e) => updateSet(item.id, set.id, 'lReps', e.target.value)} placeholder="0" className="w-full text-center text-sm font-bold text-slate-800 bg-transparent focus:outline-none" style={{ fontSize: '16px' }}/>
+                        </div>
+                        <div className="flex flex-1 items-center gap-0.5 border border-rose-200 bg-rose-50 rounded p-1">
+                          <input type="number" value={set.rWeight} onChange={(e) => updateSet(item.id, set.id, 'rWeight', e.target.value)} placeholder="0" className="w-full text-center text-sm font-bold text-slate-800 bg-transparent focus:outline-none" style={{ fontSize: '16px' }}/>
+                          <span className="text-[10px] text-rose-300">×</span>
+                          <input type="number" value={set.rReps} onChange={(e) => updateSet(item.id, set.id, 'rReps', e.target.value)} placeholder="0" className="w-full text-center text-sm font-bold text-slate-800 bg-transparent focus:outline-none" style={{ fontSize: '16px' }}/>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <input type="number" value={set.weight} onChange={(e) => updateSet(item.id, set.id, 'weight', e.target.value)} placeholder="0" className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-lg py-2 px-1 text-center text-slate-800 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
+                        <input type="number" value={set.reps} onChange={(e) => updateSet(item.id, set.id, 'reps', e.target.value)} placeholder="0" className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-lg py-2 px-1 text-center text-slate-800 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
+                      </>
+                    )}
+                    <button onClick={() => removeSet(item.id, set.id)} disabled={item.sets.length === 1} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 disabled:opacity-30 flex justify-center">
                       <X size={18} />
                     </button>
                   </div>
                 ))}
               </div>
 
-              {/* メモ入力（下に移動、fontSize: 16px を適用してズーム防止） */}
               <div className="mb-4">
                 <textarea
                   value={item.memo || ''}
@@ -1045,9 +1128,22 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showExerciseManager, setShowExerciseManager] = useState(false);
+  
+  // カテゴリ絞り込み
+  const [selectedCategories, setSelectedCategories] = useState([]);
+
+  // 体重・体脂肪率
+  const [bodyWeight, setBodyWeight] = useState('');
+  const [bodyFat, setBodyFat] = useState('');
 
   const isTraining = myInfo.isTraining;
-  const availableExercises = exercises.filter(ex => ex.gymId === selectedGymId);
+  
+  // 絞り込み適用済みの種目リスト
+  const availableExercises = exercises.filter(ex => {
+    if (ex.gymId !== selectedGymId) return false;
+    if (selectedCategories.length === 0) return true; // 未選択なら全て表示
+    return selectedCategories.includes(ex.category || 'その他');
+  });
 
   const handleStart = () => {
     if (!selectedGymId) {
@@ -1061,8 +1157,9 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
          id: Date.now().toString(), 
          exerciseName: firstEx.name, 
          weightType: firstEx.weightType || 'total',
+         category: firstEx.category || 'その他',
          memo: '',
-         sets: [{ id: Date.now().toString() + 's', weight: '', reps: '' }] 
+         sets: [{ id: Date.now().toString() + 's', weight: '', reps: '', lWeight: '', lReps: '', rWeight: '', rReps: '' }] 
        }]);
     }
   };
@@ -1075,16 +1172,18 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
         id: Date.now().toString(), 
         exerciseName: defaultEx.name, 
         weightType: defaultEx.weightType || 'total',
+        category: defaultEx.category || 'その他',
         memo: '',
-        sets: [{ id: Date.now().toString() + 's', weight: '', reps: '' }] 
+        sets: [{ id: Date.now().toString() + 's', weight: '', reps: '', lWeight: '', lReps: '', rWeight: '', rReps: '' }] 
       }]);
     } else {
       setWorkoutItems([...workoutItems, { 
         id: Date.now().toString(), 
         exerciseName: '', 
         weightType: 'total',
+        category: 'その他',
         memo: '',
-        sets: [{ id: Date.now().toString() + 's', weight: '', reps: '' }] 
+        sets: [{ id: Date.now().toString() + 's', weight: '', reps: '', lWeight: '', lReps: '', rWeight: '', rReps: '' }] 
       }]);
     }
   };
@@ -1096,7 +1195,8 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
     setWorkoutItems(workoutItems.map(item => item.id === itemId ? { 
       ...item, 
       exerciseName: newName,
-      weightType: exData ? (exData.weightType || 'total') : 'total'
+      weightType: exData ? (exData.weightType || 'total') : 'total',
+      category: exData ? (exData.category || 'その他') : 'その他'
     } : item));
   };
 
@@ -1107,8 +1207,8 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const addSet = (itemId) => {
     setWorkoutItems(workoutItems.map(item => {
       if (item.id === itemId) {
-        const lastSet = item.sets[item.sets.length - 1] || { weight: '', reps: '' };
-        return { ...item, sets: [...item.sets, { id: Date.now().toString(), weight: lastSet.weight, reps: lastSet.reps }] };
+        const lastSet = item.sets[item.sets.length - 1] || { weight: '', reps: '', lWeight: '', lReps: '', rWeight: '', rReps: '' };
+        return { ...item, sets: [...item.sets, { id: Date.now().toString(), ...lastSet }] };
       }
       return item;
     }));
@@ -1131,9 +1231,14 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   };
 
   const handleSubmit = async () => {
-    const isValid = workoutItems.every(item => 
-      item.exerciseName && item.sets.length > 0 && item.sets.every(set => set.weight !== '' && set.reps !== '')
-    );
+    const isValid = workoutItems.every(item => {
+      if (!item.exerciseName || item.sets.length === 0) return false;
+      if (item.weightType === 'lr') {
+        return item.sets.every(set => set.lWeight !== '' && set.lReps !== '' && set.rWeight !== '' && set.rReps !== '');
+      } else {
+        return item.sets.every(set => set.weight !== '' && set.reps !== '');
+      }
+    });
     if (!isValid || workoutItems.length === 0) {
       alert("種目を選択し、すべての重量と回数を入力してください。");
       return;
@@ -1141,14 +1246,17 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
     setIsSubmitting(true);
     const gym = gyms.find(g => g.id === selectedGymId);
     const enrichedItems = workoutItems.map(item => {
-      const exData = availableExercises.find(ex => ex.name === item.exerciseName);
+      const exData = exercises.find(ex => ex.gymId === selectedGymId && ex.name === item.exerciseName);
       return { 
         ...item, 
         maker: exData ? exData.maker : '',
-        weightType: exData ? (exData.weightType || 'total') : 'total'
+        weightType: exData ? (exData.weightType || 'total') : 'total',
+        category: exData ? (exData.category || 'その他') : 'その他'
       };
     });
-    await onPost(gym ? gym.name : '不明なジム', enrichedItems);
+    await onPost(gym ? gym.name : '不明なジム', enrichedItems, Number(bodyWeight), Number(bodyFat));
+    setBodyWeight('');
+    setBodyFat('');
     setIsSubmitting(false);
   };
 
@@ -1161,11 +1269,18 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
     }
   }
 
+  const toggleCategory = (cat) => {
+    if (selectedCategories.includes(cat)) {
+      setSelectedCategories(selectedCategories.filter(c => c !== cat));
+    } else {
+      setSelectedCategories([...selectedCategories, cat]);
+    }
+  };
+
   if (showExerciseManager) {
     return <ExerciseManager onClose={() => setShowExerciseManager(false)} gyms={gyms} exercises={exercises} />;
   }
 
-  // トレーニング開始前の画面
   if (!isTraining) {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
@@ -1207,7 +1322,6 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
     );
   }
 
-  // トレーニング中の画面
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="bg-slate-900 rounded-2xl p-4 shadow-lg text-white flex justify-between items-center sticky top-20 z-10">
@@ -1219,7 +1333,6 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
             <Clock size={20} className={!isSubmitting ? "animate-pulse" : ""} />
             <TimerDisplay startTime={myInfo.trainingStartTime} isStopped={isSubmitting} />
           </div>
-          {/* 開始時刻の表示（停止ボタンの代わり） */}
           <div className="text-xs text-slate-400 font-bold mt-1">
             {formatTimeFromTimestamp(myInfo.trainingStartTime)} から開始
           </div>
@@ -1233,9 +1346,25 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
         </button>
       </div>
 
+      {/* カテゴリ絞り込みボタン群 */}
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+        {MUSCLE_CATEGORIES.map(cat => {
+          const isSelected = selectedCategories.includes(cat);
+          return (
+            <button
+              key={cat}
+              onClick={() => toggleCategory(cat)}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${isSelected ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
+            >
+              {cat}
+            </button>
+          );
+        })}
+      </div>
+
       {availableExercises.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center shadow-sm">
-          <p className="text-slate-500 mb-4 text-sm font-bold">このジムにはまだ種目が登録されていません。</p>
+          <p className="text-slate-500 mb-4 text-sm font-bold">該当する種目がありません。</p>
           <button onClick={() => setShowExerciseManager(true)} className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-100 transition-colors">
             種目を追加する
           </button>
@@ -1269,41 +1398,52 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
               {/* セット入力 */}
               <div className="space-y-2 mb-3 w-full">
                 <div className="flex text-xs text-slate-500 font-bold px-1">
-                  <div className="w-10 sm:w-12 text-center">Set</div>
-                  <div className="flex-1 text-center">{getWeightPlaceholder(item.weightType)}</div>
-                  <div className="flex-1 text-center">Reps</div>
-                  <div className="w-8"></div>
+                  <div className="w-8 text-center">Set</div>
+                  {item.weightType === 'lr' ? (
+                    <div className="flex-1 flex justify-between gap-2 px-1">
+                      <span className="w-1/2 text-center text-[10px] text-blue-500">左 (kg/回)</span>
+                      <span className="w-1/2 text-center text-[10px] text-rose-500">右 (kg/回)</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex-1 text-center">{getWeightPlaceholder(item.weightType)}</div>
+                      <div className="flex-1 text-center">Reps</div>
+                    </>
+                  )}
+                  <div className="w-6"></div>
                 </div>
                 
                 {item.sets.map((set, sIndex) => (
-                  <div key={set.id} className="flex items-center gap-2">
-                    <div className="w-10 sm:w-12 text-center text-slate-400 font-bold text-sm">
+                  <div key={set.id} className="flex items-center gap-1.5">
+                    <div className="w-8 text-center text-slate-400 font-bold text-sm">
                       {sIndex + 1}
                     </div>
-                    <input 
-                      type="number" 
-                      value={set.weight}
-                      onChange={(e) => updateSet(item.id, set.id, 'weight', e.target.value)}
-                      placeholder="0"
-                      className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-lg py-2 px-1 text-center text-slate-800 font-bold focus:outline-none focus:border-emerald-500 text-base"
-                      style={{ fontSize: '16px' }}
-                    />
-                    <input 
-                      type="number" 
-                      value={set.reps}
-                      onChange={(e) => updateSet(item.id, set.id, 'reps', e.target.value)}
-                      placeholder="0"
-                      className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-lg py-2 px-1 text-center text-slate-800 font-bold focus:outline-none focus:border-emerald-500 text-base"
-                      style={{ fontSize: '16px' }}
-                    />
-                    <button onClick={() => removeSet(item.id, set.id)} disabled={item.sets.length === 1} className="w-8 flex-shrink-0 text-slate-400 hover:text-rose-500 disabled:opacity-30 flex justify-center">
+                    {item.weightType === 'lr' ? (
+                      <div className="flex flex-1 gap-1.5">
+                        <div className="flex flex-1 items-center gap-0.5 border border-blue-200 bg-blue-50 rounded p-1">
+                          <input type="number" value={set.lWeight} onChange={(e) => updateSet(item.id, set.id, 'lWeight', e.target.value)} placeholder="0" className="w-full text-center text-sm font-bold text-slate-800 bg-transparent focus:outline-none" style={{ fontSize: '16px' }}/>
+                          <span className="text-[10px] text-blue-300">×</span>
+                          <input type="number" value={set.lReps} onChange={(e) => updateSet(item.id, set.id, 'lReps', e.target.value)} placeholder="0" className="w-full text-center text-sm font-bold text-slate-800 bg-transparent focus:outline-none" style={{ fontSize: '16px' }}/>
+                        </div>
+                        <div className="flex flex-1 items-center gap-0.5 border border-rose-200 bg-rose-50 rounded p-1">
+                          <input type="number" value={set.rWeight} onChange={(e) => updateSet(item.id, set.id, 'rWeight', e.target.value)} placeholder="0" className="w-full text-center text-sm font-bold text-slate-800 bg-transparent focus:outline-none" style={{ fontSize: '16px' }}/>
+                          <span className="text-[10px] text-rose-300">×</span>
+                          <input type="number" value={set.rReps} onChange={(e) => updateSet(item.id, set.id, 'rReps', e.target.value)} placeholder="0" className="w-full text-center text-sm font-bold text-slate-800 bg-transparent focus:outline-none" style={{ fontSize: '16px' }}/>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <input type="number" value={set.weight} onChange={(e) => updateSet(item.id, set.id, 'weight', e.target.value)} placeholder="0" className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-lg py-2 px-1 text-center text-slate-800 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
+                        <input type="number" value={set.reps} onChange={(e) => updateSet(item.id, set.id, 'reps', e.target.value)} placeholder="0" className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-lg py-2 px-1 text-center text-slate-800 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
+                      </>
+                    )}
+                    <button onClick={() => removeSet(item.id, set.id)} disabled={item.sets.length === 1} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 disabled:opacity-30 flex justify-center">
                       <X size={18} />
                     </button>
                   </div>
                 ))}
               </div>
 
-              {/* メモ入力（下に移動、fontSize: 16px を適用してズーム防止） */}
               <div className="mb-4">
                 <textarea
                   value={item.memo || ''}
@@ -1324,6 +1464,22 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
           <button onClick={() => addExerciseItem()} className="w-full py-3 bg-slate-100 text-slate-700 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors border border-slate-200">
             <ListPlus size={18} /> 次の種目を追加
           </button>
+
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm mt-6">
+            <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+              <Scale size={16} /> 本日の体組成（任意）
+            </h3>
+            <div className="flex gap-4">
+              <div className="flex-1 relative">
+                <input type="number" step="0.1" value={bodyWeight} onChange={(e) => setBodyWeight(e.target.value)} placeholder="体重" className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-800 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }}/>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">kg</span>
+              </div>
+              <div className="flex-1 relative">
+                <input type="number" step="0.1" value={bodyFat} onChange={(e) => setBodyFat(e.target.value)} placeholder="体脂肪率" className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-3 text-slate-800 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }}/>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">%</span>
+              </div>
+            </div>
+          </div>
 
           <button 
             onClick={handleSubmit}
@@ -1354,7 +1510,8 @@ function ExerciseManager({ onClose, gyms, exercises }) {
   const [selectedGymId, setSelectedGymId] = useState(gyms.length > 0 ? gyms[0].id : '');
   const [newExName, setNewExName] = useState('');
   const [newExMaker, setNewExMaker] = useState('');
-  const [newExWeightType, setNewExWeightType] = useState('total'); // total, oneSide, plate
+  const [newExWeightType, setNewExWeightType] = useState('total'); // total, oneSide, plate, lr
+  const [newExCategory, setNewExCategory] = useState('胸');
   const [isAdding, setIsAdding] = useState(false);
 
   const handleAddGym = async (e) => {
@@ -1383,11 +1540,13 @@ function ExerciseManager({ onClose, gyms, exercises }) {
         maker: newExMaker.trim(), 
         gymId: selectedGymId, 
         weightType: newExWeightType,
+        category: newExCategory,
         createdAt: Date.now() 
       });
       setNewExName('');
       setNewExMaker('');
       setNewExWeightType('total');
+      setNewExCategory('胸');
     } catch (error) {}
     setIsAdding(false);
   };
@@ -1448,10 +1607,24 @@ function ExerciseManager({ onClose, gyms, exercises }) {
                     <div className="space-y-3">
                       <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1">対象のジム <span className="text-rose-500">*</span></label>
-                        <select value={selectedGymId} onChange={e => setSelectedGymId(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
-                          {gyms.map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
-                        </select>
+                        <div className="relative">
+                          <select value={selectedGymId} onChange={e => setSelectedGymId(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
+                            {gyms.map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
+                          </select>
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
+                        </div>
                       </div>
+                      
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">部位カテゴリ <span className="text-rose-500">*</span></label>
+                        <div className="relative">
+                          <select value={newExCategory} onChange={e => setNewExCategory(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
+                            {MUSCLE_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                          </select>
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
+                        </div>
+                      </div>
+
                       <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1">種目名 <span className="text-rose-500">*</span></label>
                         <input type="text" value={newExName} onChange={e => setNewExName(e.target.value)} required placeholder="例: ベンチプレス" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/>
@@ -1462,7 +1635,7 @@ function ExerciseManager({ onClose, gyms, exercises }) {
                       </div>
                       <div>
                          <label className="block text-xs font-bold text-slate-500 mb-1">重さの単位/計算方法 <span className="text-rose-500">*</span></label>
-                         <div className="grid grid-cols-3 gap-2">
+                         <div className="grid grid-cols-2 gap-2">
                             <label className={`text-center py-2 rounded-lg text-sm font-bold border transition-colors cursor-pointer ${newExWeightType === 'total' ? 'bg-emerald-50 border-emerald-500 text-emerald-600' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}`}>
                                <input type="radio" name="weightType" value="total" checked={newExWeightType === 'total'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>
                                合計 (kg)
@@ -1474,6 +1647,10 @@ function ExerciseManager({ onClose, gyms, exercises }) {
                             <label className={`text-center py-2 rounded-lg text-sm font-bold border transition-colors cursor-pointer ${newExWeightType === 'plate' ? 'bg-emerald-50 border-emerald-500 text-emerald-600' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}`}>
                                <input type="radio" name="weightType" value="plate" checked={newExWeightType === 'plate'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>
                                プレート (枚)
+                            </label>
+                            <label className={`text-center py-2 rounded-lg text-sm font-bold border transition-colors cursor-pointer ${newExWeightType === 'lr' ? 'bg-emerald-50 border-emerald-500 text-emerald-600' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}`}>
+                               <input type="radio" name="weightType" value="lr" checked={newExWeightType === 'lr'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>
+                               左右別 (独立枠)
                             </label>
                          </div>
                       </div>
@@ -1497,11 +1674,14 @@ function ExerciseManager({ onClose, gyms, exercises }) {
                               {gymExercises.map(ex => (
                                 <div key={ex.id} className="p-3 flex justify-between items-center">
                                   <div>
-                                    <p className="font-bold text-slate-800 text-sm">{ex.name}</p>
-                                    <div className="flex gap-2 mt-0.5">
+                                    <p className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                      {ex.name}
+                                      {ex.category && <span className="text-[10px] text-emerald-600 font-bold bg-emerald-100 px-1.5 py-0.5 rounded">{ex.category}</span>}
+                                    </p>
+                                    <div className="flex gap-2 mt-1">
                                       {ex.maker && <span className="text-xs text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded">{ex.maker}</span>}
                                       {ex.weightType && <span className="text-[10px] text-emerald-500 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
-                                        {ex.weightType === 'oneSide' ? '片側(kg)' : ex.weightType === 'plate' ? 'プレート(枚)' : '合計(kg)'}
+                                        {ex.weightType === 'oneSide' ? '片側(kg)' : ex.weightType === 'plate' ? 'プレート(枚)' : ex.weightType === 'lr' ? '左右別' : '合計(kg)'}
                                       </span>}
                                     </div>
                                   </div>
@@ -1600,7 +1780,14 @@ function FriendsView({ partnerName, partnerInfo }) {
           </li>
           <li className="flex items-center justify-between border-t border-slate-100 pt-3">
             <span className="text-slate-500">データ保存先</span>
-            <span className="text-slate-700 text-xs bg-slate-100 px-2 py-1 rounded-md">Firestore ({FIREBASE_PROJECT_ID})</span>
+            <a 
+              href={`https://console.firebase.google.com/project/${FIREBASE_PROJECT_ID}/firestore/data`} 
+              target="_blank" 
+              rel="noreferrer" 
+              className="text-emerald-600 hover:text-emerald-700 text-xs bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 px-2 py-1 rounded-md transition-colors"
+            >
+              Firestore データを確認
+            </a>
           </li>
         </ul>
       </div>
