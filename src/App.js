@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Square, Circle, Edit2, KeyRound, AlignLeft } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence } from 'firebase/firestore';
 
 // --- Firebase 初期化 ---
 let app, auth, db, appId = 'duofit-app';
@@ -21,6 +21,11 @@ try {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
+
+  // オフラインデータの永続化（キャッシュ保存とオフライン同期）を有効にする
+  enableIndexedDbPersistence(db).catch((err) => {
+    console.warn("Offline persistence error:", err.code);
+  });
 } catch (error) {
   console.error("Firebase initialization error:", error);
 }
@@ -168,7 +173,7 @@ export default function App() {
   }, [firebaseUser]);
 
   useEffect(() => {
-    if (!currentUser || !db) return;
+    if (!currentUser || !db || !isOnline) return;
     const updatePresence = async () => {
       try {
         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser);
@@ -180,7 +185,7 @@ export default function App() {
     updatePresence();
     const intervalId = setInterval(updatePresence, 60000);
     return () => clearInterval(intervalId);
-  }, [currentUser]);
+  }, [currentUser, isOnline]);
 
   const handleLogin = async (userId, pin) => {
     if (!firebaseUser || !db) return false;
@@ -301,7 +306,12 @@ export default function App() {
     if (!firebaseUser || !currentUser || !db) return;
     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser);
     try {
-      await setDoc(docRef, { photoUrl }, { merge: true });
+      // photoUrlがnullの場合は削除として扱うためmerge設定
+      if (photoUrl === null) {
+        await setDoc(docRef, { photoUrl: null }, { merge: true });
+      } else {
+        await setDoc(docRef, { photoUrl }, { merge: true });
+      }
       setShowProfileModal(false);
     } catch (error) {
       console.error("Error saving photo:", error);
@@ -511,11 +521,25 @@ function ProfileModal({ isOpen, onClose, currentPhotoUrl, onSave }) {
             )}
           </div>
           
-          <label className="w-full py-3 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition-colors cursor-pointer">
-            <PlusCircle size={18} />
-            新しい画像を選択
-            <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" disabled={isUploading} />
-          </label>
+          {currentPhotoUrl ? (
+            <div className="flex gap-2 w-full">
+              <label className="flex-1 py-3 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition-colors cursor-pointer">
+                <PlusCircle size={18} />
+                変更
+                <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" disabled={isUploading} />
+              </label>
+              <button onClick={() => onSave(null)} disabled={isUploading} className="flex-1 py-3 bg-rose-50 text-rose-600 border border-rose-200 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-rose-100 transition-colors">
+                <Trash2 size={18} />
+                削除
+              </button>
+            </div>
+          ) : (
+            <label className="w-full py-3 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 transition-colors cursor-pointer">
+              <PlusCircle size={18} />
+              新しい画像を選択
+              <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" disabled={isUploading} />
+            </label>
+          )}
         </div>
       </div>
     </div>
@@ -772,7 +796,6 @@ function TimelineView({ posts, onToggleLike, currentUser, onDelete, onEdit, acco
 
               <div className="pl-3 space-y-3 mb-4">
                 {post.items && post.items.map((item, idx) => {
-                  const weightUnit = getWeightLabel(item.weightType);
                   const isPlate = item.weightType === 'plate';
                   
                   return (
@@ -782,13 +805,6 @@ function TimelineView({ posts, onToggleLike, currentUser, onDelete, onEdit, acco
                         <span className="font-bold text-slate-800 text-sm">{item.exerciseName}</span>
                         {item.maker && <span className="text-[10px] text-slate-400 font-bold bg-slate-200 px-1.5 py-0.5 rounded">{item.maker}</span>}
                       </div>
-                      
-                      {item.memo && (
-                        <div className="mb-2 text-sm text-slate-600 bg-white p-2 rounded border border-slate-200">
-                          <AlignLeft size={12} className="inline mr-1 text-slate-400"/>
-                          {item.memo}
-                        </div>
-                      )}
 
                       <div className="space-y-1">
                         {item.sets.map((set, sIdx) => (
@@ -804,6 +820,14 @@ function TimelineView({ posts, onToggleLike, currentUser, onDelete, onEdit, acco
                           </div>
                         ))}
                       </div>
+
+                      {/* メモをセットの下に移動 */}
+                      {item.memo && (
+                        <div className="mt-2 text-sm text-slate-600 bg-white p-2 rounded border border-slate-200">
+                          <AlignLeft size={12} className="inline mr-1 text-slate-400"/>
+                          {item.memo}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -813,12 +837,14 @@ function TimelineView({ posts, onToggleLike, currentUser, onDelete, onEdit, acco
                 {isMyPost ? (
                   <div className="flex items-center gap-2 px-3 py-2 text-sm font-bold text-slate-400">
                     <Heart size={16} className={post.likes > 0 ? "text-rose-400" : ""} fill={post.likes > 0 ? "currentColor" : "none"} />
-                    {post.likes > 0 ? `${post.likes} ナイス！` : 'ナイス待ち'}
+                    {/* 数字を非表示に変更 */}
+                    {post.likes > 0 ? 'ナイス！' : 'ナイス待ち'}
                   </div>
                 ) : (
                   <button onClick={() => onToggleLike(post.id, post.likes || 0, post.likedByMe)} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all text-sm font-bold ${post.likedByMe ? 'bg-rose-50 text-rose-500 border border-rose-200' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200'}`}>
                     <Heart size={16} fill={post.likedByMe ? "currentColor" : "none"} className={post.likedByMe ? "animate-pulse" : ""} />
-                    ナイス！ {post.likes > 0 && post.likes}
+                    {/* 数字を非表示に変更 */}
+                    ナイス！
                   </button>
                 )}
               </div>
@@ -943,18 +969,8 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
                 </button>
               </div>
 
-              {/* メモ入力 */}
-              <div className="mb-4">
-                <textarea
-                  value={item.memo || ''}
-                  onChange={(e) => updateMemo(item.id, e.target.value)}
-                  placeholder="種目ごとのメモ（オプション）"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none resize-none"
-                  rows={2}
-                />
-              </div>
-
-              <div className="space-y-2 mb-4 w-full">
+              {/* セット入力 */}
+              <div className="space-y-2 mb-3 w-full">
                 <div className="flex text-xs text-slate-500 font-bold px-1">
                   <div className="w-10 sm:w-12 text-center">Set</div>
                   <div className="flex-1 text-center">{getWeightPlaceholder(item.weightType)}</div>
@@ -987,6 +1003,19 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
                   </div>
                 ))}
               </div>
+
+              {/* メモ入力（下に移動、fontSize: 16px を適用してズーム防止） */}
+              <div className="mb-4">
+                <textarea
+                  value={item.memo || ''}
+                  onChange={(e) => updateMemo(item.id, e.target.value)}
+                  placeholder="種目ごとのメモ（オプション）"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-base text-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none resize-none"
+                  style={{ fontSize: '16px' }}
+                  rows={2}
+                />
+              </div>
+
               <button onClick={() => addSet(item.id)} className="w-full py-2.5 border border-dashed border-slate-300 text-slate-500 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors mt-2 bg-white">
                 <Plus size={16} /> セットを追加
               </button>
@@ -1237,18 +1266,8 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
                 </button>
               </div>
 
-              {/* メモ入力 */}
-              <div className="mb-4">
-                <textarea
-                  value={item.memo || ''}
-                  onChange={(e) => updateMemo(item.id, e.target.value)}
-                  placeholder="種目ごとのメモ（オプション）"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none resize-none"
-                  rows={2}
-                />
-              </div>
-
-              <div className="space-y-2 mb-4 w-full">
+              {/* セット入力 */}
+              <div className="space-y-2 mb-3 w-full">
                 <div className="flex text-xs text-slate-500 font-bold px-1">
                   <div className="w-10 sm:w-12 text-center">Set</div>
                   <div className="flex-1 text-center">{getWeightPlaceholder(item.weightType)}</div>
@@ -1283,6 +1302,19 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
                   </div>
                 ))}
               </div>
+
+              {/* メモ入力（下に移動、fontSize: 16px を適用してズーム防止） */}
+              <div className="mb-4">
+                <textarea
+                  value={item.memo || ''}
+                  onChange={(e) => updateMemo(item.id, e.target.value)}
+                  placeholder="種目ごとのメモ（オプション）"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-base text-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none resize-none"
+                  style={{ fontSize: '16px' }}
+                  rows={2}
+                />
+              </div>
+
               <button onClick={() => addSet(item.id)} className="w-full py-2.5 border border-dashed border-slate-300 text-slate-500 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors mt-2 bg-white">
                 <Plus size={16} /> セットを追加
               </button>
