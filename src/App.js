@@ -208,7 +208,9 @@ export default function App() {
       try {
         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser);
         await setDoc(docRef, { lastActive: Date.now() }, { merge: true });
-      } catch (error) {}
+      } catch (error) {
+        console.error("Presence update error:", error);
+      }
     };
     updatePresence();
     const intervalId = setInterval(updatePresence, 60000);
