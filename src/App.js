@@ -581,39 +581,100 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
       else updateSet(item.id, setObj.id, fieldName, v);
     };
 
+    let prevRecordText = null;
+    const currentWeight = val('weight');
+    
+    if (!isCardio && currentWeight !== '' && myPastPosts) {
+       const targetExName = type === 'super2' ? item.superExerciseName : type === 'super3' ? item.superExerciseName3 : item.exerciseName;
+       if (targetExName) {
+         for (let p of myPastPosts) {
+           const foundItem = p.items?.find(i => {
+              if (type === 'main') return i.exerciseName === targetExName;
+              if (type === 'super2') return i.superExerciseName === targetExName;
+              if (type === 'super3') return i.superExerciseName3 === targetExName;
+              return false;
+           });
+           if (foundItem && foundItem.sets) {
+              let foundSet = null;
+              for (let s of foundItem.sets) {
+                 const checkSet = (checkS) => {
+                    const w = type === 'super2' ? checkS.superWeight : type === 'super3' ? checkS.superWeight3 : checkS.weight;
+                    if (String(w) === String(currentWeight) && w !== '' && w !== undefined) {
+                       foundSet = checkS;
+                       return true;
+                    }
+                    if (checkS.dropSets) {
+                       for (let ds of checkS.dropSets) {
+                          if (checkSet(ds)) return true;
+                       }
+                    }
+                    return false;
+                 };
+                 if (checkSet(s)) break;
+              }
+              
+              if (foundSet) {
+                 const pDate = p.date ? p.date.substring(5).replace('-','/') : '';
+                 if (wType === 'lr') {
+                    const l = type === 'super2' ? foundSet.superLReps : type === 'super3' ? foundSet.superLReps3 : foundSet.lReps;
+                    const r = type === 'super2' ? foundSet.superRReps : type === 'super3' ? foundSet.superRReps3 : foundSet.rReps;
+                    prevRecordText = `前回(${pDate}): L${l||0}/R${r||0}回`;
+                 } else {
+                    const r = type === 'super2' ? foundSet.superReps : type === 'super3' ? foundSet.superReps3 : foundSet.reps;
+                    prevRecordText = `前回(${pDate}): ${r||0}回`;
+                 }
+                 break;
+              }
+           }
+         }
+       }
+    }
+
+    let inputContent = null;
     if (isCardio) {
-      return (
+      inputContent = (
         <div className="flex-1 flex gap-2 min-w-0">
            <input type="number" inputMode="decimal" value={val('distance')} onChange={(e) => update('distance', e.target.value)} placeholder="距離(km)" className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-2 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
            <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('time')} onChange={(e) => update('time', e.target.value)} placeholder="時間(分)" className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-2 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
            <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('calories')} onChange={(e) => update('calories', e.target.value)} placeholder="kcal" className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-2 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
         </div>
       );
+    } else {
+      inputContent = (
+        <div className="flex-1 flex gap-2 min-w-0">
+          {isLR ? (
+            <>
+              <input type="number" inputMode="decimal" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder={getWeightPlaceholder(wType)} className="w-[64px] shrink-0 text-center text-base font-bold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded focus:outline-none focus:border-emerald-500 py-2 px-0" style={{ fontSize: '16px' }}/>
+              <div className="flex flex-1 items-center gap-1 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-2 min-w-0">
+                <span className="text-xs text-slate-400 font-bold shrink-0">L:</span>
+                <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('lReps')} onChange={(e) => update('lReps', e.target.value)} placeholder="0" className="w-full text-center text-base font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0" style={{ fontSize: '16px' }}/>
+              </div>
+              <div className="flex flex-1 items-center gap-1 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-2 min-w-0">
+                <span className="text-xs text-slate-400 font-bold shrink-0">R:</span>
+                <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('rReps')} onChange={(e) => update('rReps', e.target.value)} placeholder="0" className="w-full text-center text-base font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0" style={{ fontSize: '16px' }}/>
+              </div>
+            </>
+          ) : (
+            <>
+              <input type="number" inputMode="decimal" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder={getWeightPlaceholder(wType)} className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-2 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
+              <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('reps')} onChange={(e) => update('reps', e.target.value)} placeholder="回数" className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-2 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
+            </>
+          )}
+          {item.isForcedReps && (
+            <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('forcedReps')} onChange={(e) => update('forcedReps', e.target.value)} placeholder="+補" className="w-12 shrink-0 text-center text-sm font-bold text-rose-600 bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-800 rounded focus:outline-none focus:border-rose-500 py-2 px-0" style={{ fontSize: '16px' }}/>
+          )}
+        </div>
+      );
     }
 
     return (
-      <div className="flex-1 flex gap-2 min-w-0">
-        {isLR ? (
-          <>
-            <input type="number" inputMode="decimal" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder={getWeightPlaceholder(wType)} className="w-[64px] shrink-0 text-center text-base font-bold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded focus:outline-none focus:border-emerald-500 py-2 px-0" style={{ fontSize: '16px' }}/>
-            <div className="flex flex-1 items-center gap-1 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-2 min-w-0">
-              <span className="text-xs text-slate-400 font-bold shrink-0">L:</span>
-              <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('lReps')} onChange={(e) => update('lReps', e.target.value)} placeholder="0" className="w-full text-center text-base font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0" style={{ fontSize: '16px' }}/>
+      <div className="flex-1 flex flex-col min-w-0">
+         {inputContent}
+         {prevRecordText && (
+            <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold px-1 mt-1 text-right">
+               {prevRecordText}
             </div>
-            <div className="flex flex-1 items-center gap-1 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-2 min-w-0">
-              <span className="text-xs text-slate-400 font-bold shrink-0">R:</span>
-              <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('rReps')} onChange={(e) => update('rReps', e.target.value)} placeholder="0" className="w-full text-center text-base font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0" style={{ fontSize: '16px' }}/>
-            </div>
-          </>
-        ) : (
-          <>
-            <input type="number" inputMode="decimal" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder={getWeightPlaceholder(wType)} className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-2 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
-            <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('reps')} onChange={(e) => update('reps', e.target.value)} placeholder="回数" className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-2 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
-          </>
-        )}
-        {item.isForcedReps && (
-          <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('forcedReps')} onChange={(e) => update('forcedReps', e.target.value)} placeholder="+補" className="w-12 shrink-0 text-center text-sm font-bold text-rose-600 bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-800 rounded focus:outline-none focus:border-rose-500 py-2 px-0" style={{ fontSize: '16px' }}/>
-        )}
+         )}
       </div>
     );
   };
