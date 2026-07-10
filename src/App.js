@@ -31,7 +31,7 @@ try {
   console.error("Firebase initialization error:", error);
 }
 
-const MUSCLE_CATEGORIES = ['胸', '背中', '肩', '腕', '脚', '有酸素', 'その他'];
+const MUSCLE_CATEGORIES = ['胸', '背中', '肩', '腕', '脚', 'その他', '有酸素'];
 
 // --- カラーユーティリティ ---
 const getCategoryColor = (category) => {
@@ -699,7 +699,7 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
           </div>
           <div className="relative flex-1 min-w-0 ml-1">
             <select value={item.exerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, 0)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base pr-8" style={{ fontSize: '16px' }}>
-              <option value="" disabled>種目を選択</option>
+              <option value="" disabled>{availableExercises.length === 0 ? "上の部位を選択してください" : "種目を選択"}</option>
               {item.exerciseName && !availableExercises.some(ex => ex.name === item.exerciseName) && (
                 <option value={item.exerciseName}>{item.exerciseName}</option>
               )}
@@ -1105,7 +1105,7 @@ export default function App() {
   const isSameGym = Boolean(myInfo.isTraining && partnerIsTraining && myInfo.currentGymId && partnerInfo?.currentGymId && (myInfo.currentGymId === partnerInfo.currentGymId));
   
   const isDarkMode = ['dark', 'ocean', 'mono'].includes(myInfo.theme);
-  const themeContainerClass = myInfo.theme === 'ocean' ? 'theme-ocean' : myInfo.theme === 'mono' ? 'theme-mono grayscale' : '';
+  const themeContainerClass = myInfo.theme === 'ocean' ? 'theme-ocean' : myInfo.theme === 'mono' ? 'theme-mono' : '';
 
   return (
     <div className={`min-h-screen font-sans pb-32 overflow-x-hidden selection:bg-emerald-200 transition-colors duration-300 ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'} ${themeContainerClass}`}>
@@ -1120,6 +1120,13 @@ export default function App() {
           .theme-ocean .ring-emerald-500 { --tw-ring-color: #0284c7 !important; }
           .theme-ocean .shadow-emerald-500\\/30 { --tw-shadow-color: rgba(2, 132, 199, 0.3) !important; --tw-shadow: var(--tw-shadow-colored) !important; }
           .theme-ocean .text-slate-400 { color: #7dd3fc !important; }
+        `}</style>
+      )}
+      {myInfo.theme === 'mono' && (
+        <style>{`
+          .theme-mono > :not(style) {
+            filter: grayscale(100%);
+          }
         `}</style>
       )}
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20 shadow-sm flex flex-col transition-colors">
@@ -1735,22 +1742,22 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
 
   const availableExercises = exercises.filter(ex => {
     if (ex.gymId !== selectedGymId && ex.gymId !== 'common' && selectedGymId !== 'common') return false; 
-    if (selectedCategories.length === 0) return true;
+    if (selectedCategories.length === 0) return false;
     return selectedCategories.includes(ex.category || 'その他');
   });
 
   const handleStart = () => {
     if (!selectedGymId) { alert("ジムを選択してください"); return; }
     onStart(selectedGymId);
-    if (workoutItems.length === 0 && availableExercises.length > 0) {
-       addExerciseItem(availableExercises[0].name);
+    if (workoutItems.length === 0) {
+       addExerciseItem('');
     }
   };
 
   const updateItem = (itemId, data) => { setWorkoutItems(prev => prev.map(item => item.id === itemId ? { ...item, ...data } : item)); };
   
   const addExerciseItem = (defaultName = '') => {
-    const defaultEx = availableExercises.find(ex => ex.name === defaultName) || (availableExercises.length > 0 ? availableExercises[0] : null);
+    const defaultEx = availableExercises.find(ex => ex.name === defaultName);
     const isCardio = defaultEx ? defaultEx.weightType === 'cardio' : false;
     const newItem = { 
       id: generateId(), 
@@ -1878,7 +1885,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
           <button onClick={handleStart} className="w-full py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all shadow-md bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30 mb-3">
             <Play fill="currentColor" size={20} /> トレーニング開始
           </button>
-          <button onClick={() => {setIsManual(true); if(workoutItems.length === 0 && availableExercises.length > 0) addExerciseItem(availableExercises[0].name);}} className="w-full py-3 rounded-xl font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center gap-2 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-all">
+          <button onClick={() => {setIsManual(true); if(workoutItems.length === 0) addExerciseItem('');}} className="w-full py-3 rounded-xl font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center gap-2 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-all">
             <CalendarIcon size={18} /> 過去の記録を追加
           </button>
         </div>
@@ -1928,64 +1935,65 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
 
       <h2 className="text-lg font-bold text-slate-900 dark:text-white mt-6 mb-2">{isManual ? '記録内容' : 'ワークアウト中'}</h2>
 
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+      <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-6">
         {MUSCLE_CATEGORIES.map(cat => {
           const isSelected = selectedCategories.includes(cat);
-          return <button key={cat} onClick={() => toggleCategory(cat)} className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${getCategoryTabColor(cat, isSelected)}`}>{cat}</button>;
+          return <button key={cat} onClick={() => toggleCategory(cat)} className={`py-2.5 px-1 rounded-xl text-sm font-bold transition-all border ${getCategoryTabColor(cat, isSelected)}`}>{cat}</button>;
         })}
       </div>
 
-      {availableExercises.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-center shadow-sm">
-          <p className="text-slate-500 dark:text-slate-400 mb-2 text-sm font-bold">該当する種目がありません。</p><p className="text-slate-400 dark:text-slate-500 text-xs font-bold">「種目」タブから追加してください。</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {workoutItems.map((item, index) => (
-             <WorkoutItemForm 
-               key={item.id} 
-               item={item} 
-               index={index}
-               isFirst={index === 0}
-               isLast={index === workoutItems.length - 1}
-               availableExercises={availableExercises} 
-               updateItem={updateItem} 
-               removeItem={removeExerciseItem}
-               moveItemUp={moveItemUp}
-               moveItemDown={moveItemDown}
-               addSet={addSet} 
-               removeSet={removeSet} 
-               updateSet={updateSetField} 
-               addDropSet={addDropSet} 
-               removeDropSet={removeDropSet} 
-               updateDropSet={updateDropSetField}
-               myPastPosts={myPastPosts}
-             />
-          ))}
-
-          <button onClick={() => addExerciseItem()} className="w-full py-4 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border border-slate-200 dark:border-slate-800"><ListPlus size={18} /> 次の種目を追加</button>
-
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm mt-6">
-            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2"><Activity size={16} /> 本日の体組成（任意）</h3>
-            <div className="flex gap-4">
-              <div className="flex-1 relative">
-                <input type="number" inputMode="decimal" step="0.1" value={bodyWeight} onChange={(e) => setBodyWeight(e.target.value)} placeholder="体重" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }}/>
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">kg</span>
-              </div>
-              <div className="flex-1 relative">
-                <input type="number" inputMode="decimal" step="0.1" value={bodyFat} onChange={(e) => setBodyFat(e.target.value)} placeholder="体脂肪率" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }}/>
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">%</span>
-              </div>
-            </div>
-          </div>
-
-          <button onClick={handleSubmit} disabled={isSubmitting || workoutItems.length === 0} className={`w-full text-white font-bold py-4 rounded-xl shadow-md flex items-center justify-center gap-2 mt-6 mb-8 transition-all ${isSubmitting || workoutItems.length === 0 ? 'bg-slate-300 dark:bg-slate-800 cursor-not-allowed text-slate-500 dark:text-slate-400' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30'}`}>
-            {isSubmitting ? <Activity className="animate-spin" size={20} /> : <><Flame size={20} /> トレーニングを完了して保存</>}
-          </button>
-          
-          <button onClick={handleCancel} className="w-full text-slate-500 dark:text-slate-400 font-bold py-3 rounded-xl flex items-center justify-center gap-2 mt-2 mb-8 transition-all bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:text-rose-500 hover:border-rose-200 dark:hover:border-rose-800">記録を破棄して終了</button>
+      {selectedCategories.length > 0 && availableExercises.length === 0 && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-center shadow-sm mb-4">
+          <p className="text-slate-500 dark:text-slate-400 mb-2 text-sm font-bold">この部位に該当する種目がありません。</p>
+          <p className="text-slate-400 dark:text-slate-500 text-xs font-bold">「種目」タブから追加してください。</p>
         </div>
       )}
+
+      <div className="space-y-4">
+        {workoutItems.map((item, index) => (
+           <WorkoutItemForm 
+             key={item.id} 
+             item={item} 
+             index={index}
+             isFirst={index === 0}
+             isLast={index === workoutItems.length - 1}
+             availableExercises={availableExercises} 
+             updateItem={updateItem} 
+             removeItem={removeExerciseItem}
+             moveItemUp={moveItemUp}
+             moveItemDown={moveItemDown}
+             addSet={addSet} 
+             removeSet={removeSet} 
+             updateSet={updateSetField} 
+             addDropSet={addDropSet} 
+             removeDropSet={removeDropSet} 
+             updateDropSet={updateDropSetField}
+             myPastPosts={myPastPosts}
+           />
+        ))}
+
+        <button onClick={() => addExerciseItem()} className="w-full py-4 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border border-slate-200 dark:border-slate-800"><ListPlus size={18} /> 次の種目を追加</button>
+
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm mt-6">
+          <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2"><Activity size={16} /> 本日の体組成（任意）</h3>
+          <div className="flex gap-4">
+            <div className="flex-1 relative">
+              <input type="number" inputMode="decimal" step="0.1" value={bodyWeight} onChange={(e) => setBodyWeight(e.target.value)} placeholder="体重" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }}/>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">kg</span>
+            </div>
+            <div className="flex-1 relative">
+              <input type="number" inputMode="decimal" step="0.1" value={bodyFat} onChange={(e) => setBodyFat(e.target.value)} placeholder="体脂肪率" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }}/>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">%</span>
+            </div>
+          </div>
+        </div>
+
+        <button onClick={handleSubmit} disabled={isSubmitting || workoutItems.length === 0} className={`w-full text-white font-bold py-4 rounded-xl shadow-md flex items-center justify-center gap-2 mt-6 mb-8 transition-all ${isSubmitting || workoutItems.length === 0 ? 'bg-slate-300 dark:bg-slate-800 cursor-not-allowed text-slate-500 dark:text-slate-400' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30'}`}>
+          {isSubmitting ? <Activity className="animate-spin" size={20} /> : <><Flame size={20} /> トレーニングを完了して保存</>}
+        </button>
+        
+        <button onClick={handleCancel} className="w-full text-slate-500 dark:text-slate-400 font-bold py-3 rounded-xl flex items-center justify-center gap-2 mt-2 mb-8 transition-all bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:text-rose-500 hover:border-rose-200 dark:hover:border-rose-800">記録を破棄して終了</button>
+      </div>
     </div>
   );
 }
