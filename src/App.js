@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award } from 'lucide-react';
+import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Contrast } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence } from 'firebase/firestore';
@@ -1103,10 +1103,25 @@ export default function App() {
   const partnerInfo = accountsInfo[partnerName];
   const partnerIsTraining = partnerInfo?.isTraining || false;
   const isSameGym = Boolean(myInfo.isTraining && partnerIsTraining && myInfo.currentGymId && partnerInfo?.currentGymId && (myInfo.currentGymId === partnerInfo.currentGymId));
-  const isDarkMode = myInfo.theme === 'dark';
+  
+  const isDarkMode = ['dark', 'ocean', 'mono'].includes(myInfo.theme);
+  const themeContainerClass = myInfo.theme === 'ocean' ? 'theme-ocean' : myInfo.theme === 'mono' ? 'theme-mono grayscale' : '';
 
   return (
-    <div className={`min-h-screen font-sans pb-32 overflow-x-hidden selection:bg-emerald-200 transition-colors duration-300 ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
+    <div className={`min-h-screen font-sans pb-32 overflow-x-hidden selection:bg-emerald-200 transition-colors duration-300 ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'} ${themeContainerClass}`}>
+      {myInfo.theme === 'ocean' && (
+        <style>{`
+          .theme-ocean.dark, .theme-ocean .bg-slate-950 { background-color: #021526 !important; }
+          .theme-ocean .bg-slate-900 { background-color: #032a4a !important; }
+          .theme-ocean .border-slate-800 { border-color: #0c4a6e !important; }
+          .theme-ocean .text-emerald-500, .theme-ocean .text-emerald-400 { color: #38bdf8 !important; }
+          .theme-ocean .bg-emerald-500 { background-color: #0284c7 !important; }
+          .theme-ocean .border-emerald-500 { border-color: #0284c7 !important; }
+          .theme-ocean .ring-emerald-500 { --tw-ring-color: #0284c7 !important; }
+          .theme-ocean .shadow-emerald-500\\/30 { --tw-shadow-color: rgba(2, 132, 199, 0.3) !important; --tw-shadow: var(--tw-shadow-colored) !important; }
+          .theme-ocean .text-slate-400 { color: #7dd3fc !important; }
+        `}</style>
+      )}
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20 shadow-sm flex flex-col transition-colors">
         {isSameGym && (
           <div className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-4 py-2 flex items-center justify-center gap-2 text-white text-xs font-bold animate-pulse shadow-inner">
@@ -1276,9 +1291,11 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser }) {
           
           <div>
              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">テーマ設定</label>
-             <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
-               <button onClick={() => setTheme('light')} className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-bold rounded-lg transition-colors ${theme === 'light' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}><Sun size={16}/> ライト</button>
-               <button onClick={() => setTheme('dark')} className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-bold rounded-lg transition-colors ${theme === 'dark' ? 'bg-slate-900 dark:bg-slate-950 text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}><Moon size={16}/> ダーク</button>
+             <div className="grid grid-cols-2 gap-2 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
+               <button onClick={() => setTheme('light')} className={`flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-colors ${theme === 'light' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}><Sun size={16}/> ライト</button>
+               <button onClick={() => setTheme('dark')} className={`flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-colors ${theme === 'dark' ? 'bg-slate-900 dark:bg-slate-950 text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}><Moon size={16}/> ダーク</button>
+               <button onClick={() => setTheme('ocean')} className={`flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-colors ${theme === 'ocean' ? 'bg-[#0a2e4a] text-[#38bdf8] shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}><Droplet size={16}/> オーシャン</button>
+               <button onClick={() => setTheme('mono')} className={`flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-lg transition-colors ${theme === 'mono' ? 'bg-zinc-800 text-zinc-300 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}><Contrast size={16}/> モノクロ</button>
              </div>
           </div>
         </div>
@@ -1543,15 +1560,24 @@ function BodyCompositionInfo({ info, dailyCalories = 0, dateLabel = '' }) {
   const bmr = getBMR(info.weight, info.height, age, info.gender);
   const totalCalories = bmr + dailyCalories;
   
-  let ffmiBlock = null;
+  let advancedStatsBlock = null;
   if (info.weight && info.height && info.gender && info.lastFat) {
       const ffmi = getFFMI(info.weight, info.lastFat, info.height);
       const evalText = getFFMIEval(ffmi, info.gender);
-      ffmiBlock = (
-         <div className="flex-1 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900 rounded-xl p-3">
-            <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold mb-1">FFMI (徐脂肪量指数)</p>
-            <p className="text-lg font-bold text-indigo-700 dark:text-indigo-300">{ffmi.toFixed(1)} <span className="text-xs font-normal">({evalText})</span></p>
-            <p className="text-[9px] text-indigo-500 dark:text-indigo-500 mt-1">※筋肉量の指標。男性20、女性16以上で優秀です。</p>
+      const leanBodyMass = info.weight * (1 - (info.lastFat / 100));
+
+      advancedStatsBlock = (
+         <div className="flex gap-2 sm:gap-3 w-full">
+            <div className="flex-1 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900 rounded-xl p-3 flex flex-col">
+               <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold mb-1">FFMI (除脂肪量指数)</p>
+               <p className="text-lg font-bold text-indigo-700 dark:text-indigo-300">{ffmi.toFixed(1)} <span className="text-xs font-normal">({evalText})</span></p>
+               <p className="text-[9px] text-indigo-500 dark:text-indigo-500 mt-auto pt-1">※男性20、女性16以上で優秀</p>
+            </div>
+            <div className="flex-1 bg-cyan-50 dark:bg-cyan-950/50 border border-cyan-100 dark:border-cyan-900 rounded-xl p-3 flex flex-col">
+               <p className="text-[10px] text-cyan-600 dark:text-cyan-400 font-bold mb-1">除脂肪体重 (LBM)</p>
+               <p className="text-lg font-bold text-cyan-700 dark:text-cyan-300">{leanBodyMass.toFixed(1)} <span className="text-xs font-normal">kg</span></p>
+               <p className="text-[9px] text-cyan-500 dark:text-cyan-500 mt-auto pt-1">※筋肉・骨・内臓などの総重量</p>
+            </div>
          </div>
       );
   }
@@ -1572,9 +1598,9 @@ function BodyCompositionInfo({ info, dailyCalories = 0, dateLabel = '' }) {
               <p className="text-sm sm:text-base font-bold text-rose-700 dark:text-rose-300">{totalCalories.toLocaleString()} <span className="text-[9px] sm:text-[10px] font-normal">kcal</span></p>
            </div>
         </div>
-        {ffmiBlock && (
+        {advancedStatsBlock && (
            <div className="flex w-full">
-              {ffmiBlock}
+              {advancedStatsBlock}
            </div>
         )}
      </div>
