@@ -153,9 +153,9 @@ const calcSetVolume = (set, wType, userWeight) => {
   if (wType === 'cardio') return 0;
   let v = 0;
   const w = Number(set.weight) || 0;
-  const r = Number(set.reps) || 0;
   const l = Number(set.lReps) || 0;
   const rR = Number(set.rReps) || 0;
+  const r = Number(set.reps) || Math.max(l, rR);
   const f = Number(set.forcedReps) || 0;
 
   if (wType === 'lr') {
@@ -177,16 +177,16 @@ const calculateWorkoutTotals = (items, durationMs, bodyWeight) => {
   let totalVolume = 0;
   let cardioKcal = 0;
   let cardioTimeMin = 0;
-  const baseWeight = bodyWeight || 60;
+  const baseWeight = Number(bodyWeight) || 60;
 
   let effectiveDuration = durationMs;
   if (!effectiveDuration || isNaN(effectiveDuration) || effectiveDuration <= 0) {
      let totalSets = 0;
-     items.forEach(i => totalSets += (i.sets?.length || 0));
+     (items || []).forEach(i => totalSets += (i.sets?.length || 0));
      effectiveDuration = totalSets * 3 * 60000;
   }
 
-  const processedItems = items.map(item => {
+  const processedItems = (items || []).map(item => {
     let itemVolume = 0;
     if (item.sets && Array.isArray(item.sets)) {
       item.sets.forEach(set => {
@@ -284,15 +284,15 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
   const authorInfo = accountsInfo && accountsInfo[post.author];
   const userColor = post.author === '勇太' ? 'bg-indigo-500' : 'bg-rose-500';
 
-  const baseWeight = post.bodyWeight || authorInfo?.weight || 60;
+  const baseWeight = Number(post.bodyWeight) || Number(authorInfo?.weight) || 60;
   const { processedItems, totalVolume, totalCalories } = useMemo(() => {
       return calculateWorkoutTotals(post.items || [], post.duration, baseWeight);
   }, [post.items, post.duration, baseWeight]);
 
   const displayVolumeCalc = (post.volume && post.volume > 0) ? post.volume : totalVolume;
   const displayCalories = (post.calories && post.calories > 0) ? post.calories : totalCalories;
-  const displayItems = processedItems;
-  const categories = Array.from(new Set(displayItems.map(item => item.category).filter(Boolean)));
+  const displaySets = post.totalSets || processedItems.reduce((acc, it) => acc + (it.sets?.length || 0), 0);
+  const categories = Array.from(new Set(processedItems.map(item => item.category).filter(Boolean)));
 
   const renderSetRow = (setObj, wType, type, isDrop, label) => {
     const isLR = wType === 'lr';
@@ -315,10 +315,10 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
       return (
         <div className={`flex justify-between items-center border-b border-slate-200/50 dark:border-slate-800/50 pb-2 pt-2 last:border-0 ${isDrop ? 'pl-8' : ''}`}>
           <span className="font-bold w-16 text-sm shrink-0 text-slate-500 dark:text-slate-400">{label}</span>
-          <div className="flex-1 flex justify-end items-center px-1 gap-3">
-             {distance && <span className="font-bold text-slate-800 dark:text-slate-100">{distance}<span className="text-xs font-normal text-slate-400 ml-0.5">km</span></span>}
-             {time && <span className="font-bold text-slate-800 dark:text-slate-100">{time}<span className="text-xs font-normal text-slate-400 ml-0.5">分</span></span>}
-             {calories && <span className="font-bold text-slate-800 dark:text-slate-100">{calories}<span className="text-xs font-normal text-slate-400 ml-0.5">kcal</span></span>}
+          <div className="flex-1 flex justify-end items-center px-1 gap-3 overflow-hidden">
+             {distance && <span className="font-bold text-slate-800 dark:text-slate-100 truncate">{distance}<span className="text-xs font-normal text-slate-400 ml-0.5">km</span></span>}
+             {time && <span className="font-bold text-slate-800 dark:text-slate-100 truncate">{time}<span className="text-xs font-normal text-slate-400 ml-0.5">分</span></span>}
+             {calories && <span className="font-bold text-slate-800 dark:text-slate-100 truncate">{calories}<span className="text-xs font-normal text-slate-400 ml-0.5">kcal</span></span>}
           </div>
         </div>
       );
@@ -342,8 +342,8 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
     if (isPlate) weightLabel = '枚';
     else if (wType === 'oneSide') weightLabel = 'kg(片)';
     else if (isBodyWeight) {
-      if (Number(weight) < 0) { displayWeight = weight; weightLabel = 'kg(アシスト)'; } 
-      else if (Number(weight) > 0) { displayWeight = `+${weight}`; weightLabel = 'kg(加重)'; } 
+      if (Number(weight) < 0) { displayWeight = weight; weightLabel = 'kg'; } 
+      else if (Number(weight) > 0) { displayWeight = `+${weight}`; weightLabel = 'kg'; } 
       else { displayWeight = '自重'; weightLabel = ''; }
     }
 
@@ -354,22 +354,22 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
         </span>
         {isLR ? (
            <div className="flex-1 flex justify-between items-center px-1 gap-2 min-w-0">
-             <span className="font-bold text-base tracking-wide text-slate-800 dark:text-slate-100 text-center flex-1 flex flex-col items-center min-w-0">
-               <span className="truncate w-full">{displayWeight}{weightLabel && <span className="text-xs font-normal text-slate-400 ml-0.5">{weightLabel}</span>}</span>
+             <span className="font-bold text-base tracking-wide text-slate-800 dark:text-slate-100 flex-1 min-w-0 flex flex-col items-center">
+               <span className="truncate w-full text-center">{displayWeight}{weightLabel && <span className="text-xs font-normal text-slate-400 ml-0.5">{weightLabel}</span>}</span>
                {prBadgeWeight}
              </span>
-             <span className="font-bold text-sm sm:text-base tracking-wide text-slate-800 dark:text-slate-100 shrink-0 flex flex-col items-end whitespace-nowrap">
+             <span className="font-bold text-sm sm:text-base tracking-wide text-slate-800 dark:text-slate-100 shrink-0 whitespace-nowrap flex flex-col items-end">
                <span>L:{lReps || 0} <span className="text-slate-300 dark:text-slate-600 font-normal mx-0.5">/</span> R:{rReps || 0}<span className="text-xs font-normal text-slate-400 ml-0.5">回</span>{forced}</span>
                {prBadgeReps}
              </span>
            </div>
         ) : (
            <div className="flex-1 flex justify-between items-center px-1 gap-2 min-w-0">
-             <span className="font-bold text-base tracking-wide text-slate-800 dark:text-slate-100 text-center flex-1 flex flex-col items-center min-w-0">
-               <span className="truncate w-full">{displayWeight}{weightLabel && <span className="text-xs font-normal text-slate-400 ml-1">{weightLabel}</span>}</span>
+             <span className="font-bold text-base tracking-wide text-slate-800 dark:text-slate-100 flex-1 min-w-0 flex flex-col items-center">
+               <span className="truncate w-full text-center">{displayWeight}{weightLabel && <span className="text-xs font-normal text-slate-400 ml-1">{weightLabel}</span>}</span>
                {prBadgeWeight}
              </span>
-             <span className="font-bold text-base tracking-wide text-slate-800 dark:text-slate-100 shrink-0 flex flex-col items-end whitespace-nowrap">
+             <span className="font-bold text-base tracking-wide text-slate-800 dark:text-slate-100 shrink-0 whitespace-nowrap flex flex-col items-end">
                <span>{reps || 0} <span className="text-xs font-normal text-slate-400 ml-0.5">回</span>{forced}</span>
                {prBadgeReps}
              </span>
@@ -418,9 +418,9 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
             {post.bodyFat && `${post.bodyFat}%`}
           </div>
         )}
-        {post.totalSets > 0 && (
+        {displaySets > 0 && (
           <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700">
-             <ListPlus size={14} /> 計 {post.totalSets} Set
+             <ListPlus size={14} /> 計 {displaySets} Set
           </div>
         )}
       </div>
@@ -442,26 +442,26 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
       </div>
 
       <div className="pl-3 space-y-3 mb-4">
-        {displayItems.map((item, idx) => (
+        {processedItems.map((item, idx) => (
           <div key={idx} className="bg-slate-50 dark:bg-slate-950/50 rounded-xl p-3 border border-slate-100 dark:border-slate-800">
             <div className="flex items-center justify-between mb-3">
-              <div className="flex flex-col gap-1.5 flex-1">
+              <div className="flex flex-col gap-1.5 flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  {item.category === '有酸素' ? <Activity size={14} className="text-cyan-500"/> : <Dumbbell size={14} className="text-emerald-500" />}
-                  <span className="font-bold text-slate-800 dark:text-slate-100 text-[15px]">{item.exerciseName}</span>
-                  {item.category && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${getCategoryColor(item.category)}`}>{item.category}</span>}
-                  {item.itemVolume > 0 && <span className="text-xs font-bold text-slate-500 dark:text-slate-400 ml-auto">{item.itemVolume.toLocaleString()}kg</span>}
+                  {item.category === '有酸素' ? <Activity size={14} className="text-cyan-500 shrink-0"/> : <Dumbbell size={14} className="text-emerald-500 shrink-0" />}
+                  <span className="font-bold text-slate-800 dark:text-slate-100 text-[15px] truncate">{item.exerciseName}</span>
+                  {item.category && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${getCategoryColor(item.category)}`}>{item.category}</span>}
+                  {item.itemVolume > 0 && <span className="text-xs font-bold text-slate-500 dark:text-slate-400 ml-auto shrink-0">{item.itemVolume.toLocaleString()}kg</span>}
                 </div>
                 {item.isSuperSet && item.superExerciseName && (
                   <div className="flex items-center gap-2 flex-wrap pl-5">
-                    <Zap size={14} className="text-indigo-400"/>
-                    <span className="font-bold text-indigo-600 dark:text-indigo-400 text-sm">{item.superExerciseName}</span>
+                    <Zap size={14} className="text-indigo-400 shrink-0"/>
+                    <span className="font-bold text-indigo-600 dark:text-indigo-400 text-sm truncate">{item.superExerciseName}</span>
                   </div>
                 )}
                 {item.isSuperSet && item.superExerciseName3 && (
                   <div className="flex items-center gap-2 flex-wrap pl-5">
-                    <Zap size={14} className="text-indigo-400"/>
-                    <span className="font-bold text-indigo-600 dark:text-indigo-400 text-sm">{item.superExerciseName3}</span>
+                    <Zap size={14} className="text-indigo-400 shrink-0"/>
+                    <span className="font-bold text-indigo-600 dark:text-indigo-400 text-sm truncate">{item.superExerciseName3}</span>
                   </div>
                 )}
               </div>
@@ -865,7 +865,7 @@ export default function App() {
     
     const startTime = manualStart || myInfo?.trainingStartTime || Date.now();
     const endTime = manualEnd || Date.now();
-    const duration = endTime - startTime > 0 ? endTime - startTime : 3600000;
+    const duration = Math.max(0, endTime - startTime) || 3600000;
     const timestamp = manualEnd || Date.now();
     const dateIso = new Date(timestamp).toISOString();
     
@@ -949,10 +949,10 @@ export default function App() {
        }
     }
 
-    const newItems = post.items.map(item => ({
+    const newItems = (post.items || []).map(item => ({
       ...item,
       id: generateId(),
-      sets: item.sets.map(set => ({ 
+      sets: (item.sets || []).map(set => ({ 
          ...set, 
          id: generateId(),
          dropSets: set.dropSets ? set.dropSets.map(ds => ({ ...ds, id: generateId() })) : [] 
@@ -1577,7 +1577,8 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const [manualEndTime, setManualEndTime] = useState("13:00");
 
   const isTraining = myInfo.isTraining;
-  const myPastPosts = posts.filter(p => p.author === myInfo.name || p.author === myInfo.userId || p.author === (myInfo.gender === 'male' ? '勇太' : '未来')); 
+  const currentUser = myInfo.name || myInfo.userId; // 過去の記録PR検索用
+  const myPastPosts = posts.filter(p => p.author === currentUser);
 
   const availableExercises = exercises.filter(ex => {
     if (ex.gymId !== selectedGymId && ex.gymId !== 'common' && selectedGymId !== 'common') return false; 
