@@ -1644,7 +1644,7 @@ function BodyCompositionInfo({ info, dailyCalories = 0, dateLabel = '' }) {
   );
 }
 
-// --- データ画面 (カレンダー・グラフ・レポート) ---
+/// --- データ画面 (カレンダー・グラフ・レポート) ---
 function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDelete, onImport }) {
   const myPosts = posts ? posts.filter(p => p.author === currentUser) : [];
   const partnerPosts = posts ? posts.filter(p => p.author === partnerName) : [];
@@ -1688,22 +1688,24 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
   const weightData = myPosts.filter(p => p.bodyWeight && !isNaN(p.bodyWeight)).map(p => ({ date: p.date, value: Number(p.bodyWeight) })).reverse();
   const fatData = myPosts.filter(p => p.bodyFat && !isNaN(p.bodyFat)).map(p => ({ date: p.date, value: Number(p.bodyFat) })).reverse();
 
-  // ★選択したタブ（自分/相手）の投稿だけを抽出
+  // 選択した日付・タブ（自分/相手）のトレーニング記録
   const selectedPosts = posts.filter(p => p.author === postsTab && formatDateFromTimestamp(p.timestamp) === selectedDateStr);
 
-  const currentTabUserInfo = accountsInfo[postsTab] || {};
-  const currentTabPosts = postsTab === currentUser ? myPosts : partnerPosts;
-  const lastFatPost = currentTabPosts.find(p => p.bodyFat);
-  const compositionInfo = { ...currentTabUserInfo, lastFat: lastFatPost ? lastFatPost.bodyFat : null };
+  // 一番上の体組成データおよび消費カロリーは、下のタブに関わらず常に自分（currentUser）のデータに固定
+  const myUserInfo = accountsInfo[currentUser] || {};
+  const lastMyFatPost = myPosts.find(p => p.bodyFat);
+  const myCompositionInfo = { ...myUserInfo, lastFat: lastMyFatPost ? lastMyFatPost.bodyFat : null };
 
-  const dailyCalories = selectedPosts.reduce((sum, p) => sum + (Number(p.calories) || 0), 0);
+  const mySelectedPosts = myPosts.filter(p => formatDateFromTimestamp(p.timestamp) === selectedDateStr);
+  const myDailyCalories = mySelectedPosts.reduce((sum, p) => sum + (Number(p.calories) || 0), 0);
+  
   const dateLabel = selectedDateStr ? selectedDateStr.substring(5).replace('-', '/') : '';
 
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">データ</h2>
       
-      <BodyCompositionInfo info={compositionInfo} dailyCalories={dailyCalories} dateLabel={dateLabel} />
+      <BodyCompositionInfo info={myCompositionInfo} dailyCalories={myDailyCalories} dateLabel={dateLabel} />
 
       <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <div className="flex justify-between items-center mb-4">
@@ -2476,8 +2478,6 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
         </div>
       </div>
 
-      <BodyCompositionInfo info={partnerCompositionInfo} dailyCalories={partnerDailyCalories} dateLabel={dateLabel} />
-
       <div className="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
          <div className="absolute top-2 right-2 text-white/20"><Trophy size={80}/></div>
          <div className="relative z-10">
@@ -2504,6 +2504,11 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       <div className="mt-8">
          <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">{partnerName}の月間レポート ({currentMonth + 1}月)</h3>
          <MonthlyReport monthDate={new Date(currentYear, currentMonth, 1)} posts={posts} userName={partnerName} accountsInfo={accountsInfo} />
+      </div>
+
+      <div className="mt-8">
+         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">基礎代謝・体組成データ</h3>
+         <BodyCompositionInfo info={partnerCompositionInfo} dailyCalories={partnerDailyCalories} dateLabel={dateLabel} />
       </div>
 
       <div className="space-y-6 pt-8">
@@ -2535,7 +2540,6 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
     </div>
   );
 }
-
 // --- ナビゲーションボタン ---
 function NavButton({ icon, label, isActive, onClick, isPrimary, isTraining }) {
   if (isPrimary) {
