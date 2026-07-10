@@ -1193,7 +1193,7 @@ export default function App() {
 
       <main className="p-4 max-w-md mx-auto w-full pb-40">
         {currentTab === 'timeline' && <TimelineView posts={posts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} />}
-        {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} />}
+        {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={posts} accountsInfo={accountsInfo} />}
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} posts={posts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} partnerName={partnerName} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
         {currentTab === 'friends' && <FriendsView partnerName={partnerName} partnerInfo={partnerInfo} currentUser={currentUser} posts={posts} accountsInfo={accountsInfo} />}
@@ -2188,7 +2188,7 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
 }
 
 // --- 種目・ジム管理画面 ---
-function ExercisesView({ gyms, exercises }) {
+function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
   const [activeTab, setActiveTab] = useState('exercises'); 
   const [newGymName, setNewGymName] = useState('');
   const [selectedGymId, setSelectedGymId] = useState(gyms.length > 0 ? gyms[0].id : '');
@@ -2201,6 +2201,7 @@ function ExercisesView({ gyms, exercises }) {
   const [isAdding, setIsAdding] = useState(false);
 
   const [editingExId, setEditingExId] = useState(null);
+  const [editingExOldName, setEditingExOldName] = useState('');
   const [editExName, setEditExName] = useState('');
   const [editExMaker, setEditExMaker] = useState('');
   const [editExWeightType, setEditExWeightType] = useState('total'); 
@@ -2233,13 +2234,69 @@ function ExercisesView({ gyms, exercises }) {
     setIsAdding(false);
   };
 
-  const startEdit = (ex) => { setEditingExId(ex.id); setEditExName(ex.name); setEditExMaker(ex.maker || ''); setEditExWeightType(ex.weightType || 'total'); setEditExCategory(ex.category || 'その他'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-  const cancelEdit = () => { setEditingExId(null); };
+  const startEdit = (ex) => { setEditingExId(ex.id); setEditingExOldName(ex.name); setEditExName(ex.name); setEditExMaker(ex.maker || ''); setEditExWeightType(ex.weightType || 'total'); setEditExCategory(ex.category || 'その他'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const cancelEdit = () => { setEditingExId(null); setEditingExOldName(''); };
 
   const handleUpdateExercise = async (e) => {
     e.preventDefault();
     if (!editExName.trim()) return;
-    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', editingExId), { name: editExName.trim(), maker: editExMaker.trim(), weightType: editExWeightType, category: editExCategory }, { merge: true }); setEditingExId(null); } catch (e) {}
+    try { 
+      // 種目マスターデータの更新
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', editingExId), { name: editExName.trim(), maker: editExMaker.trim(), weightType: editExWeightType, category: editExCategory }, { merge: true }); 
+
+      // 過去の投稿を一括更新（種目名・カテゴリ・重量タイプの変更を反映）
+      if (posts && posts.length > 0) {
+        const postsToUpdate = posts.filter(post => {
+          if (!post.items) return false;
+          return post.items.some(item => 
+            item.exerciseName === editingExOldName || 
+            item.superExerciseName === editingExOldName || 
+            item.superExerciseName3 === editingExOldName
+          );
+        });
+
+        if (postsToUpdate.length > 0) {
+          const updatePromises = postsToUpdate.map(async (post) => {
+            const updatedItems = post.items.map(item => {
+              let newItem = { ...item };
+              if (newItem.exerciseName === editingExOldName) {
+                newItem.exerciseName = editExName.trim();
+                newItem.category = editExCategory;
+                newItem.weightType = editExWeightType;
+              }
+              if (newItem.isSuperSet && newItem.superExerciseName === editingExOldName) {
+                newItem.superExerciseName = editExName.trim();
+                newItem.superWeightType = editExWeightType;
+              }
+              if (newItem.isSuperSet && newItem.superExerciseName3 === editingExOldName) {
+                newItem.superExerciseName3 = editExName.trim();
+                newItem.superWeightType3 = editExWeightType;
+              }
+              return newItem;
+            });
+
+            // 変更後の重量タイプに基づいてボリューム・カロリー・セット数を再計算
+            const baseWeight = Number(post.bodyWeight) || Number(accountsInfo[post.author]?.weight) || 60;
+            const { processedItems, totalVolume, totalCalories } = calculateWorkoutTotals(updatedItems, post.duration, baseWeight);
+            const totalSets = processedItems.reduce((acc, it) => acc + (it.sets?.length || 0), 0);
+
+            return setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', post.id), {
+              items: processedItems,
+              volume: totalVolume,
+              calories: totalCalories,
+              totalSets: totalSets
+            }, { merge: true });
+          });
+          
+          await Promise.all(updatePromises);
+        }
+      }
+
+      setEditingExId(null); 
+      setEditingExOldName(''); 
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const handleDelete = async (collectionName, id) => {
@@ -2321,7 +2378,7 @@ function ExercisesView({ gyms, exercises }) {
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'plate' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="plate" checked={editExWeightType === 'plate'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>20kgプレート (枚)</label>
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'lr' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="lr" checked={editExWeightType === 'lr'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>片側種目 (kg)</label>
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'bodyWeight' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="bodyWeight" checked={editExWeightType === 'bodyWeight'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>自重種目(+kg,-kg)</label>
-                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'cardio' ? 'bg-cyan-500 text-white border-cyan-600' : 'bg-white dark:bg-slate-900 border-cyan-200 dark:border-cyan-800 text-cyan-600 dark:text-cyan-300'}`}><input type="radio" value="cardio" checked={editExWeightType === 'cardio'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>有酸素(距離/時間/kcal)</label>
+                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'cardio' ? 'bg-cyan-500 text-white border-cyan-600' : 'bg-white dark:bg-slate-900 border-cyan-200 dark:border-cyan-800 text-cyan-600 dark:text-slate-300'}`}><input type="radio" value="cardio" checked={editExWeightType === 'cardio'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>有酸素(距離/時間/kcal)</label>
                        </div>
                     </div>
                     <button type="submit" disabled={!editExName.trim()} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded-xl mt-2 transition-colors disabled:opacity-50 shadow-md">更新して保存</button>
@@ -2411,7 +2468,6 @@ function ExercisesView({ gyms, exercises }) {
     </div>
   );
 }
-
 // --- パートナー画面 ---
 function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInfo }) {
   const isTraining = partnerInfo?.isTraining;
