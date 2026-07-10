@@ -1039,20 +1039,6 @@ export default function App() {
     } catch (e) {}
   };
 
-    const { processedItems, totalVolume, totalCalories } = calculateWorkoutTotals(workoutItems, duration, bodyWeight || myInfo?.weight);
-    const totalSets = processedItems.reduce((acc, it) => acc + (it.sets?.length || 0), 0);
-
-    const newDocId = `workout_${generateId()}`;
-    try {
-      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', newDocId), {
-        author: currentUser, gymName, items: processedItems, timestamp: timestamp, startTime, endTime, duration, date: dateIso, likes: 0, likedByMe: false, bodyWeight: bodyWeight || null, bodyFat: bodyFat || null, volume: totalVolume, calories: totalCalories, totalSets: totalSets
-      });
-      if (!manualStart) {
-        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now() }, { merge: true });
-      }
-      setDraftWorkoutItems([]); setCurrentTab('timeline');
-    } catch (e) {}
-  };
 
   const handleUpdateWorkout = async (postId, updatedData) => {
     if (!currentUser || !db) return;
