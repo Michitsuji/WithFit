@@ -1698,13 +1698,13 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   };
 
   const handleCancel = () => {
-     if (isManual) {
-        setDraftWorkoutItems([]);
-        setIsManual(false);
-     } else {
-        onCancel();
-     }
-  };
+      if (isManual) {
+          setWorkoutItems([]); // setDraftWorkoutItems から setWorkoutItems に修正
+          setIsManual(false);
+      } else {
+          onCancel();
+      }
+    };
 
   const toggleCategory = (cat) => setSelectedCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]);
 
