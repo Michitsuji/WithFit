@@ -627,8 +627,11 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
             <button onClick={() => moveItemDown(index)} disabled={isLast} className="p-1 text-slate-400 hover:text-emerald-500 disabled:opacity-30 bg-slate-50 dark:bg-slate-800 rounded transition-colors"><ArrowDown size={14}/></button>
           </div>
           <div className="relative flex-1 min-w-0 ml-1">
-            <select value={item.exerciseName} onChange={(e) => updateExerciseName(e.target.value, 0)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base pr-8" style={{ fontSize: '16px' }}>
+            <select value={item.exerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, 0)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base pr-8" style={{ fontSize: '16px' }}>
               <option value="" disabled>種目を選択</option>
+              {item.exerciseName && !availableExercises.some(ex => ex.name === item.exerciseName) && (
+                <option value={item.exerciseName}>{item.exerciseName}</option>
+              )}
               {availableExercises.map(ex => <option key={ex.id} value={ex.name}>{ex.name}{ex.maker ? `（${ex.maker}）` : ''}</option>)}
             </select>
             <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
@@ -666,6 +669,9 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
           <div className="relative w-full">
             <select value={item.superExerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, 2)} className="w-full bg-indigo-50/30 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold appearance-none focus:outline-none focus:border-indigo-500 text-base pr-8" style={{ fontSize: '16px' }}>
               <option value="" disabled>スーパーセットの種目 (2種目目)</option>
+              {item.superExerciseName && !availableExercises.some(ex => ex.name === item.superExerciseName) && (
+                <option value={item.superExerciseName}>{item.superExerciseName}</option>
+              )}
               {availableExercises.filter(ex => ex.weightType !== 'cardio').map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
             </select>
             <div className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-300 pointer-events-none text-xs">▼</div>
@@ -674,6 +680,9 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
             <div className="relative w-full">
               <select value={item.superExerciseName3 || ''} onChange={(e) => updateExerciseName(e.target.value, 3)} className="w-full bg-indigo-50/30 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold appearance-none focus:outline-none focus:border-indigo-500 text-base pr-8" style={{ fontSize: '16px' }}>
                 <option value="">ジャイアントセット (3種目目・任意)</option>
+                {item.superExerciseName3 && !availableExercises.some(ex => ex.name === item.superExerciseName3) && (
+                  <option value={item.superExerciseName3}>{item.superExerciseName3}</option>
+                )}
                 {availableExercises.filter(ex => ex.weightType !== 'cardio').map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
               </select>
               <div className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-300 pointer-events-none text-xs">▼</div>
@@ -1430,10 +1439,11 @@ function MonthlyReport({ monthDate, posts, userName, accountsInfo }) {
 }
 
 // --- 体組成バッジコンポーネント ---
-function BodyCompositionInfo({ info }) {
+function BodyCompositionInfo({ info, dailyCalories = 0, dateLabel = '' }) {
   if (!info.height || !info.weight || !info.birthDate) return null;
   const age = getAge(info.birthDate);
   const bmr = getBMR(info.weight, info.height, age, info.gender);
+  const totalCalories = bmr + dailyCalories;
   
   let ffmiBlock = null;
   if (info.weight && info.height && info.gender && info.lastFat) {
@@ -1449,13 +1459,26 @@ function BodyCompositionInfo({ info }) {
   }
 
   return (
-     <div className="flex gap-3 mb-6">
-        <div className="flex-1 bg-amber-50 dark:bg-amber-950/50 border border-amber-100 dark:border-amber-900 rounded-xl p-3">
-           <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold mb-1">基礎代謝 (BMR)</p>
-           <p className="text-lg font-bold text-amber-700 dark:text-amber-300">{bmr.toLocaleString()} <span className="text-xs font-normal">kcal/日</span></p>
-           <p className="text-[9px] text-amber-500 dark:text-amber-500 mt-1">※Mifflin-St Jeor式による推定値</p>
+     <div className="space-y-3 mb-6">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+           <div className="bg-amber-50 dark:bg-amber-950/50 border border-amber-100 dark:border-amber-900 rounded-xl p-2 flex flex-col justify-center">
+              <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold mb-0.5">基礎代謝</p>
+              <p className="text-sm sm:text-base font-bold text-amber-700 dark:text-amber-300">{bmr.toLocaleString()} <span className="text-[9px] sm:text-[10px] font-normal">kcal</span></p>
+           </div>
+           <div className="bg-orange-50 dark:bg-orange-950/50 border border-orange-100 dark:border-orange-900 rounded-xl p-2 flex flex-col justify-center">
+              <p className="text-[10px] text-orange-600 dark:text-orange-400 font-bold mb-0.5">運動消費 {dateLabel && <span className="font-normal opacity-80">({dateLabel})</span>}</p>
+              <p className="text-sm sm:text-base font-bold text-orange-700 dark:text-orange-300">{dailyCalories.toLocaleString()} <span className="text-[9px] sm:text-[10px] font-normal">kcal</span></p>
+           </div>
+           <div className="bg-rose-50 dark:bg-rose-950/50 border border-rose-100 dark:border-rose-900 rounded-xl p-2 flex flex-col justify-center">
+              <p className="text-[10px] text-rose-600 dark:text-rose-400 font-bold mb-0.5">合計</p>
+              <p className="text-sm sm:text-base font-bold text-rose-700 dark:text-rose-300">{totalCalories.toLocaleString()} <span className="text-[9px] sm:text-[10px] font-normal">kcal</span></p>
+           </div>
         </div>
-        {ffmiBlock}
+        {ffmiBlock && (
+           <div className="flex w-full">
+              {ffmiBlock}
+           </div>
+        )}
      </div>
   );
 }
@@ -1510,11 +1533,15 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
   const lastFatPost = myPosts.find(p => p.bodyFat);
   const compositionInfo = { ...myInfo, lastFat: lastFatPost ? lastFatPost.bodyFat : null };
 
+  const mySelectedPosts = posts.filter(p => p.author === currentUser && formatDateFromTimestamp(p.timestamp) === selectedDateStr);
+  const dailyCalories = mySelectedPosts.reduce((sum, p) => sum + (Number(p.calories) || 0), 0);
+  const dateLabel = selectedDateStr ? selectedDateStr.substring(5).replace('-', '/') : '';
+
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">データ</h2>
       
-      <BodyCompositionInfo info={compositionInfo} />
+      <BodyCompositionInfo info={compositionInfo} dailyCalories={dailyCalories} dateLabel={dateLabel} />
 
       <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <div className="flex justify-between items-center mb-4">
@@ -2220,6 +2247,11 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
   const lastPartnerFat = partnerPosts.find(p => p.bodyFat);
   const partnerCompositionInfo = { ...partnerInfo, lastFat: lastPartnerFat ? lastPartnerFat.bodyFat : null };
 
+  const todayStr = formatDateFromTimestamp(Date.now());
+  const todayPartnerPosts = partnerPosts.filter(p => formatDateFromTimestamp(p.timestamp) === todayStr);
+  const partnerDailyCalories = todayPartnerPosts.reduce((sum, p) => sum + (Number(p.calories) || 0), 0);
+  const dateLabel = todayStr.substring(5).replace('-', '/');
+
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">パートナー</h2>
@@ -2256,7 +2288,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
         </div>
       </div>
 
-      <BodyCompositionInfo info={partnerCompositionInfo} />
+      <BodyCompositionInfo info={partnerCompositionInfo} dailyCalories={partnerDailyCalories} dateLabel={dateLabel} />
 
       <div className="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
          <div className="absolute top-2 right-2 text-white/20"><Trophy size={80}/></div>
