@@ -142,6 +142,14 @@ const formatDateFromTimestamp = (timestamp) => {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 };
 
+const formatDateWithDay = (timestampOrDateStr) => {
+  if (!timestampOrDateStr) return '';
+  const date = new Date(timestampOrDateStr);
+  if (isNaN(date.getTime())) return '';
+  const days = ['日', '月', '火', '水', '木', '金', '土'];
+  return `${date.getMonth() + 1}/${date.getDate()}(${days[date.getDay()]})`;
+};
+
 const formatShortDateTime = (timestamp) => {
   if (!timestamp || isNaN(new Date(timestamp).getTime())) return '';
   const date = new Date(timestamp);
@@ -616,7 +624,7 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
               }
               
               if (foundSet) {
-                 const pDate = p.date ? p.date.substring(5).replace('-','/') : '';
+                 const pDate = formatDateWithDay(p.date);
                  if (wType === 'lr') {
                     const l = pastType === 'super2' ? foundSet.superLReps : pastType === 'super3' ? foundSet.superLReps3 : foundSet.lReps;
                     const r = pastType === 'super2' ? foundSet.superRReps : pastType === 'super3' ? foundSet.superRReps3 : foundSet.rReps;
@@ -705,7 +713,7 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
 
       {prevRecord && (
         <div className="mb-4 pl-8 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950/50 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
-          <span className="text-emerald-600 dark:text-emerald-400 mr-2 flex items-center inline-flex gap-1"><Clock size={12}/>前回 ({prevRecord.date.substring(5).replace('-','/')})</span>
+          <span className="text-emerald-600 dark:text-emerald-400 mr-2 flex items-center inline-flex gap-1"><Clock size={12}/>前回 ({formatDateWithDay(prevRecord.date)})</span>
           <div className="mt-1 flex flex-wrap gap-2">
             {prevRecord.sets.map((s, i) => (
                <span key={i} className="bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
