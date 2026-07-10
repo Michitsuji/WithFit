@@ -36,11 +36,11 @@ const MUSCLE_CATEGORIES = ['胸', '背中', '肩', '腕', '脚', 'その他'];
 // --- カラーユーティリティ ---
 const getCategoryColor = (category) => {
   switch (category) {
-    case '胸': return 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-400 border border-rose-200 dark:border-rose-900';
-    case '背中': return 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400 border border-blue-200 dark:border-blue-900';
-    case '肩': return 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400 border border-amber-200 dark:border-amber-900';
-    case '腕': return 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400 border border-purple-200 dark:border-purple-900';
-    case '脚': return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900';
+    case '胸': return 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-900';
+    case '背中': return 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-900';
+    case '肩': return 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-900';
+    case '腕': return 'bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400 border border-purple-200 dark:border-purple-900';
+    case '脚': return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900';
     default: return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700';
   }
 };
@@ -108,8 +108,6 @@ const formatShortDateTime = (timestamp) => {
 };
 
 const calcSetVolume = (weight, reps, lReps, rReps, forcedReps, wType) => {
-  if (wType === 'assist') return 0;
-
   let v = 0;
   const w = Number(weight) || 0;
   const r = Number(reps) || 0;
@@ -125,6 +123,10 @@ const calcSetVolume = (weight, reps, lReps, rReps, forcedReps, wType) => {
     v += w * (r + f) * 2;
   } else if (wType === 'plate') {
     v += w * (r + f) * 5;
+  } else if (wType === 'bodyWeight') {
+    if (w > 0) {
+      v += w * (r + f); // 加重分のみ総負荷量に加算
+    }
   } else {
     v += w * (r + f);
   }
@@ -215,12 +217,12 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
   const isMyPost = post.author === currentUser;
   const authorInfo = accountsInfo && accountsInfo[post.author];
   const userColor = post.author === '勇太' ? 'bg-indigo-500' : 'bg-rose-500';
+  const categories = Array.from(new Set((post.items || []).map(item => item.category).filter(Boolean)));
 
   const renderSetRow = (setObj, wType, type, isDrop, label) => {
     const isLR = wType === 'lr';
     const isPlate = wType === 'plate';
     const isBodyWeight = wType === 'bodyWeight';
-    const isAssist = wType === 'assist';
     
     const val = (f) => {
       let fieldName = f;
@@ -239,11 +241,23 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 
     const forced = forcedReps ? <span className="text-rose-500 text-xs ml-1">(+{forcedReps})</span> : null;
 
+    let displayWeight = weight || 0;
     let weightLabel = 'kg';
+    
     if (isPlate) weightLabel = '枚';
     else if (wType === 'oneSide') weightLabel = 'kg(片)';
-    else if (isBodyWeight) weightLabel = 'kg加重';
-    else if (isAssist) weightLabel = 'kgアシスト';
+    else if (isBodyWeight) {
+      if (Number(weight) < 0) {
+        displayWeight = weight;
+        weightLabel = 'kg(補助)';
+      } else if (Number(weight) > 0) {
+        displayWeight = `+${weight}`;
+        weightLabel = 'kg(加重)';
+      } else {
+        displayWeight = '自重';
+        weightLabel = '';
+      }
+    }
 
     return (
       <div className={`flex justify-between items-center border-b border-slate-200/50 dark:border-slate-800/50 pb-2 pt-2 last:border-0 ${isDrop ? 'pl-8' : ''}`}>
@@ -253,7 +267,8 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
         {isLR ? (
            <div className="flex-1 flex justify-between items-center px-1 gap-2 overflow-hidden">
              <span className="font-bold text-base tracking-wide text-slate-800 dark:text-slate-100 text-center w-20 shrink-0 whitespace-nowrap">
-               {weight || 0} <span className="text-xs font-normal text-slate-400 dark:text-slate-500 ml-0.5">kg</span>
+               {displayWeight}
+               {weightLabel && <span className="text-xs font-normal text-slate-400 dark:text-slate-500 ml-0.5">{weightLabel}</span>}
              </span>
              <span className="font-bold text-sm sm:text-base tracking-wide text-slate-800 dark:text-slate-100 flex-1 text-right whitespace-nowrap overflow-hidden text-ellipsis">
                L:{lReps || 0} <span className="text-slate-300 dark:text-slate-600 font-normal mx-0.5">/</span> R:{rReps || 0}
@@ -264,10 +279,10 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
         ) : (
            <div className="flex-1 flex justify-between items-center px-1 gap-2">
              <span className="font-bold text-base tracking-wide text-slate-800 dark:text-slate-100 text-center flex-1 whitespace-nowrap">
-               {isAssist && weight ? `-${weight}` : (weight || 0)} 
-               <span className="text-xs font-normal text-slate-400 dark:text-slate-500 ml-1">
+               {displayWeight} 
+               {weightLabel && <span className="text-xs font-normal text-slate-400 dark:text-slate-500 ml-1">
                  {weightLabel}
-               </span>
+               </span>}
              </span>
              <span className="font-bold text-base tracking-wide text-slate-800 dark:text-slate-100 w-24 text-right shrink-0 whitespace-nowrap">
                {reps || 0} <span className="text-xs font-normal text-slate-400 dark:text-slate-500 ml-0.5">回</span>
@@ -281,7 +296,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm overflow-hidden relative mb-4">
-      <div className={`absolute top-0 left-0 w-1.5 h-full ${isMyPost ? 'bg-slate-300 dark:bg-slate-600' : 'bg-emerald-400'}`}></div>
+      <div className={`absolute top-0 left-0 w-1.5 h-full ${isMyPost ? 'bg-slate-300 dark:bg-slate-600' : 'bg-emerald-500'}`}></div>
       <div className="flex justify-between items-start mb-4 pl-3">
         <div className="flex items-center gap-3 w-full overflow-hidden">
           <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm overflow-hidden shrink-0 ${isMyPost ? 'bg-slate-600 dark:bg-slate-500' : userColor}`}>
@@ -289,13 +304,14 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-bold text-slate-800 dark:text-slate-100 truncate">{post.author || '不明'}</p>
-            <div className="flex flex-col gap-1 mt-0.5">
-              <div className="text-xs text-slate-500 dark:text-slate-400 font-bold">
-                {formatShortDateTime(post.timestamp)}
+            <div className="flex flex-col gap-1.5 mt-1">
+              <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 dark:text-slate-400 font-bold">
+                <span>{formatShortDateTime(post.timestamp)}</span>
+                {post.duration && <span className="flex items-center gap-0.5"><Clock size={12}/> {formatDuration(post.duration)}</span>}
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                {post.gymName && <span className="flex items-center gap-0.5 text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-900"><MapPin size={10}/> {post.gymName}</span>}
-                {post.duration && <span className="flex items-center gap-0.5 text-[10px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700"><Clock size={10}/> {formatDuration(post.duration)}</span>}
+                {post.gymName && <span className="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-900"><MapPin size={10}/> {post.gymName}</span>}
+                {categories.length > 0 && <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-900">部位: {categories.join(', ')}</span>}
               </div>
             </div>
           </div>
@@ -356,15 +372,12 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
             <div className="space-y-1">
               {item.sets && Array.isArray(item.sets) && item.sets.map((set, sIdx) => (
                 <div key={sIdx} className="mb-4 last:mb-0 bg-white/40 dark:bg-slate-900/40 p-2 rounded-lg border border-slate-200/40 dark:border-slate-800/40">
-                  {/* メメイン通常 */}
                   {renderSetRow(set, item.weightType, 'main', false, `set ${sIdx + 1}`)}
                   
-                  {/* メメインドロップ */}
                   {item.isDropSet && set.dropSets && set.dropSets.map((ds, dsIdx) => (
                     renderSetRow(ds, item.weightType, 'main', true, '↳ drop')
                   ))}
                   
-                  {/* スーパー2 通常＆ドロップ */}
                   {item.isSuperSet && item.superExerciseName && (
                     <>
                       {renderSetRow(set, item.superWeightType || 'total', 'super2', false, '↳ Sup2')}
@@ -374,7 +387,6 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                     </>
                   )}
 
-                  {/* スーパー3 通常＆ドロップ */}
                   {item.isSuperSet && item.superExerciseName3 && (
                     <>
                       {renderSetRow(set, item.superWeightType3 || 'total', 'super3', false, '↳ Sup3')}
@@ -410,7 +422,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
         )}
         
         {onImport && (
-          <button onClick={() => onImport(post)} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-2 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-950/80 transition-colors border border-emerald-100 dark:border-emerald-900">
+          <button onClick={() => onImport(post)} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-2 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/80 transition-colors border border-emerald-100 dark:border-emerald-900">
             <Copy size={14} /> この構成で開始
           </button>
         )}
@@ -436,8 +448,7 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
   const getWeightPlaceholder = (type) => {
     if (type === 'oneSide') return '片側kg';
     if (type === 'plate') return '枚数';
-    if (type === 'bodyWeight') return '加重kg';
-    if (type === 'assist') return '-補助kg';
+    if (type === 'bodyWeight') return '+加重/-補助kg';
     return '重量kg';
   };
 
@@ -515,7 +526,7 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
       {item.isSuperSet && (
         <div className="mb-5 pl-8 border-l-2 border-indigo-300 dark:border-indigo-600 space-y-3">
           <div className="relative w-full">
-            <select value={item.superExerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, 2)} className="w-full bg-indigo-50/30 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold appearance-none focus:outline-none focus:border-indigo-300 text-base pr-8" style={{ fontSize: '16px' }}>
+            <select value={item.superExerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, 2)} className="w-full bg-indigo-50/30 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold appearance-none focus:outline-none focus:border-indigo-500 text-base pr-8" style={{ fontSize: '16px' }}>
               <option value="" disabled>スーパーセットの種目 (2種目目)</option>
               {availableExercises.map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
             </select>
@@ -523,7 +534,7 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
           </div>
           {item.superExerciseName && (
             <div className="relative w-full">
-              <select value={item.superExerciseName3 || ''} onChange={(e) => updateExerciseName(e.target.value, 3)} className="w-full bg-indigo-50/30 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold appearance-none focus:outline-none focus:border-indigo-300 text-base pr-8" style={{ fontSize: '16px' }}>
+              <select value={item.superExerciseName3 || ''} onChange={(e) => updateExerciseName(e.target.value, 3)} className="w-full bg-indigo-50/30 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold appearance-none focus:outline-none focus:border-indigo-500 text-base pr-8" style={{ fontSize: '16px' }}>
                 <option value="">ジャイアントセット (3種目目・任意)</option>
                 {availableExercises.map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
               </select>
@@ -541,15 +552,13 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
         </div>
         
         {item.sets && Array.isArray(item.sets) && item.sets.map((set, sIndex) => (
-          <div key={set.id} className="bg-slate-50/50 dark:bg-slate-950/40 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
-            {/* 1. メイン通常入力 */}
+          <div key={set.id} className="bg-slate-50/50 dark:bg-slate-950/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
             <div className="flex items-center gap-2">
               <div className="w-10 text-center text-slate-400 dark:text-slate-500 font-bold text-sm shrink-0">{sIndex + 1}</div>
               {renderInputRow(set, item.weightType, 'main', false)}
               <button onClick={() => removeSet(item.id, set.id)} disabled={item.sets.length === 1} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 disabled:opacity-30 flex justify-center"><X size={18} /></button>
             </div>
 
-            {/* 2. メインドロップ入力 */}
             {item.isDropSet && set.dropSets && set.dropSets.map(ds => (
               <div key={ds.id} className="border-l-2 border-orange-200 dark:border-orange-800 pl-3 flex items-center gap-2 ml-4">
                 <TrendingDown size={16} className="text-orange-400 flex-shrink-0" />
@@ -558,15 +567,13 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
               </div>
             ))}
 
-            {/* ドロップ追加ボタン（メイン用） */}
             {item.isDropSet && (
               <button onClick={() => addDropSet(item.id, set.id)} className="ml-4 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900 border border-orange-200 dark:border-orange-800 px-3 py-1.5 rounded transition-colors font-bold flex items-center gap-1"><Plus size={12}/>ドロップ追加</button>
             )}
 
-            {/* 3. スーパー2 通常＆ドロップ入力 */}
             {item.isSuperSet && item.superExerciseName && (
               <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-3">
-                <div className="flex items-center gap-2 pl-4 border-l-2 border-indigo-300 dark:border-indigo-600 ml-1">
+                <div className="flex items-center gap-2 pl-4 border-l-2 border-indigo-300 dark:border-indigo-700 ml-1">
                   <Zap size={16} className="text-indigo-400 flex-shrink-0" />
                   {renderInputRow(set, item.superWeightType || 'total', 'super2', false)}
                   <div className="w-6 shrink-0"></div>
@@ -581,10 +588,9 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
               </div>
             )}
             
-            {/* 4. スーパー3 通常＆ドロップ入力 */}
             {item.isSuperSet && item.superExerciseName3 && (
               <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-3">
-                <div className="flex items-center gap-2 pl-4 border-l-2 border-indigo-300 dark:border-indigo-600 ml-1">
+                <div className="flex items-center gap-2 pl-4 border-l-2 border-indigo-300 dark:border-indigo-700 ml-1">
                   <Zap size={16} className="text-indigo-400 flex-shrink-0" />
                   {renderInputRow(set, item.superWeightType3 || 'total', 'super3', false)}
                   <div className="w-6 shrink-0"></div>
@@ -813,7 +819,7 @@ export default function App() {
 
   return (
     <div className={`min-h-screen font-sans pb-32 overflow-x-hidden selection:bg-emerald-200 transition-colors duration-300 ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20 shadow-sm flex flex-col">
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20 shadow-sm flex flex-col transition-colors">
         {isSameGym && (
           <div className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 px-4 py-2 flex items-center justify-center gap-2 text-white text-xs font-bold animate-pulse shadow-inner">
             <span>🔥 パートナーと同じジムでトレーニング中！ 🔥</span>
@@ -829,12 +835,12 @@ export default function App() {
               <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">{isOnline ? 'オンライン' : 'オフライン'}</span>
             </div>
             <button onClick={() => setShowProfileModal(true)} className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-              <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-xs overflow-hidden border border-emerald-200 dark:border-emerald-800">
+              <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-xs overflow-hidden border border-emerald-200 dark:border-emerald-800">
                 {myInfo.photoUrl ? <img src={myInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : currentUser.charAt(0)}
               </div>
               <span className="text-sm font-bold text-slate-700 dark:text-slate-200 hidden sm:inline">{currentUser}</span>
             </button>
-            <button onClick={handleLogout} className="text-slate-400 hover:text-rose-500 p-1.5 rounded-full transition-colors"><LogOut size={20} /></button>
+            <button onClick={handleLogout} className="text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 p-1.5 rounded-full transition-colors"><LogOut size={20} /></button>
           </div>
         </div>
         {partnerIsTraining && !isSameGym && (
@@ -915,28 +921,28 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex flex-col items-center justify-center animate-in fade-in duration-200 p-4">
+    <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-50 flex flex-col items-center justify-center animate-in fade-in duration-200 p-4">
       <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-slate-800 dark:text-white">プロフィール設定</h2>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={20} /></button>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={20} /></button>
         </div>
         
         <div className="flex flex-col items-center space-y-6">
           <div className="w-28 h-28 rounded-full bg-slate-100 dark:bg-slate-800 border-4 border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center relative">
             {photoUrl ? (
               <img src={photoUrl} alt="profile" className="w-full h-full object-cover" />
-            ) : <Users size={40} className="text-slate-300 dark:text-slate-600" />}
+            ) : <Users size={40} className="text-slate-300 dark:text-slate-500" />}
             {isUploading && <div className="absolute inset-0 bg-white/60 dark:bg-slate-900/60 flex items-center justify-center"><Activity className="animate-spin text-emerald-500" size={24} /></div>}
           </div>
           
           <div className="flex gap-2 w-full">
-            <label className="flex-1 py-2 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 dark:hover:bg-emerald-950/80 transition-colors cursor-pointer">
+            <label className="flex-1 py-2 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-colors cursor-pointer">
               <PlusCircle size={16} /> 画像変更
               <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" disabled={isUploading} />
             </label>
             {photoUrl && (
-              <button onClick={() => setPhotoUrl(null)} disabled={isUploading} className="flex-1 py-2 bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-rose-100 dark:hover:bg-rose-950/80 transition-colors">
+              <button onClick={() => setPhotoUrl(null)} disabled={isUploading} className="flex-1 py-2 bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-rose-100 dark:hover:bg-rose-900 transition-colors">
                 <Trash2 size={16} /> 削除
               </button>
             )}
@@ -946,15 +952,15 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave }) {
         <div className="mt-6 space-y-4">
           <div>
             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">目標 (100文字以内)</label>
-            <textarea value={goal} maxLength={100} onChange={e => setGoal(e.target.value)} placeholder="例: ベンチプレス100kg達成！" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-base text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500 resize-none" style={{ fontSize: '16px' }} rows={3} />
-            <div className="text-right text-xs text-slate-400 mt-1">{goal.length} / 100</div>
+            <textarea value={goal} maxLength={100} onChange={e => setGoal(e.target.value)} placeholder="例: ベンチプレス100kg達成！" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-base text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500 resize-none" style={{ fontSize: '16px' }} rows={3} />
+            <div className="text-right text-xs text-slate-400 dark:text-slate-500 mt-1">{goal.length} / 100</div>
           </div>
           
           <div>
              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">テーマ設定</label>
              <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
-               <button onClick={() => setTheme('light')} className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-bold rounded-lg transition-colors ${theme === 'light' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}><Sun size={16}/> ライト</button>
-               <button onClick={() => setTheme('dark')} className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-bold rounded-lg transition-colors ${theme === 'dark' ? 'bg-slate-900 text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}><Moon size={16}/> ダーク</button>
+               <button onClick={() => setTheme('light')} className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-bold rounded-lg transition-colors ${theme === 'light' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}><Sun size={16}/> ライト</button>
+               <button onClick={() => setTheme('dark')} className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-bold rounded-lg transition-colors ${theme === 'dark' ? 'bg-slate-900 dark:bg-slate-950 text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}><Moon size={16}/> ダーク</button>
              </div>
           </div>
         </div>
@@ -1030,7 +1036,7 @@ function LoginScreen({ onLogin, accountsInfo, onChangePin, isOnline }) {
           <KeyRound size={16} />{isChangingPin ? 'パスワード変更モード' : 'パスワード変更'}
         </button>
         {isChangingPin && (
-          <div className="absolute top-16 right-6 text-xs text-emerald-600 font-bold bg-emerald-50 px-3 py-2 rounded-lg border border-slate-200 shadow-sm">
+          <div className="absolute top-16 right-6 text-xs text-emerald-600 font-bold bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200 shadow-sm">
             変更するユーザーを選択してください
           </div>
         )}
@@ -1201,7 +1207,7 @@ function MonthlyReport({ monthDate, posts, userName, accountsInfo }) {
                     <div className="flex-1 h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                       <div className={`h-full ${getCategoryColor(cat).split(' ')[0]} ${getCategoryColor(cat).split(' ')[2]}`} style={{ width: `${percent}%` }}></div>
                     </div>
-                    <span className="w-8 text-right text-slate-500">{categoryCount[cat]}</span>
+                    <span className="w-8 text-right text-slate-500 dark:text-slate-400">{categoryCount[cat]}</span>
                   </div>
                 );
               })}
@@ -1270,7 +1276,7 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
           <button onClick={() => setCurrentMonth(new Date(year, month + 1, 1))} className="text-slate-400 hover:text-emerald-500 font-bold p-2 transition-colors">&gt;</button>
         </div>
         <div className="grid grid-cols-7 text-center mb-2">
-          {['日', '月', '火', '水', '木', '金', '土'].map(d => <div key={d} className={`text-xs font-bold ${d === '日' ? 'text-rose-400' : d === '土' ? 'text-blue-400' : 'text-slate-400'}`}>{d}</div>)}
+          {['日', '月', '火', '水', '木', '金', '土'].map(d => <div key={d} className={`text-xs font-bold ${d === '日' ? 'text-rose-400' : d === '土' ? 'text-blue-400' : 'text-slate-400 dark:text-slate-500'}`}>{d}</div>)}
         </div>
         <div className="grid grid-cols-7 text-center">{blanks}{days}</div>
         
@@ -1588,7 +1594,7 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex flex-col justify-end animate-in fade-in duration-200">
+    <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-50 flex flex-col justify-end animate-in fade-in duration-200">
       <div className="bg-slate-50 dark:bg-slate-950 rounded-t-3xl flex flex-col h-[90vh] overflow-hidden shadow-2xl">
         <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 pt-safe sticky top-0 z-10">
           <h2 className="text-lg font-bold text-slate-800 dark:text-white">記録の編集</h2>
@@ -1599,29 +1605,30 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave }) {
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm mb-6 space-y-4">
             <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2"><Settings size={16} className="text-slate-400" /> トレーニング情報</h3>
             
-            <div className="flex flex-wrap gap-3">
-              <div className="w-36">
-                <label className="block text-xs font-bold text-slate-500 mb-1">日付</label>
-                <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">日付</label>
+                <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
               </div>
-              <div className="w-24">
-                <label className="block text-xs font-bold text-slate-500 mb-1">開始</label>
-                <input type="time" value={editStartTime} onChange={e => setEditStartTime(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">開始</label>
+                  <input type="time" value={editStartTime} onChange={e => setEditStartTime(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">終了</label>
+                  <input type="time" value={editEndTime} onChange={e => setEditEndTime(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+                </div>
               </div>
-              <div className="w-24">
-                <label className="block text-xs font-bold text-slate-500 mb-1">終了</label>
-                <input type="time" value={editEndTime} onChange={e => setEditEndTime(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <div className="w-28">
-                <label className="block text-xs font-bold text-slate-500 mb-1">体重 (kg)</label>
-                <input type="number" step="0.1" value={editBodyWeight} onChange={e => setEditBodyWeight(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
-              </div>
-              <div className="w-28">
-                <label className="block text-xs font-bold text-slate-500 mb-1">体脂肪率 (%)</label>
-                <input type="number" step="0.1" value={editBodyFat} onChange={e => setEditBodyFat(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">体重 (kg)</label>
+                  <input type="number" step="0.1" value={editBodyWeight} onChange={e => setEditBodyWeight(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">体脂肪率 (%)</label>
+                  <input type="number" step="0.1" value={editBodyFat} onChange={e => setEditBodyFat(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+                </div>
               </div>
             </div>
           </div>
@@ -1716,8 +1723,8 @@ function ExercisesView({ gyms, exercises }) {
       <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">種目とジムの管理</h2>
       
       <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl mb-6">
-        <button onClick={() => setActiveTab('exercises')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'exercises' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>種目リスト</button>
-        <button onClick={() => setActiveTab('gyms')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'gyms' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>ジムの登録</button>
+        <button onClick={() => setActiveTab('exercises')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'exercises' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>種目リスト</button>
+        <button onClick={() => setActiveTab('gyms')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'gyms' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>ジムの登録</button>
       </div>
 
       {activeTab === 'gyms' && (
@@ -1750,21 +1757,21 @@ function ExercisesView({ gyms, exercises }) {
           ) : (
             <>
               {editingExId ? (
-                <form onSubmit={handleUpdateExercise} className="bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-4 shadow-sm relative animate-in slide-in-from-top-4">
+                <form onSubmit={handleUpdateExercise} className="bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-900 rounded-2xl p-4 shadow-sm relative animate-in slide-in-from-top-4">
                   <h3 className="text-sm font-bold text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2"><Edit2 size={16}/> 種目の編集</h3>
-                  <button type="button" onClick={cancelEdit} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={20}/></button>
+                  <button type="button" onClick={cancelEdit} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><X size={20}/></button>
                   <div className="space-y-3">
                     <div>
                       <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">部位カテゴリ</label>
                       <div className="relative">
-                        <select value={editExCategory} onChange={e => setEditExCategory(e.target.value)} className="w-full bg-white dark:bg-slate-950 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
+                        <select value={editExCategory} onChange={e => setEditExCategory(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
                           {MUSCLE_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                         </select>
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
                       </div>
                     </div>
-                    <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">種目名 <span className="text-rose-500">*</span></label><input type="text" value={editExName} onChange={e => setEditExName(e.target.value)} required className="w-full bg-white dark:bg-slate-950 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/></div>
-                    <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">メーカー (任意)</label><input type="text" value={editExMaker} onChange={e => setEditExMaker(e.target.value)} className="w-full bg-white dark:bg-slate-950 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/></div>
+                    <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">種目名 <span className="text-rose-500">*</span></label><input type="text" value={editExName} onChange={e => setEditExName(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/></div>
+                    <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">メーカー (任意)</label><input type="text" value={editExMaker} onChange={e => setEditExMaker(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/></div>
                     <div>
                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">重さの単位/記録方法 <span className="text-rose-500">*</span></label>
                        <div className="grid grid-cols-2 gap-2">
@@ -1772,8 +1779,7 @@ function ExercisesView({ gyms, exercises }) {
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'oneSide' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="oneSide" checked={editExWeightType === 'oneSide'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>片側 (kg)</label>
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'plate' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="plate" checked={editExWeightType === 'plate'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>プレート (枚)</label>
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'lr' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="lr" checked={editExWeightType === 'lr'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>片側種目 (左右別)</label>
-                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'bodyWeight' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="bodyWeight" checked={editExWeightType === 'bodyWeight'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>自重 (+加重)</label>
-                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'assist' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="assist" checked={editExWeightType === 'assist'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>アシスト</label>
+                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'bodyWeight' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="bodyWeight" checked={editExWeightType === 'bodyWeight'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>自重(加重+, 補助-)</label>
                        </div>
                     </div>
                     <button type="submit" disabled={!editExName.trim()} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded-xl mt-2 transition-colors disabled:opacity-50 shadow-md">更新して保存</button>
@@ -1806,12 +1812,11 @@ function ExercisesView({ gyms, exercises }) {
                     <div>
                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">重さの単位/記録方法 <span className="text-rose-500">*</span></label>
                        <div className="grid grid-cols-2 gap-2">
-                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'total' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}><input type="radio" value="total" checked={newExWeightType === 'total'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>合計 (kg)</label>
-                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'oneSide' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}><input type="radio" value="oneSide" checked={newExWeightType === 'oneSide'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>片側 (kg)</label>
-                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'plate' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}><input type="radio" value="plate" checked={newExWeightType === 'plate'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>プレート (枚)</label>
-                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'lr' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}><input type="radio" value="lr" checked={newExWeightType === 'lr'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>片側種目 (左右別)</label>
-                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'bodyWeight' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}><input type="radio" value="bodyWeight" checked={newExWeightType === 'bodyWeight'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>自重 (+加重)</label>
-                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'assist' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}><input type="radio" value="assist" checked={newExWeightType === 'assist'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>アシスト</label>
+                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'total' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}><input type="radio" value="total" checked={newExWeightType === 'total'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>合計 (kg)</label>
+                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'oneSide' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}><input type="radio" value="oneSide" checked={newExWeightType === 'oneSide'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>片側 (kg)</label>
+                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'plate' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}><input type="radio" value="plate" checked={newExWeightType === 'plate'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>プレート (枚)</label>
+                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'lr' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}><input type="radio" value="lr" checked={newExWeightType === 'lr'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>片側種目 (左右別)</label>
+                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'bodyWeight' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}><input type="radio" value="bodyWeight" checked={newExWeightType === 'bodyWeight'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>自重(加重+, 補助-)</label>
                        </div>
                     </div>
                     <button type="submit" disabled={isAdding || !newExName.trim()} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold py-3 rounded-xl mt-2 transition-colors disabled:opacity-50">リストに追加</button>
@@ -1824,8 +1829,8 @@ function ExercisesView({ gyms, exercises }) {
                 <div className="space-y-4">
                   {gyms.map(gym => {
                     const gymExercises = exercises.filter(ex => ex.gymId === gym.id).sort((a, b) => {
-                      const idxA = MUSCLE_CATEGORIES.indexOf(a.category || 'その他');
-                      const idxB = MUSCLE_CATEGORIES.indexOf(b.category || 'その他');
+                      const idxA = MUSCLE_CATEGORIES.indexOf(a.category);
+                      const idxB = MUSCLE_CATEGORIES.indexOf(b.category);
                       return (idxA !== -1 ? idxA : 99) - (idxB !== -1 ? idxB : 99);
                     });
                     if (gymExercises.length === 0) return null;
@@ -1840,7 +1845,7 @@ function ExercisesView({ gyms, exercises }) {
                                 <div className="flex gap-2 mt-1">
                                   {ex.maker && <span className="text-xs text-slate-400 dark:text-slate-500 font-bold bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{ex.maker}</span>}
                                   {ex.weightType && <span className="text-[10px] text-emerald-500 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-900">
-                                    {ex.weightType === 'oneSide' ? '片側(kg)' : ex.weightType === 'plate' ? 'プレート(枚)' : ex.weightType === 'lr' ? '片側種目' : ex.weightType === 'bodyWeight' ? '自重' : ex.weightType === 'assist' ? 'アシスト' : '合計(kg)'}
+                                    {ex.weightType === 'oneSide' ? '片側(kg)' : ex.weightType === 'plate' ? 'プレート(枚)' : ex.weightType === 'lr' ? '片側種目' : ex.weightType === 'bodyWeight' ? '自重/アシスト' : '合計(kg)'}
                                   </span>}
                                 </div>
                               </div>
@@ -1934,7 +1939,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts }) {
          <div className="absolute top-2 right-2 text-white/20"><Trophy size={80}/></div>
          <div className="relative z-10">
            <h3 className="font-bold text-lg flex items-center gap-2 mb-2"><Target size={20}/> 今月のふたりで100トンチャレンジ！</h3>
-           <p className="text-xs text-indigo-100 font-bold mb-4">ふたりの合計総負荷量で100,000kgを目指おう！</p>
+           <p className="text-xs text-indigo-100 font-bold mb-4">ふたりの合計総負荷量で100,000kgを目指そう！</p>
            
            <div className="flex justify-between items-end mb-2">
               <span className="text-2xl font-bold">{totalMonthVolume.toLocaleString()} <span className="text-sm font-normal">kg</span></span>
@@ -1983,7 +1988,7 @@ function NavButton({ icon, label, isActive, onClick, isPrimary, isTraining }) {
   if (isPrimary) {
     return (
       <button onClick={onClick} className="flex flex-col items-center justify-center -mt-8 relative group">
-        <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 text-white ${isTraining ? 'bg-amber-500 shadow-amber-500/40 scale-110' : isActive ? 'bg-emerald-500 shadow-emerald-500/40 scale-110' : 'bg-slate-800 dark:bg-slate-700 border-4 border-white dark:border-slate-950 group-hover:bg-slate-700 dark:group-hover:bg-slate-600'}`}><div>{icon}</div></div>
+        <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 text-white ${isTraining ? 'bg-amber-500 shadow-amber-500/40 scale-110' : isActive ? 'bg-emerald-500 shadow-emerald-500/40 scale-110' : 'bg-slate-800 dark:bg-slate-700 border-4 border-white dark:border-slate-800 group-hover:bg-slate-700 dark:group-hover:bg-slate-600'}`}><div>{icon}</div></div>
         <span className={`text-[10px] mt-1 font-bold transition-colors ${isTraining ? 'text-amber-500' : isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`}>{label}</span>
       </button>
     );
