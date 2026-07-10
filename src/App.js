@@ -1598,25 +1598,37 @@ function BodyCompositionInfo({ info, dailyCalories = 0, dateLabel = '' }) {
   const totalCalories = bmr + dailyCalories;
   
   let advancedStatsBlock = null;
-  if (info.weight && info.height && info.gender && info.lastFat) {
-      const ffmi = getFFMI(info.weight, info.lastFat, info.height);
-      const evalText = getFFMIEval(ffmi, info.gender);
-      const leanBodyMass = info.weight * (1 - (info.lastFat / 100));
+  if (info.weight && info.height && info.gender) {
+      if (info.lastFat) {
+          const ffmi = getFFMI(info.weight, info.lastFat, info.height);
+          const evalText = getFFMIEval(ffmi, info.gender);
+          const leanBodyMass = info.weight * (1 - (info.lastFat / 100));
 
-      advancedStatsBlock = (
-         <div className="flex gap-2 sm:gap-3 w-full">
-            <div className="flex-1 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900 rounded-xl p-3 flex flex-col">
-               <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold mb-1">FFMI (除脂肪量指数)</p>
-               <p className="text-lg font-bold text-indigo-700 dark:text-indigo-300">{ffmi.toFixed(1)} <span className="text-xs font-normal">({evalText})</span></p>
-               <p className="text-[9px] text-indigo-500 dark:text-indigo-500 mt-auto pt-1">※男性20、女性16以上で優秀</p>
-            </div>
-            <div className="flex-1 bg-cyan-50 dark:bg-cyan-950/50 border border-cyan-100 dark:border-cyan-900 rounded-xl p-3 flex flex-col">
-               <p className="text-[10px] text-cyan-600 dark:text-cyan-400 font-bold mb-1">除脂肪体重 (LBM)</p>
-               <p className="text-lg font-bold text-cyan-700 dark:text-cyan-300">{leanBodyMass.toFixed(1)} <span className="text-xs font-normal">kg</span></p>
-               <p className="text-[9px] text-cyan-500 dark:text-cyan-500 mt-auto pt-1">※筋肉・骨・内臓などの総重量</p>
-            </div>
-         </div>
-      );
+          advancedStatsBlock = (
+             <div className="flex gap-2 sm:gap-3 w-full">
+                <div className="flex-1 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-900 rounded-xl p-3 flex flex-col">
+                   <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold mb-1">FFMI (除脂肪量指数)</p>
+                   <p className="text-lg font-bold text-indigo-700 dark:text-indigo-300">{ffmi.toFixed(1)} <span className="text-xs font-normal">({evalText})</span></p>
+                   <p className="text-[9px] text-indigo-500 dark:text-indigo-500 mt-auto pt-1">※男性20、女性16以上で優秀</p>
+                </div>
+                <div className="flex-1 bg-cyan-50 dark:bg-cyan-950/50 border border-cyan-100 dark:border-cyan-900 rounded-xl p-3 flex flex-col">
+                   <p className="text-[10px] text-cyan-600 dark:text-cyan-400 font-bold mb-1">除脂肪体重 (LBM)</p>
+                   <p className="text-lg font-bold text-cyan-700 dark:text-cyan-300">{leanBodyMass.toFixed(1)} <span className="text-xs font-normal">kg</span></p>
+                   <p className="text-[9px] text-cyan-500 dark:text-cyan-500 mt-auto pt-1">※筋肉・骨・内臓などの総重量</p>
+                </div>
+             </div>
+          );
+      } else {
+          advancedStatsBlock = (
+             <div className="flex gap-2 sm:gap-3 w-full">
+                <div className="flex-1 bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-3 flex flex-col items-center justify-center text-center">
+                   <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold mb-1">FFMI / 除脂肪体重 (LBM)</p>
+                   <p className="text-base font-bold text-slate-400 dark:text-slate-500 my-1">データなし</p>
+                   <p className="text-[9px] text-slate-400 dark:text-slate-500 mt-auto">※計算には体脂肪率の記録が必要です</p>
+                </div>
+             </div>
+          );
+      }
   }
 
   return (
@@ -1643,7 +1655,6 @@ function BodyCompositionInfo({ info, dailyCalories = 0, dateLabel = '' }) {
      </div>
   );
 }
-
 /// --- データ画面 (カレンダー・グラフ・レポート) ---
 function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDelete, onImport }) {
   const myPosts = posts ? posts.filter(p => p.author === currentUser) : [];
