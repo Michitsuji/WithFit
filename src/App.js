@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Sparkles, Scale, Calendar as CalendarIcon, Save, Zap, TrendingDown, LifeBuoy, GripVertical, Copy, Moon, Sun } from 'lucide-react';
+import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, GripVertical, Copy, Moon, Sun, Target, Trophy } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence } from 'firebase/firestore';
@@ -32,6 +32,30 @@ try {
 }
 
 const MUSCLE_CATEGORIES = ['胸', '背中', '肩', '腕', '脚', 'その他'];
+
+// --- カラーユーティリティ ---
+const getCategoryColor = (category) => {
+  switch (category) {
+    case '胸': return 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-400 border border-rose-200 dark:border-rose-800';
+    case '背中': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-400 border border-blue-200 dark:border-blue-800';
+    case '肩': return 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400 border border-amber-200 dark:border-amber-800';
+    case '腕': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-400 border border-purple-200 dark:border-purple-800';
+    case '脚': return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800';
+    default: return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700';
+  }
+};
+
+const getCategoryTabColor = (category, isSelected) => {
+  if (!isSelected) return 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700';
+  switch (category) {
+    case '胸': return 'bg-rose-500 text-white border-rose-500 shadow-sm';
+    case '背中': return 'bg-blue-500 text-white border-blue-500 shadow-sm';
+    case '肩': return 'bg-amber-500 text-white border-amber-500 shadow-sm';
+    case '腕': return 'bg-purple-500 text-white border-purple-500 shadow-sm';
+    case '脚': return 'bg-emerald-500 text-white border-emerald-500 shadow-sm';
+    default: return 'bg-slate-600 text-white border-slate-600 shadow-sm';
+  }
+}
 
 // --- ユーティリティ関数 ---
 const generateId = () => Date.now().toString() + Math.random().toString(36).substring(2, 9);
@@ -80,8 +104,7 @@ const formatShortDateTime = (timestamp) => {
   if (!timestamp || isNaN(new Date(timestamp).getTime())) return '';
   const date = new Date(timestamp);
   const days = ['日', '月', '火', '水', '木', '金', '土'];
-  const dayStr = days[date.getDay()];
-  return `${date.getMonth() + 1}/${date.getDate()}(${dayStr}) ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  return `${date.getMonth() + 1}/${date.getDate()}(${days[date.getDay()]}) ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 };
 
 const calcSetVolume = (weight, reps, lReps, rReps, forcedReps, wType) => {
@@ -109,20 +132,12 @@ const calcSetVolume = (weight, reps, lReps, rReps, forcedReps, wType) => {
 const calculateTotalVolume = (items) => {
   let volume = 0;
   if (!items || !Array.isArray(items)) return volume;
-  
   items.forEach(item => {
     if (!item.sets || !Array.isArray(item.sets)) return;
     item.sets.forEach(set => {
       volume += calcSetVolume(set.weight, set.reps, set.lReps, set.rReps, set.forcedReps, item.weightType);
-      
-      if (item.isSuperSet) {
-        volume += calcSetVolume(set.superWeight, set.superReps, set.superLReps, set.superRReps, set.superForcedReps, item.superWeightType);
-      }
-      if (item.isDropSet && set.dropSets && Array.isArray(set.dropSets)) {
-        set.dropSets.forEach(ds => {
-          volume += calcSetVolume(ds.weight, ds.reps, ds.lReps, ds.rReps, ds.forcedReps, item.weightType);
-        });
-      }
+      if (item.isSuperSet) { volume += calcSetVolume(set.superWeight, set.superReps, set.superLReps, set.superRReps, set.superForcedReps, item.superWeightType); }
+      if (item.isDropSet && set.dropSets && Array.isArray(set.dropSets)) { set.dropSets.forEach(ds => { volume += calcSetVolume(ds.weight, ds.reps, ds.lReps, ds.rReps, ds.forcedReps, item.weightType); }); }
     });
   });
   return volume;
@@ -138,12 +153,12 @@ const getVolumeMetaphor = (kg) => {
   return `大型トレーラー級！`;
 };
 
-// グラフコンポーネント
+// --- グラフコンポーネント ---
 function SimpleChart({ data, color, title }) {
   if (!data || data.length === 0) return (
     <div className="w-full bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col items-center justify-center">
       <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 w-full flex items-center gap-2"><Activity size={16} className="text-slate-400"/> {title}</h4>
-      <p className="text-sm font-bold text-slate-400 bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl text-center border border-slate-100 dark:border-slate-800 w-full">データがありません</p>
+      <p className="text-sm font-bold text-slate-400 bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl text-center border border-slate-100 dark:border-slate-700/50 w-full">データがありません</p>
     </div>
   );
   const values = data.map(d => d.value).filter(v => !isNaN(v));
@@ -170,9 +185,9 @@ function SimpleChart({ data, color, title }) {
             const dateStr = d.date ? d.date.slice(5, 10).replace('-', '/') : '';
             return (
               <g key={i}>
-                <circle cx={x} cy={y} r="5" fill="white" stroke={color} strokeWidth="2.5" />
+                <circle cx={x} cy={y} r="5" fill="currentColor" className="text-white dark:text-slate-800" stroke={color} strokeWidth="2.5" />
                 <text x={x} y={y - 12} fontSize="12" fill={color} textAnchor="middle" className="font-bold tracking-tighter">{d.value}</text>
-                {dateStr && <text x={x} y={height + 25} fontSize="10" fill="#94a3b8" textAnchor="middle" className="font-bold">{dateStr}</text>}
+                {dateStr && <text x={x} y={height + 25} fontSize="10" fill="currentColor" textAnchor="middle" className="font-bold text-slate-400 dark:text-slate-500">{dateStr}</text>}
               </g>
             );
           })}
@@ -186,6 +201,7 @@ function SimpleChart({ data, color, title }) {
 function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onToggleLike, onImport }) {
   const isMyPost = post.author === currentUser;
   const authorInfo = accountsInfo && accountsInfo[post.author];
+  const userColor = post.author === '勇太' ? 'bg-indigo-500' : 'bg-rose-500';
 
   const renderSetRow = (set, wType, isDrop, label) => {
     const isLR = wType === 'lr';
@@ -193,7 +209,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
     const forced = set.forcedReps ? <span className="text-rose-500 text-xs ml-1">(+{set.forcedReps}補助)</span> : null;
 
     return (
-      <div className={`flex justify-between items-center border-b border-slate-200/50 dark:border-slate-700 pb-2 pt-2 last:border-0 ${isDrop ? 'pl-8' : ''}`}>
+      <div className={`flex justify-between items-center border-b border-slate-200/50 dark:border-slate-700/50 pb-2 pt-2 last:border-0 ${isDrop ? 'pl-8' : ''}`}>
         <span className={`font-bold w-14 text-sm shrink-0 ${isDrop ? 'text-orange-500' : 'text-slate-500 dark:text-slate-400'}`}>
           {isDrop ? `↳ drop` : label}
         </span>
@@ -231,15 +247,19 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
       <div className={`absolute top-0 left-0 w-1.5 h-full ${isMyPost ? 'bg-slate-300 dark:bg-slate-600' : 'bg-emerald-400'}`}></div>
       <div className="flex justify-between items-start mb-4 pl-3">
         <div className="flex items-center gap-3 w-full overflow-hidden">
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm overflow-hidden shrink-0 ${isMyPost ? 'bg-slate-600' : (post.author === '勇太' ? 'bg-indigo-500' : 'bg-rose-500')}`}>
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm overflow-hidden shrink-0 ${isMyPost ? 'bg-slate-600 dark:bg-slate-500' : userColor}`}>
             {authorInfo?.photoUrl ? <img src={authorInfo.photoUrl} alt={post.author} className="w-full h-full object-cover" /> : post.author ? post.author.charAt(0) : '?'}
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-bold text-slate-800 dark:text-slate-100 truncate">{post.author || '不明'}</p>
-            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-bold overflow-x-auto whitespace-nowrap scrollbar-hide pb-1 w-full">
-              <span>{formatShortDateTime(post.timestamp)}</span>
-              {post.gymName && <><span className="text-slate-300 dark:text-slate-600">•</span><span className="flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded"><MapPin size={10}/> {post.gymName}</span></>}
-              {post.duration && <><span className="text-slate-300 dark:text-slate-600">•</span><span className="flex items-center gap-0.5 text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded"><Clock size={10}/> {formatDuration(post.duration)}</span></>}
+            <div className="flex flex-col gap-1 mt-0.5">
+              <div className="text-xs text-slate-500 dark:text-slate-400 font-bold">
+                {formatShortDateTime(post.timestamp)}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {post.gymName && <span className="flex items-center gap-0.5 text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-800"><MapPin size={10}/> {post.gymName}</span>}
+                {post.duration && <span className="flex items-center gap-0.5 text-[10px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-600"><Clock size={10}/> {formatDuration(post.duration)}</span>}
+              </div>
             </div>
           </div>
         </div>
@@ -273,7 +293,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 
       <div className="pl-3 space-y-3 mb-4">
         {post.items && Array.isArray(post.items) && post.items.map((item, idx) => (
-          <div key={idx} className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3 border border-slate-100 dark:border-slate-700">
+          <div key={idx} className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-3 border border-slate-100 dark:border-slate-700">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2 flex-wrap flex-1">
                 <Dumbbell size={14} className="text-emerald-500" />
@@ -281,7 +301,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                 {item.isSuperSet && item.superExerciseName && (
                   <span className="font-bold text-indigo-600 dark:text-indigo-400 text-sm flex items-center gap-1"><Zap size={14} className="text-indigo-400"/> {item.superExerciseName}</span>
                 )}
-                {item.category && <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-100 dark:bg-emerald-900/50 px-1.5 py-0.5 rounded">{item.category}</span>}
+                {item.category && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${getCategoryColor(item.category)}`}>{item.category}</span>}
               </div>
             </div>
 
@@ -370,20 +390,20 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
       <div className="flex-1 flex gap-2 min-w-0">
         {isLR ? (
           <>
-            <input type="number" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder="重量" className="w-[60px] shrink-0 text-center text-base font-bold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded focus:outline-none focus:border-emerald-500 py-2 px-0" style={{ fontSize: '16px' }}/>
-            <div className="flex flex-1 items-center gap-1 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 rounded px-2 min-w-0">
+            <input type="number" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder="重量" className="w-[60px] shrink-0 text-center text-base font-bold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:border-emerald-500 py-2 px-0" style={{ fontSize: '16px' }}/>
+            <div className="flex flex-1 items-center gap-1 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded px-2 min-w-0">
               <span className="text-xs text-slate-400 font-bold shrink-0">L:</span>
               <input type="number" value={val('lReps')} onChange={(e) => update('lReps', e.target.value)} placeholder="0" className="w-full text-center text-base font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0" style={{ fontSize: '16px' }}/>
             </div>
-            <div className="flex flex-1 items-center gap-1 border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 rounded px-2 min-w-0">
+            <div className="flex flex-1 items-center gap-1 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded px-2 min-w-0">
               <span className="text-xs text-slate-400 font-bold shrink-0">R:</span>
               <input type="number" value={val('rReps')} onChange={(e) => update('rReps', e.target.value)} placeholder="0" className="w-full text-center text-base font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0" style={{ fontSize: '16px' }}/>
             </div>
           </>
         ) : (
           <>
-            <input type="number" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder="0" className="flex-1 min-w-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded py-2 px-2 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
-            <input type="number" value={val('reps')} onChange={(e) => update('reps', e.target.value)} placeholder="0" className="flex-1 min-w-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded py-2 px-2 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
+            <input type="number" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder="0" className="flex-1 min-w-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded py-2 px-2 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
+            <input type="number" value={val('reps')} onChange={(e) => update('reps', e.target.value)} placeholder="0" className="flex-1 min-w-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded py-2 px-2 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
           </>
         )}
         {item.isForcedReps && (
@@ -403,7 +423,7 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
     >
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className="cursor-move p-1 text-slate-300 hover:text-slate-500 active:cursor-grabbing rounded"><GripVertical size={20} /></div>
+          <div className="cursor-move p-1 text-slate-300 dark:text-slate-500 hover:text-slate-500 dark:hover:text-slate-300 active:cursor-grabbing rounded"><GripVertical size={20} /></div>
           <div className="relative flex-1 min-w-0">
             <select value={item.exerciseName} onChange={(e) => updateExerciseName(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base pr-8" style={{ fontSize: '16px' }}>
               <option value="" disabled>種目を選択</option>
@@ -707,8 +727,8 @@ export default function App() {
         {currentTab === 'timeline' && <TimelineView posts={posts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} />}
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} />}
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} />}
-        {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} />}
-        {currentTab === 'friends' && <FriendsView partnerName={partnerName} partnerInfo={partnerInfo} posts={posts} />}
+        {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} partnerName={partnerName} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} />}
+        {currentTab === 'friends' && <FriendsView partnerName={partnerName} partnerInfo={partnerInfo} currentUser={currentUser} posts={posts} />}
       </main>
 
       {editingPost && <EditWorkoutModal post={editingPost} gyms={allGyms} exercises={exercises} onClose={() => setEditingPost(null)} onSave={handleUpdateWorkout} />}
@@ -775,7 +795,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave }) {
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex flex-col items-center justify-center animate-in fade-in duration-200 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
+      <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-slate-200 dark:border-slate-700">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-slate-800 dark:text-white">プロフィール設定</h2>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-100 dark:bg-slate-700 rounded-full"><X size={20} /></button>
@@ -811,7 +831,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave }) {
           
           <div>
              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">テーマ設定</label>
-             <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
+             <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-xl border border-slate-200 dark:border-slate-600">
                <button onClick={() => setTheme('light')} className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-bold rounded-lg transition-colors ${theme === 'light' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}><Sun size={16}/> ライト</button>
                <button onClick={() => setTheme('dark')} className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-bold rounded-lg transition-colors ${theme === 'dark' ? 'bg-slate-800 text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}><Moon size={16}/> ダーク</button>
              </div>
@@ -982,11 +1002,104 @@ function TimelineView({ posts, onToggleLike, onImport, currentUser, onDelete, on
   );
 }
 
-// --- データ画面 (カレンダー・グラフ) ---
-function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete }) {
+// --- 月間レポートコンポーネント ---
+function MonthlyReport({ monthDate, posts, userName, accountsInfo }) {
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const monthPosts = posts.filter(p => {
+    const d = new Date(p.timestamp);
+    return d.getFullYear() === year && d.getMonth() === month && p.author === userName;
+  });
+
+  const totalVolume = monthPosts.reduce((sum, p) => sum + (Number(p.volume) || 0), 0);
+  const trainingDays = new Set(monthPosts.map(p => formatDateFromTimestamp(p.timestamp))).size;
+  
+  let totalSets = 0;
+  let totalWorkoutsCount = 0;
+  const categoryCount = { '胸': 0, '背中': 0, '肩': 0, '腕': 0, '脚': 0, 'その他': 0 };
+
+  monthPosts.forEach(post => {
+    if (post.items) {
+      post.items.forEach(item => {
+        totalWorkoutsCount++;
+        const sets = item.sets ? item.sets.length : 0;
+        totalSets += sets;
+        const cat = item.category || 'その他';
+        if (categoryCount[cat] !== undefined) {
+           categoryCount[cat] += sets;
+        } else {
+           categoryCount['その他'] += sets;
+        }
+      });
+    }
+  });
+
+  const hasData = monthPosts.length > 0;
+
+  return (
+    <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm animate-in fade-in">
+      <div className="flex items-center gap-3 mb-5">
+         <div className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center font-bold text-white text-xs ${userName === '勇太' ? 'bg-indigo-500' : 'bg-rose-500'}`}>
+            {accountsInfo[userName]?.photoUrl ? <img src={accountsInfo[userName].photoUrl} alt={userName} className="w-full h-full object-cover" /> : userName.charAt(0)}
+         </div>
+         <h3 className="font-bold text-slate-800 dark:text-slate-100">{userName} のレポート</h3>
+      </div>
+      
+      {!hasData ? (
+        <div className="text-center py-6 text-slate-400 dark:text-slate-500 font-bold text-sm bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-800">記録がありません</div>
+      ) : (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+             <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+               <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold mb-1">月間総負荷量</p>
+               <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{totalVolume.toLocaleString()} <span className="text-xs">kg</span></p>
+             </div>
+             <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+               <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold mb-1">トレーニング日数</p>
+               <p className="text-xl font-bold text-slate-800 dark:text-slate-100">{trainingDays} <span className="text-xs">日</span></p>
+             </div>
+             <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+               <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold mb-1">総セット数</p>
+               <p className="text-xl font-bold text-slate-800 dark:text-slate-100">{totalSets} <span className="text-xs">set</span></p>
+             </div>
+             <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+               <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold mb-1">トレーニング回数(種目)</p>
+               <p className="text-xl font-bold text-slate-800 dark:text-slate-100">{totalWorkoutsCount} <span className="text-xs">回</span></p>
+             </div>
+          </div>
+          
+          <div className="pt-2">
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-bold mb-2">部位別のセット数</p>
+            <div className="space-y-2">
+              {MUSCLE_CATEGORIES.map(cat => {
+                if (categoryCount[cat] === 0) return null;
+                const percent = Math.min(100, (categoryCount[cat] / totalSets) * 100);
+                return (
+                  <div key={cat} className="flex items-center gap-2 text-xs font-bold">
+                    <span className="w-10 text-slate-600 dark:text-slate-300">{cat}</span>
+                    <div className="flex-1 h-3 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                      <div className={`h-full ${getCategoryColor(cat).split(' ')[0]} ${getCategoryColor(cat).split(' ')[2]}`} style={{ width: `${percent}%` }}></div>
+                    </div>
+                    <span className="w-8 text-right text-slate-500">{categoryCount[cat]}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- データ画面 (カレンダー・グラフ・レポート) ---
+function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDelete }) {
   const myPosts = posts ? posts.filter(p => p.author === currentUser) : [];
+  const partnerPosts = posts ? posts.filter(p => p.author === partnerName) : [];
+  
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState(formatDateFromTimestamp(Date.now()));
+  const [reportTab, setReportTab] = useState(currentUser);
   
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
@@ -998,18 +1111,23 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete }) {
   const days = Array.from({ length: daysInMonth || 0 }).map((_, i) => {
     const date = i + 1;
     const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(date).padStart(2,'0')}`;
-    const isTrained = myPosts.some(p => formatDateFromTimestamp(p.timestamp) === dateStr);
+    const isMyTraining = myPosts.some(p => formatDateFromTimestamp(p.timestamp) === dateStr);
+    const isPartnerTraining = partnerPosts.some(p => formatDateFromTimestamp(p.timestamp) === dateStr);
     const isSelected = selectedDateStr === dateStr;
     const isToday = dateStr === todayStr;
     
     return (
-      <div key={`day-${date}`} className="p-1 flex justify-center items-center" onClick={() => setSelectedDateStr(dateStr)}>
+      <div key={`day-${date}`} className="p-1 flex flex-col justify-center items-center h-14" onClick={() => setSelectedDateStr(dateStr)}>
         <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold transition-all cursor-pointer 
           ${isSelected ? 'ring-2 ring-offset-1 ring-emerald-500 dark:ring-offset-slate-800' : ''} 
-          ${isTrained ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}
-          ${isToday && !isTrained ? 'border-2 border-rose-400 text-rose-500' : ''}
+          ${isMyTraining || isPartnerTraining ? 'bg-slate-100 dark:bg-slate-700/50' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}
+          ${isToday ? 'border-2 border-emerald-400 text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}
         `}>
           {date}
+        </div>
+        <div className="flex gap-1 mt-1 h-1.5">
+          {isMyTraining && <div className={`w-1.5 h-1.5 rounded-full ${currentUser === '勇太' ? 'bg-indigo-500' : 'bg-rose-500'}`}></div>}
+          {isPartnerTraining && <div className={`w-1.5 h-1.5 rounded-full ${partnerName === '勇太' ? 'bg-indigo-500' : 'bg-rose-500'}`}></div>}
         </div>
       </div>
     );
@@ -1018,7 +1136,7 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete }) {
   const weightData = myPosts.filter(p => p.bodyWeight && !isNaN(p.bodyWeight)).map(p => ({ date: p.date, value: Number(p.bodyWeight) })).reverse();
   const fatData = myPosts.filter(p => p.bodyFat && !isNaN(p.bodyFat)).map(p => ({ date: p.date, value: Number(p.bodyFat) })).reverse();
 
-  const selectedPosts = myPosts.filter(p => formatDateFromTimestamp(p.timestamp) === selectedDateStr);
+  const selectedPosts = posts.filter(p => formatDateFromTimestamp(p.timestamp) === selectedDateStr);
 
   return (
     <div className="space-y-6">
@@ -1034,6 +1152,11 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete }) {
           {['日', '月', '火', '水', '木', '金', '土'].map(d => <div key={d} className={`text-xs font-bold ${d === '日' ? 'text-rose-400' : d === '土' ? 'text-blue-400' : 'text-slate-400'}`}>{d}</div>)}
         </div>
         <div className="grid grid-cols-7 text-center">{blanks}{days}</div>
+        
+        <div className="flex justify-center gap-4 mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400"><div className={`w-2 h-2 rounded-full ${currentUser === '勇太' ? 'bg-indigo-500' : 'bg-rose-500'}`}></div> {currentUser}</div>
+           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400"><div className={`w-2 h-2 rounded-full ${partnerName === '勇太' ? 'bg-indigo-500' : 'bg-rose-500'}`}></div> {partnerName}</div>
+        </div>
       </div>
       
       {selectedDateStr && (
@@ -1047,8 +1170,20 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete }) {
         </div>
       )}
 
-      <SimpleChart data={weightData} color="#10b981" title="体重の推移 (kg)" />
-      <SimpleChart data={fatData} color="#6366f1" title="体脂肪率の推移 (%)" />
+      <div>
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-8 mb-4">月間レポート ({month + 1}月)</h3>
+        <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl">
+          <button onClick={() => setReportTab(currentUser)} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${reportTab === currentUser ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{currentUser}</button>
+          <button onClick={() => setReportTab(partnerName)} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${reportTab === partnerName ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{partnerName}</button>
+        </div>
+        <MonthlyReport monthDate={currentMonth} posts={posts} userName={reportTab} accountsInfo={accountsInfo} />
+      </div>
+
+      <div className="space-y-6 pt-8">
+         <h3 className="text-lg font-bold text-slate-900 dark:text-white">体重・体脂肪率の推移</h3>
+         <SimpleChart data={weightData} color="#10b981" title={`${currentUser}の体重推移 (kg)`} />
+         <SimpleChart data={fatData} color="#6366f1" title={`${currentUser}の体脂肪率推移 (%)`} />
+      </div>
     </div>
   );
 }
@@ -1146,7 +1281,6 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const handleDragStart = (e, index) => {
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
-    // Firefox対応のためのダミーデータ
     if (e.dataTransfer.setData) e.dataTransfer.setData('text/plain', '');
   };
 
@@ -1217,7 +1351,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
       <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
         {MUSCLE_CATEGORIES.map(cat => {
           const isSelected = selectedCategories.includes(cat);
-          return <button key={cat} onClick={() => toggleCategory(cat)} className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${isSelected ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm' : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>{cat}</button>;
+          return <button key={cat} onClick={() => toggleCategory(cat)} className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${getCategoryTabColor(cat, isSelected)}`}>{cat}</button>;
         })}
       </div>
 
@@ -1562,7 +1696,7 @@ function ExercisesView({ gyms, exercises }) {
                           {gymExercises.map(ex => (
                             <div key={ex.id} className="p-3 flex justify-between items-center group">
                               <div>
-                                <p className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">{ex.name}{ex.category && <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-100 dark:bg-emerald-900/50 px-1.5 py-0.5 rounded">{ex.category}</span>}</p>
+                                <p className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">{ex.name}{ex.category && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${getCategoryColor(ex.category)}`}>{ex.category}</span>}</p>
                                 <div className="flex gap-2 mt-1">
                                   {ex.maker && <span className="text-xs text-slate-400 dark:text-slate-500 font-bold bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">{ex.maker}</span>}
                                   {ex.weightType && <span className="text-[10px] text-emerald-500 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-800">{ex.weightType === 'oneSide' ? '片側(kg)' : ex.weightType === 'plate' ? 'プレート(枚)' : ex.weightType === 'lr' ? '片側種目' : '合計(kg)'}</span>}
@@ -1589,7 +1723,7 @@ function ExercisesView({ gyms, exercises }) {
 }
 
 // --- パートナー画面 ---
-function FriendsView({ partnerName, partnerInfo, posts }) {
+function FriendsView({ partnerName, partnerInfo, currentUser, posts }) {
   const isTraining = partnerInfo?.isTraining;
   const lastActive = partnerInfo?.lastActive || 0;
   const isOnline = !isTraining && (Date.now() - lastActive < 300000);
@@ -1604,6 +1738,23 @@ function FriendsView({ partnerName, partnerInfo, posts }) {
   const partnerPosts = posts ? posts.filter(p => p.author === partnerName) : [];
   const weightData = partnerPosts.filter(p => p.bodyWeight && !isNaN(p.bodyWeight)).map(p => ({ date: p.date, value: Number(p.bodyWeight) })).reverse();
   const fatData = partnerPosts.filter(p => p.bodyFat && !isNaN(p.bodyFat)).map(p => ({ date: p.date, value: Number(p.bodyFat) })).reverse();
+
+  // 月間チャレンジの計算
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+  const currentMonthPosts = posts.filter(p => {
+    const d = new Date(p.timestamp);
+    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+  });
+
+  const myMonthVolume = currentMonthPosts.filter(p => p.author === currentUser).reduce((sum, p) => sum + (Number(p.volume) || 0), 0);
+  const partnerMonthVolume = currentMonthPosts.filter(p => p.author === partnerName).reduce((sum, p) => sum + (Number(p.volume) || 0), 0);
+  const totalMonthVolume = myMonthVolume + partnerMonthVolume;
+  const targetVolume = 100000; // 固定目標: 100トン(100,000kg)
+  const progressPercent = Math.min(100, (totalMonthVolume / targetVolume) * 100);
+  
+  const myPercent = Math.min(100, (myMonthVolume / targetVolume) * 100);
+  const partnerPercent = Math.min(100 - myPercent, (partnerMonthVolume / targetVolume) * 100);
 
   return (
     <div className="space-y-6">
@@ -1636,6 +1787,29 @@ function FriendsView({ partnerName, partnerInfo, posts }) {
             <div className="mt-4 inline-flex items-center gap-2 bg-black/20 px-4 py-1.5 rounded-full text-sm font-bold backdrop-blur-sm text-slate-200"><Circle fill="currentColor" size={10} className="text-slate-300" /> オフライン</div>
           )}
         </div>
+      </div>
+
+      <div className="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
+         <div className="absolute top-2 right-2 text-white/20"><Trophy size={80}/></div>
+         <div className="relative z-10">
+           <h3 className="font-bold text-lg flex items-center gap-2 mb-2"><Target size={20}/> 今月のふたりで100トンチャレンジ！</h3>
+           <p className="text-xs text-indigo-100 font-bold mb-4">ふたりの合計総負荷量で100,000kgを目指そう！</p>
+           
+           <div className="flex justify-between items-end mb-2">
+              <span className="text-2xl font-bold">{totalMonthVolume.toLocaleString()} <span className="text-sm font-normal">kg</span></span>
+              <span className="text-sm font-bold text-indigo-200">/ 100,000 kg</span>
+           </div>
+           
+           <div className="w-full h-4 bg-black/30 rounded-full overflow-hidden flex">
+              <div className="h-full bg-emerald-400 transition-all duration-1000" style={{ width: `${myPercent}%` }}></div>
+              <div className="h-full bg-rose-400 transition-all duration-1000" style={{ width: `${partnerPercent}%` }}></div>
+           </div>
+           
+           <div className="flex justify-between items-center mt-3 text-xs font-bold">
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-emerald-400"></div>{currentUser}: {myMonthVolume.toLocaleString()}kg</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-rose-400"></div>{partnerName}: {partnerMonthVolume.toLocaleString()}kg</div>
+           </div>
+         </div>
       </div>
 
       <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 mt-4 shadow-sm">
