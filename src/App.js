@@ -290,6 +290,7 @@ function SimpleChart({ data, color, title }) {
 
 // --- 共通コンポーネント：ワークアウトカード ---
 function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onToggleLike, onImport }) {
+  const [showImportOptions, setShowImportOptions] = useState(false);
   const isMyPost = post.author === currentUser;
   const authorInfo = accountsInfo && accountsInfo[post.author];
   const userColor = post.author === '勇太' ? 'bg-indigo-500' : 'bg-rose-500';
@@ -530,9 +531,25 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
         )}
         
         {onImport && (
-          <button onClick={() => onImport(post)} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-2 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/80 transition-colors border border-emerald-100 dark:border-emerald-900">
-            <Copy size={14} /> この構成で開始
-          </button>
+          <div className="relative">
+            {!showImportOptions ? (
+              <button onClick={() => setShowImportOptions(true)} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-2 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/80 transition-colors border border-emerald-100 dark:border-emerald-900">
+                <Copy size={14} /> 構成をコピー
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
+                <button onClick={() => { setShowImportOptions(false); onImport(post, false); }} className="flex items-center gap-1 text-xs font-bold text-white bg-emerald-500 px-2.5 py-1.5 rounded hover:bg-emerald-600 transition-colors shadow-sm">
+                  <Play size={12} fill="currentColor" /> 今から
+                </button>
+                <button onClick={() => { setShowImportOptions(false); onImport(post, true); }} className="flex items-center gap-1 text-xs font-bold text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-300 px-2.5 py-1.5 rounded border border-slate-200 dark:border-slate-700 transition-colors shadow-sm">
+                  <CalendarIcon size={12} /> 過去
+                </button>
+                <button onClick={() => setShowImportOptions(false)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-50 dark:bg-slate-800 rounded-full">
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -844,6 +861,8 @@ export default function App() {
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [currentUser, setCurrentUser] = useState(null); 
   const [currentTab, setCurrentTab] = useState('timeline');
+  const [isRecordManual, setIsRecordManual] = useState(false); // 追加
+  const [importGymId, setImportGymId] = useState(''); // 追加
   
   const [posts, setPosts] = useState([]);
   const [accountsInfo, setAccountsInfo] = useState({});
@@ -1049,8 +1068,11 @@ export default function App() {
   const myInfo = accountsInfo[currentUser] || {};
   const allGyms = useMemo(() => [{ id: 'common', name: 'フリーウェイト', createdAt: 0 }, ...gyms], [gyms]);
 
-  const handleImportWorkout = async (post) => {
-    if (myInfo.isTraining && myInfo.currentGymId) {
+  const handleImportWorkout = async (post, isManual) => {
+    const gym = allGyms.find(g => g.name === post.gymName);
+    const gymId = gym ? gym.id : '';
+
+    if (!isManual && myInfo.isTraining && myInfo.currentGymId) {
        const currentGymName = gyms.find(g => g.id === myInfo.currentGymId)?.name;
        if (currentGymName !== post.gymName) {
           alert(`現在 ${currentGymName} でトレーニング中のため、他のジムのメニューはコピーできません。`);
@@ -1070,9 +1092,15 @@ export default function App() {
     
     setDraftWorkoutItems(newItems);
     
-    if (!myInfo.isTraining) {
-      const gym = allGyms.find(g => g.name === post.gymName);
-      if (gym) await handleStartTraining(gym.id);
+    if (isManual) {
+      setIsRecordManual(true);
+      setImportGymId(gymId); // 過去の記録画面にジムIDを引き継ぐ
+    } else {
+      setIsRecordManual(false);
+      setImportGymId('');
+      if (!myInfo.isTraining) {
+        if (gymId) await handleStartTraining(gymId);
+      }
     }
     
     setCurrentTab('record');
@@ -1166,7 +1194,7 @@ export default function App() {
       <main className="p-4 max-w-md mx-auto w-full pb-40">
         {currentTab === 'timeline' && <TimelineView posts={posts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} />}
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} />}
-        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} posts={posts} currentUser={currentUser} />}
+        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} posts={posts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} partnerName={partnerName} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
         {currentTab === 'friends' && <FriendsView partnerName={partnerName} partnerInfo={partnerInfo} currentUser={currentUser} posts={posts} accountsInfo={accountsInfo} />}
       </main>
@@ -1726,7 +1754,7 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
 }
 
 // --- 記録入力画面 ---
-function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workoutItems, setWorkoutItems, posts, currentUser }) {
+function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workoutItems, setWorkoutItems, posts, currentUser, isManual, setIsManual }) {
   const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (gyms.filter(g => g.id !== 'common')[0]?.id || ''));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState([]);
@@ -1734,7 +1762,6 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const [bodyFat, setBodyFat] = useState('');
 
   // 過去の記録用ステート
-  const [isManual, setIsManual] = useState(false);
   const [manualDate, setManualDate] = useState(formatDateFromTimestamp(Date.now()));
   const [manualStartTime, setManualStartTime] = useState("12:00");
   const [manualEndTime, setManualEndTime] = useState("13:00");
