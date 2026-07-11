@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Contrast } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
@@ -864,6 +864,22 @@ export default function App() {
   const [isRecordManual, setIsRecordManual] = useState(false); // 追加
   const [importGymId, setImportGymId] = useState(''); // 追加
   
+  const scrollPositions = useRef({});
+  const prevTabRef = useRef('timeline');
+
+  // タブごとのスクロール位置を保持・復元する処理
+  useEffect(() => {
+    scrollPositions.current[prevTabRef.current] = window.scrollY;
+    const targetPosition = scrollPositions.current[currentTab] || 0;
+    
+    const timer = setTimeout(() => {
+      window.scrollTo(0, targetPosition);
+    }, 0);
+
+    prevTabRef.current = currentTab;
+    return () => clearTimeout(timer);
+  }, [currentTab]);
+  
   const [posts, setPosts] = useState([]);
   const [accountsInfo, setAccountsInfo] = useState({});
   const [gyms, setGyms] = useState([]); 
@@ -1145,7 +1161,7 @@ export default function App() {
 
   if (!isFullyLoaded) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6">
+      <div className="h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6">
         <Activity className="text-emerald-500 w-12 h-12 animate-pulse mb-4" />
         <p className="text-slate-500 dark:text-slate-400 font-bold mb-2">データを読み込み中...</p>
         <p className="text-slate-400 text-xs font-bold text-center">完了するまでしばらくお待ちください</p>
@@ -1427,7 +1443,7 @@ function LoginScreen({ onLogin, accountsInfo, onChangePin, isOnline }) {
 
   if (!selectedUser) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 relative">
+      <div className="h-screen overflow-hidden bg-slate-50 flex flex-col items-center justify-center p-6 relative">
         <div className="absolute top-6 left-6 z-10 flex items-center gap-1.5 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
           <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`}></div>
           <span className="text-[10px] font-bold text-slate-500">{isOnline ? 'オンライン' : 'オフライン (キャッシュ利用)'}</span>
@@ -2566,7 +2582,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
   const isOnline = lastActive > 0 && (Date.now() - lastActive < 45000); // 45秒以内かつアクティブ時のみオンライン
 
   const getTimeAgo = (timestamp) => {
-    if (!timestamp || timestamp === 0) return 'しばらく前';
+    if (!timestamp || timestamp === 0) return '少し前';
     const diff = Date.now() - timestamp;
     const minutes = Math.floor(diff / 60000);
     if (minutes < 1) return '数秒前';
