@@ -1048,7 +1048,14 @@ export default function App() {
     return false;
   }
 
-  const handleLogout = () => { setCurrentUser(null); setCurrentTab('timeline'); setEditingPost(null); };
+  const handleLogout = async () => { 
+    if (currentUser && db) {
+      try {
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isAppOnline: false, lastActive: Date.now() }, { merge: true });
+      } catch (e) {}
+    }
+    setCurrentUser(null); setCurrentTab('timeline'); setEditingPost(null); 
+  };
 
   const handleStartTraining = async (gymId) => {
     if (!currentUser || !db) return;
@@ -2611,13 +2618,16 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
 function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInfo }) {
   const isTraining = partnerInfo?.isTraining;
   const lastActive = partnerInfo?.lastActive || 0;
-  const isOnline = lastActive > 0 && (Date.now() - lastActive < 45000); // 45秒以内かつアクティブ時のみオンライン
+  
+  // フラグがtrue、かつ45秒以内に通信がある場合のみオンラインとする
+  const isAppOnline = partnerInfo?.isAppOnline !== false;
+  const isOnline = isAppOnline && lastActive > 0 && (Date.now() - lastActive < 45000);
 
   const getTimeAgo = (timestamp) => {
     if (!timestamp || timestamp === 0) return '記録なし';
-    const diff = Date.now() - timestamp;
+    const diff = Math.max(0, Date.now() - timestamp); // 負の数を防止
     const minutes = Math.floor(diff / 60000);
-    if (minutes < 1) return '数秒前';
+    if (minutes < 1) return 'たった今';
     if (minutes < 60) return `${minutes}分前`;
     const hours = Math.floor(minutes / 60);
     if (hours < 24) return `${hours}時間前`;
