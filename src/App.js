@@ -209,14 +209,29 @@ const calculateWorkoutTotals = (items, durationMs, bodyWeight) => {
             if (item.superExerciseName) itemVolume += calcSetVolume({weight: set.superWeight, reps: set.superReps, lReps: set.superLReps, rReps: set.superRReps, forcedReps: set.superForcedReps}, item.superWeightType, baseWeight); 
             if (item.superExerciseName3) itemVolume += calcSetVolume({weight: set.superWeight3, reps: set.superReps3, lReps: set.superLReps3, rReps: set.superRReps3, forcedReps: set.superForcedReps3}, item.superWeightType3, baseWeight); 
           }
-          if (item.isDropSet && set.dropSets) { 
-            set.dropSets.forEach(ds => { 
-              itemVolume += calcSetVolume(ds, item.weightType, baseWeight); 
-              if (item.isSuperSet) {
-                if (item.superExerciseName) itemVolume += calcSetVolume({weight: ds.superWeight, reps: ds.superReps, lReps: ds.superLReps, rReps: ds.superRReps, forcedReps: ds.superForcedReps}, item.superWeightType, baseWeight); 
-                if (item.superExerciseName3) itemVolume += calcSetVolume({weight: ds.superWeight3, reps: ds.superReps3, lReps: ds.superLReps3, rReps: ds.superRReps3, forcedReps: ds.superForcedReps3}, item.superWeightType3, baseWeight); 
-              }
-            }); 
+          if (item.isDropSet) { 
+            if (set.dropSets) {
+              set.dropSets.forEach(ds => { 
+                itemVolume += calcSetVolume(ds, item.weightType, baseWeight); 
+                // 旧データとの互換性
+                if (item.isSuperSet && !set.superDropSets && item.superExerciseName && ds.superWeight !== undefined) {
+                   itemVolume += calcSetVolume({weight: ds.superWeight, reps: ds.superReps, lReps: ds.superLReps, rReps: ds.superRReps, forcedReps: ds.superForcedReps}, item.superWeightType, baseWeight); 
+                }
+                if (item.isSuperSet && !set.superDropSets3 && item.superExerciseName3 && ds.superWeight3 !== undefined) {
+                   itemVolume += calcSetVolume({weight: ds.superWeight3, reps: ds.superReps3, lReps: ds.superLReps3, rReps: ds.superRReps3, forcedReps: ds.superForcedReps3}, item.superWeightType3, baseWeight); 
+                }
+              }); 
+            }
+            if (item.isSuperSet && item.superExerciseName && set.superDropSets) {
+              set.superDropSets.forEach(ds => {
+                itemVolume += calcSetVolume({weight: ds.superWeight, reps: ds.superReps, lReps: ds.superLReps, rReps: ds.superRReps, forcedReps: ds.superForcedReps}, item.superWeightType, baseWeight);
+              });
+            }
+            if (item.isSuperSet && item.superExerciseName3 && set.superDropSets3) {
+              set.superDropSets3.forEach(ds => {
+                itemVolume += calcSetVolume({weight: ds.superWeight3, reps: ds.superReps3, lReps: ds.superLReps3, rReps: ds.superRReps3, forcedReps: ds.superForcedReps3}, item.superWeightType3, baseWeight);
+              });
+            }
           }
         }
       });
@@ -497,7 +512,10 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                   {item.isSuperSet && item.superExerciseName && (
                     <>
                       {renderSetRow(set, item.superWeightType || 'total', 'super2', false, '↳ Sup2')}
-                      {item.isDropSet && set.dropSets && set.dropSets.map((ds, dsIdx) => (
+                      {item.isDropSet && set.dropSets && !set.superDropSets && set.dropSets.map((ds, dsIdx) => (
+                        ds.superWeight !== undefined ? renderSetRow(ds, item.superWeightType || 'total', 'super2', true, '↳ drop2') : null
+                      ))}
+                      {item.isDropSet && set.superDropSets && set.superDropSets.map((ds, dsIdx) => (
                         renderSetRow(ds, item.superWeightType || 'total', 'super2', true, '↳ drop2')
                       ))}
                     </>
@@ -506,7 +524,10 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                   {item.isSuperSet && item.superExerciseName3 && (
                     <>
                       {renderSetRow(set, item.superWeightType3 || 'total', 'super3', false, '↳ Sup3')}
-                      {item.isDropSet && set.dropSets && set.dropSets.map((ds, dsIdx) => (
+                      {item.isDropSet && set.dropSets && !set.superDropSets3 && set.dropSets.map((ds, dsIdx) => (
+                        ds.superWeight3 !== undefined ? renderSetRow(ds, item.superWeightType3 || 'total', 'super3', true, '↳ drop3') : null
+                      ))}
+                      {item.isDropSet && set.superDropSets3 && set.superDropSets3.map((ds, dsIdx) => (
                         renderSetRow(ds, item.superWeightType3 || 'total', 'super3', true, '↳ drop3')
                       ))}
                     </>
@@ -611,7 +632,7 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
       if (type === 'super2') fieldName = 'super' + f.charAt(0).toUpperCase() + f.slice(1);
       if (type === 'super3') fieldName = 'super' + f.charAt(0).toUpperCase() + f.slice(1) + '3';
 
-      if (isDrop) updateDropSet(item.id, setObj._parentId, dropId, fieldName, v);
+      if (isDrop) updateDropSet(item.id, setObj._parentId, dropId, fieldName, v, setObj._targetArray || 'dropSets');
       else updateSet(item.id, setObj.id, fieldName, v);
     };
 
@@ -806,13 +827,13 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
             {item.isDropSet && item.weightType !== 'cardio' && set.dropSets && set.dropSets.map(ds => (
               <div key={ds.id} className="border-l-2 border-orange-200 dark:border-orange-800 pl-3 flex items-center gap-2 ml-4">
                 <TrendingDown size={16} className="text-orange-400 flex-shrink-0" />
-                {renderInputRow({ ...ds, _parentId: set.id }, item.weightType, 'main', true, ds.id)}
-                <button onClick={() => removeDropSet(item.id, set.id, ds.id)} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
+                {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'dropSets' }, item.weightType, 'main', true, ds.id)}
+                <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'dropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
               </div>
             ))}
 
             {item.isDropSet && item.weightType !== 'cardio' && (
-              <button onClick={() => addDropSet(item.id, set.id)} className="ml-4 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900 border border-orange-200 dark:border-orange-800 px-3 py-1.5 rounded transition-colors font-bold flex items-center gap-1"><Plus size={12}/>ドロップ追加</button>
+              <button onClick={() => addDropSet(item.id, set.id, 'dropSets')} className="ml-4 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900 border border-orange-200 dark:border-orange-800 px-3 py-1.5 rounded transition-colors font-bold flex items-center gap-1 w-max"><Plus size={12}/>ドロップ追加</button>
             )}
 
             {item.isSuperSet && item.superExerciseName && item.weightType !== 'cardio' && (
@@ -822,13 +843,28 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
                   {renderInputRow(set, item.superWeightType || 'total', 'super2', false)}
                   <div className="w-6 shrink-0"></div>
                 </div>
-                {item.isDropSet && set.dropSets && set.dropSets.map(ds => (
-                  <div key={`super2-ds-${ds.id}`} className="flex items-center gap-2 pl-8 border-l-2 border-indigo-200 dark:border-indigo-800 ml-5">
-                    <TrendingDown size={14} className="text-indigo-300 flex-shrink-0" />
-                    {renderInputRow({ ...ds, _parentId: set.id }, item.superWeightType || 'total', 'super2', true, ds.id)}
-                    <div className="w-6 shrink-0"></div>
+                
+                {item.isDropSet && set.dropSets && !set.superDropSets && set.dropSets.map(ds => (
+                  ds.superWeight !== undefined ? (
+                  <div key={`super2-old-ds-${ds.id}`} className="flex items-center gap-2 pl-8 border-l-2 border-orange-300 dark:border-orange-700 ml-5">
+                    <TrendingDown size={14} className="text-orange-400 flex-shrink-0" />
+                    {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'dropSets' }, item.superWeightType || 'total', 'super2', true, ds.id)}
+                    <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'dropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
+                  </div>
+                  ) : null
+                ))}
+                
+                {item.isDropSet && set.superDropSets && set.superDropSets.map(ds => (
+                  <div key={`super2-ds-${ds.id}`} className="flex items-center gap-2 pl-8 border-l-2 border-orange-300 dark:border-orange-700 ml-5">
+                    <TrendingDown size={14} className="text-orange-400 flex-shrink-0" />
+                    {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'superDropSets' }, item.superWeightType || 'total', 'super2', true, ds.id)}
+                    <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'superDropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
                   </div>
                 ))}
+                
+                {item.isDropSet && (
+                  <button onClick={() => addDropSet(item.id, set.id, 'superDropSets')} className="ml-12 mt-1 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900 border border-orange-200 dark:border-orange-800 px-3 py-1.5 rounded transition-colors font-bold flex items-center gap-1 w-max"><Plus size={12}/>ドロップ追加</button>
+                )}
               </div>
             )}
             
@@ -839,13 +875,28 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
                   {renderInputRow(set, item.superWeightType3 || 'total', 'super3', false)}
                   <div className="w-6 shrink-0"></div>
                 </div>
-                {item.isDropSet && set.dropSets && set.dropSets.map(ds => (
-                  <div key={`super3-ds-${ds.id}`} className="flex items-center gap-2 pl-8 border-l-2 border-indigo-200 dark:border-indigo-800 ml-5">
-                    <TrendingDown size={14} className="text-indigo-300 flex-shrink-0" />
-                    {renderInputRow({ ...ds, _parentId: set.id }, item.superWeightType3 || 'total', 'super3', true, ds.id)}
-                    <div className="w-6 shrink-0"></div>
+                
+                {item.isDropSet && set.dropSets && !set.superDropSets3 && set.dropSets.map(ds => (
+                  ds.superWeight3 !== undefined ? (
+                  <div key={`super3-old-ds-${ds.id}`} className="flex items-center gap-2 pl-8 border-l-2 border-orange-300 dark:border-orange-700 ml-5">
+                    <TrendingDown size={14} className="text-orange-400 flex-shrink-0" />
+                    {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'dropSets' }, item.superWeightType3 || 'total', 'super3', true, ds.id)}
+                    <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'dropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
+                  </div>
+                  ) : null
+                ))}
+                
+                {item.isDropSet && set.superDropSets3 && set.superDropSets3.map(ds => (
+                  <div key={`super3-ds-${ds.id}`} className="flex items-center gap-2 pl-8 border-l-2 border-orange-300 dark:border-orange-700 ml-5">
+                    <TrendingDown size={14} className="text-orange-400 flex-shrink-0" />
+                    {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'superDropSets3' }, item.superWeightType3 || 'total', 'super3', true, ds.id)}
+                    <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'superDropSets3')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
                   </div>
                 ))}
+                
+                {item.isDropSet && (
+                  <button onClick={() => addDropSet(item.id, set.id, 'superDropSets3')} className="ml-12 mt-1 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900 border border-orange-200 dark:border-orange-800 px-3 py-1.5 rounded transition-colors font-bold flex items-center gap-1 w-max"><Plus size={12}/>ドロップ追加</button>
+                )}
               </div>
             )}
           </div>
@@ -1933,7 +1984,9 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
           reps: lastSet.reps || '', 
           lReps: lastSet.lReps || '', 
           rReps: lastSet.rReps || '',
-          dropSets: lastSet.dropSets ? lastSet.dropSets.map(ds => ({ ...ds, id: generateId() })) : undefined
+          dropSets: lastSet.dropSets ? lastSet.dropSets.map(ds => ({ ...ds, id: generateId() })) : undefined,
+          superDropSets: lastSet.superDropSets ? lastSet.superDropSets.map(ds => ({ ...ds, id: generateId() })) : undefined,
+          superDropSets3: lastSet.superDropSets3 ? lastSet.superDropSets3.map(ds => ({ ...ds, id: generateId() })) : undefined
         }]};
       }
       return item;
@@ -1949,30 +2002,30 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
     }));
   };
 
-  const addDropSet = (itemId, parentSetId) => {
+  const addDropSet = (itemId, parentSetId, targetArray = 'dropSets') => {
     setWorkoutItems(prev => prev.map(item => {
       if (item.id !== itemId) return item;
       return { ...item, sets: item.sets.map(set => {
         if (set.id !== parentSetId) return set;
-        return { ...set, dropSets: [...(set.dropSets || []), { id: generateId(), weight: '', reps: '', lReps: '', rReps: '' }]};
+        return { ...set, [targetArray]: [...(set[targetArray] || []), { id: generateId(), weight: '', reps: '', lReps: '', rReps: '' }]};
       })};
     }));
   }
-  const removeDropSet = (itemId, parentSetId, dropId) => {
+  const removeDropSet = (itemId, parentSetId, dropId, targetArray = 'dropSets') => {
     setWorkoutItems(prev => prev.map(item => {
       if (item.id !== itemId) return item;
       return { ...item, sets: item.sets.map(set => {
         if (set.id !== parentSetId) return set;
-        return { ...set, dropSets: set.dropSets.filter(ds => ds.id !== dropId) };
+        return { ...set, [targetArray]: (set[targetArray] || []).filter(ds => ds.id !== dropId) };
       })};
     }));
   }
-  const updateDropSetField = (itemId, parentSetId, dropId, field, value) => {
+  const updateDropSetField = (itemId, parentSetId, dropId, field, value, targetArray = 'dropSets') => {
     setWorkoutItems(prev => prev.map(item => {
       if (item.id !== itemId) return item;
       return { ...item, sets: item.sets.map(set => {
         if (set.id !== parentSetId) return set;
-        return { ...set, dropSets: set.dropSets.map(ds => ds.id === dropId ? { ...ds, [field]: value } : ds) };
+        return { ...set, [targetArray]: (set[targetArray] || []).map(ds => ds.id === dropId ? { ...ds, [field]: value } : ds) };
       })};
     }));
   }
@@ -2235,13 +2288,13 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
     [newItems[index], newItems[index + 1]] = [newItems[index + 1], newItems[index]];
     setWorkoutItems(newItems);
   };
-  const addSet = (itemId) => { setWorkoutItems(prev => prev.map(item => { if (item.id === itemId) { const lastSet = (item.sets && item.sets.length > 0) ? item.sets[item.sets.length - 1] : { weight: '', reps: '', lReps: '', rReps: '' }; return { ...item, sets: [...(item.sets || []), { id: generateId(), weight: lastSet.weight || '', reps: lastSet.reps || '', lReps: lastSet.lReps || '', rReps: lastSet.rReps || '' }]}; } return item; })); };
+  const addSet = (itemId) => { setWorkoutItems(prev => prev.map(item => { if (item.id === itemId) { const lastSet = (item.sets && item.sets.length > 0) ? item.sets[item.sets.length - 1] : { weight: '', reps: '', lReps: '', rReps: '' }; return { ...item, sets: [...(item.sets || []), { id: generateId(), weight: lastSet.weight || '', reps: lastSet.reps || '', lReps: lastSet.lReps || '', rReps: lastSet.rReps || '', dropSets: lastSet.dropSets ? lastSet.dropSets.map(ds => ({...ds, id: generateId()})) : undefined, superDropSets: lastSet.superDropSets ? lastSet.superDropSets.map(ds => ({...ds, id: generateId()})) : undefined, superDropSets3: lastSet.superDropSets3 ? lastSet.superDropSets3.map(ds => ({...ds, id: generateId()})) : undefined }]}; } return item; })); };
   const removeSet = (itemId, setId) => setWorkoutItems(prev => prev.map(item => item.id === itemId ? { ...item, sets: (item.sets || []).filter(set => set.id !== setId) } : item));
   const updateSetField = (itemId, setId, field, value) => { setWorkoutItems(prev => prev.map(item => { if (item.id !== itemId) return item; return { ...item, sets: (item.sets || []).map(set => set.id === setId ? { ...set, [field]: value } : set) }; })); };
 
-  const addDropSet = (itemId, parentSetId) => { setWorkoutItems(prev => prev.map(item => { if (item.id !== itemId) return item; return { ...item, sets: item.sets.map(set => { if (set.id !== parentSetId) return set; return { ...set, dropSets: [...(set.dropSets || []), { id: generateId(), weight: '', reps: '', lReps: '', rReps: '' }]}; })}; })); }
-  const removeDropSet = (itemId, parentSetId, dropId) => { setWorkoutItems(prev => prev.map(item => { if (item.id !== itemId) return item; return { ...item, sets: item.sets.map(set => { if (set.id !== parentSetId) return set; return { ...set, dropSets: set.dropSets.filter(ds => ds.id !== dropId) }; })}; })); }
-  const updateDropSetField = (itemId, parentSetId, dropId, field, value) => { setWorkoutItems(prev => prev.map(item => { if (item.id !== itemId) return item; return { ...item, sets: item.sets.map(set => { if (set.id !== parentSetId) return set; return { ...set, dropSets: set.dropSets.map(ds => ds.id === dropId ? { ...ds, [field]: value } : ds) }; })}; })); }
+  const addDropSet = (itemId, parentSetId, targetArray = 'dropSets') => { setWorkoutItems(prev => prev.map(item => { if (item.id !== itemId) return item; return { ...item, sets: item.sets.map(set => { if (set.id !== parentSetId) return set; return { ...set, [targetArray]: [...(set[targetArray] || []), { id: generateId(), weight: '', reps: '', lReps: '', rReps: '' }]}; })}; })); }
+  const removeDropSet = (itemId, parentSetId, dropId, targetArray = 'dropSets') => { setWorkoutItems(prev => prev.map(item => { if (item.id !== itemId) return item; return { ...item, sets: item.sets.map(set => { if (set.id !== parentSetId) return set; return { ...set, [targetArray]: (set[targetArray] || []).filter(ds => ds.id !== dropId) }; })}; })); }
+  const updateDropSetField = (itemId, parentSetId, dropId, field, value, targetArray = 'dropSets') => { setWorkoutItems(prev => prev.map(item => { if (item.id !== itemId) return item; return { ...item, sets: item.sets.map(set => { if (set.id !== parentSetId) return set; return { ...set, [targetArray]: (set[targetArray] || []).map(ds => ds.id === dropId ? { ...ds, [field]: value } : ds) }; })}; })); }
 
   const handleSave = () => {
     const isValid = workoutItems.every(item => {
