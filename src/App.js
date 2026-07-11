@@ -856,8 +856,40 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
   );
 }
 
+// --- スクロール自動制御フック ---
+function useAutoScrollDisable() {
+  useEffect(() => {
+    const checkScroll = () => {
+      // コンテンツの高さがウィンドウの高さ以下であればスクロールを無効化
+      if (document.documentElement.scrollHeight <= window.innerHeight) {
+        document.body.style.overflow = 'hidden';
+      } else {
+        document.body.style.overflow = '';
+      }
+    };
+
+    // 初期レンダリング時の判定
+    checkScroll();
+
+    // 画面サイズ変更時の判定
+    window.addEventListener('resize', checkScroll);
+    
+    // 要素の追加や削除など、DOMの変更を監視して再判定
+    const observer = new MutationObserver(checkScroll);
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+
+    return () => {
+      window.removeEventListener('resize', checkScroll);
+      observer.disconnect();
+      document.body.style.overflow = '';
+    };
+  }, []);
+}
+
 // === メインアプリケーション ===
 export default function App() {
+  useAutoScrollDisable();
+
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [currentUser, setCurrentUser] = useState(null); 
   const [currentTab, setCurrentTab] = useState('timeline');
@@ -2582,7 +2614,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
   const isOnline = lastActive > 0 && (Date.now() - lastActive < 45000); // 45秒以内かつアクティブ時のみオンライン
 
   const getTimeAgo = (timestamp) => {
-    if (!timestamp || timestamp === 0) return '少し前';
+    if (!timestamp || timestamp === 0) return '記録なし';
     const diff = Date.now() - timestamp;
     const minutes = Math.floor(diff / 60000);
     if (minutes < 1) return '数秒前';
