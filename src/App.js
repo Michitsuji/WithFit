@@ -593,7 +593,14 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 
 // --- 共通コンポーネント：ワークアウト入力フォーム ---
 function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, updateItem, removeItem, moveItemUp, moveItemDown, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet, myPastPosts }) {
-  
+  const [localFilter, setLocalFilter] = useState('all');
+
+  const filteredExercises = availableExercises.filter(ex => {
+    if (localFilter === 'common' && ex.gymId !== 'common') return false;
+    if (localFilter === 'gym' && ex.gymId === 'common') return false;
+    return true;
+  });
+
   const updateExerciseName = (newName, superIndex = 0) => {
     const exData = availableExercises.find(ex => ex.name === newName);
     if (superIndex === 2) {
@@ -745,24 +752,31 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm relative w-full overflow-hidden mb-6 transition-all duration-200">
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-1.5 flex-1 min-w-0">
-          <div className="flex flex-col gap-0.5">
+      <div className="flex justify-between items-start mb-4">
+        <div className="flex items-start gap-1.5 flex-1 min-w-0">
+          <div className="flex flex-col gap-0.5 mt-2">
             <button onClick={() => moveItemUp(index)} disabled={isFirst} className="p-1 text-slate-400 hover:text-emerald-500 disabled:opacity-30 bg-slate-50 dark:bg-slate-800 rounded transition-colors"><ArrowUp size={14}/></button>
             <button onClick={() => moveItemDown(index)} disabled={isLast} className="p-1 text-slate-400 hover:text-emerald-500 disabled:opacity-30 bg-slate-50 dark:bg-slate-800 rounded transition-colors"><ArrowDown size={14}/></button>
           </div>
-          <div className="relative flex-1 min-w-0 ml-1">
-            <select value={item.exerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, 0)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base pr-8" style={{ fontSize: '16px' }}>
-              <option value="" disabled>{availableExercises.length === 0 ? "上の部位を選択してください" : "種目を選択"}</option>
-              {item.exerciseName && !availableExercises.some(ex => ex.name === item.exerciseName) && (
-                <option value={item.exerciseName}>{item.exerciseName}</option>
-              )}
-              {availableExercises.map(ex => <option key={ex.id} value={ex.name}>{ex.name}{ex.maker ? `（${ex.maker}）` : ''}</option>)}
-            </select>
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
+          <div className="flex flex-col flex-1 min-w-0 ml-1 gap-2">
+            <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg">
+              <button onClick={() => setLocalFilter('all')} className={`flex-1 py-1.5 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'all' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>すべて表示</button>
+              <button onClick={() => setLocalFilter('common')} className={`flex-1 py-1.5 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'common' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>フリーウェイト</button>
+              <button onClick={() => setLocalFilter('gym')} className={`flex-1 py-1.5 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'gym' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>マシン等</button>
+            </div>
+            <div className="relative w-full">
+              <select value={item.exerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, 0)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base pr-8" style={{ fontSize: '16px' }}>
+                <option value="" disabled>{filteredExercises.length === 0 ? (availableExercises.length === 0 ? "上の部位を選択してください" : "該当する種目がありません") : "種目を選択"}</option>
+                {item.exerciseName && !filteredExercises.some(ex => ex.name === item.exerciseName) && (
+                  <option value={item.exerciseName}>{item.exerciseName}</option>
+                )}
+                {filteredExercises.map(ex => <option key={ex.id} value={ex.name}>{ex.name}{ex.maker ? `（${ex.maker}）` : ''}</option>)}
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
+            </div>
           </div>
         </div>
-        <button onClick={() => removeItem(item.id)} className="ml-2 text-slate-400 hover:text-rose-500 p-2 flex-shrink-0 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors"><Trash2 size={18} /></button>
+        <button onClick={() => removeItem(item.id)} className="ml-2 text-slate-400 hover:text-rose-500 p-2 flex-shrink-0 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors mt-2"><Trash2 size={18} /></button>
       </div>
 
       {prevRecord && (
@@ -794,10 +808,10 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
           <div className="relative w-full">
             <select value={item.superExerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, 2)} className="w-full bg-indigo-50/30 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold appearance-none focus:outline-none focus:border-indigo-500 text-base pr-8" style={{ fontSize: '16px' }}>
               <option value="" disabled>スーパーセットの種目 (2種目目)</option>
-              {item.superExerciseName && !availableExercises.some(ex => ex.name === item.superExerciseName) && (
+              {item.superExerciseName && !filteredExercises.some(ex => ex.name === item.superExerciseName) && (
                 <option value={item.superExerciseName}>{item.superExerciseName}</option>
               )}
-              {availableExercises.filter(ex => ex.weightType !== 'cardio').map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
+              {filteredExercises.filter(ex => ex.weightType !== 'cardio').map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
             </select>
             <div className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-300 pointer-events-none text-xs">▼</div>
           </div>
@@ -805,10 +819,10 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
             <div className="relative w-full">
               <select value={item.superExerciseName3 || ''} onChange={(e) => updateExerciseName(e.target.value, 3)} className="w-full bg-indigo-50/30 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold appearance-none focus:outline-none focus:border-indigo-500 text-base pr-8" style={{ fontSize: '16px' }}>
                 <option value="">ジャイアントセット (3種目目・任意)</option>
-                {item.superExerciseName3 && !availableExercises.some(ex => ex.name === item.superExerciseName3) && (
+                {item.superExerciseName3 && !filteredExercises.some(ex => ex.name === item.superExerciseName3) && (
                   <option value={item.superExerciseName3}>{item.superExerciseName3}</option>
                 )}
-                {availableExercises.filter(ex => ex.weightType !== 'cardio').map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
+                {filteredExercises.filter(ex => ex.weightType !== 'cardio').map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
               </select>
               <div className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-300 pointer-events-none text-xs">▼</div>
             </div>
