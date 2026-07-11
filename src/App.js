@@ -1857,13 +1857,11 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
   );
 }
 
-<main className="p-4 max-w-md mx-auto w-full pb-40">
-        {currentTab === 'timeline' && <TimelineView posts={posts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} />}
-        {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={posts} accountsInfo={accountsInfo} />}
-        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={posts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} />}
-        {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} partnerName={partnerName} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
-        {currentTab === 'friends' && <FriendsView partnerName={partnerName} partnerInfo={partnerInfo} currentUser={currentUser} posts={posts} accountsInfo={accountsInfo} />}
-      </main>
+// --- 記録入力画面 ---
+function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workoutItems, setWorkoutItems, selectedCategories, setSelectedCategories, posts, currentUser, isManual, setIsManual }) {
+  const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (gyms.filter(g => g.id !== 'common')[0]?.id || ''));
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bodyWeight, setBodyWeight] = useState(myInfo.weight || '');
   const [bodyFat, setBodyFat] = useState('');
 
   // 過去の記録用ステート
