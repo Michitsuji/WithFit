@@ -2441,6 +2441,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
   const [editExMaker, setEditExMaker] = useState('');
   const [editExWeightType, setEditExWeightType] = useState('total'); 
   const [editExCategory, setEditExCategory] = useState('胸');
+  const [editingExGymId, setEditingExGymId] = useState('');
 
   const handleAddGym = async (e) => {
     e.preventDefault();
@@ -2469,7 +2470,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
     setIsAdding(false);
   };
 
-  const startEdit = (ex) => { setEditingExId(ex.id); setEditingExOldName(ex.name); setEditExName(ex.name); setEditExMaker(ex.maker || ''); setEditExWeightType(ex.weightType || 'total'); setEditExCategory(ex.category || 'その他'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const startEdit = (ex) => { setEditingExId(ex.id); setEditingExOldName(ex.name); setEditExName(ex.name); setEditExMaker(ex.maker || ''); setEditExWeightType(ex.weightType || 'total'); setEditExCategory(ex.category || 'その他'); setEditingExGymId(ex.gymId || ''); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const cancelEdit = () => { setEditingExId(null); setEditingExOldName(''); };
 
   const handleUpdateExercise = async (e) => {
@@ -2477,7 +2478,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
     if (!editExName.trim()) return;
     try { 
       // 種目マスターデータの更新
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', editingExId), { name: editExName.trim(), maker: editExMaker.trim(), weightType: editExWeightType, category: editExCategory }, { merge: true }); 
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', editingExId), { name: editExName.trim(), maker: editExMaker.trim(), weightType: editExWeightType, category: editExCategory, gymId: editingExGymId }, { merge: true }); 
 
       // 過去の投稿を一括更新（種目名・カテゴリ・重量タイプの変更を反映）
       if (posts && posts.length > 0) {
@@ -2594,6 +2595,15 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
                   <h3 className="text-sm font-bold text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2"><Edit2 size={16}/> 種目の編集</h3>
                   <button type="button" onClick={cancelEdit} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><X size={20}/></button>
                   <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">対象のジム <span className="text-rose-500">*</span></label>
+                      <div className="relative">
+                        <select value={editingExGymId} onChange={e => setEditingExGymId(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
+                          {gyms.map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
+                        </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
+                      </div>
+                    </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">部位カテゴリ</label>
                       <div className="relative">
