@@ -952,10 +952,30 @@ export default function App() {
 
   useEffect(() => {
     if (!currentUser || !db || !isOnline) return;
-    const updatePresence = async () => { try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { lastActive: Date.now() }, { merge: true }); } catch (e) {} };
-    updatePresence();
-    const intervalId = setInterval(updatePresence, 60000);
-    return () => clearInterval(intervalId);
+    const updatePresence = async (activeTime) => { 
+      try { 
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { lastActive: activeTime }, { merge: true }); 
+      } catch (e) {} 
+    };
+    
+    updatePresence(Date.now());
+    const intervalId = setInterval(() => updatePresence(Date.now()), 15000); // 15秒に1回更新
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        updatePresence(0); // アプリを閉じたりバックグラウンドに入ったらオフラインにする
+      } else {
+        updatePresence(Date.now()); // アプリに戻ったらオンラインにする
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      updatePresence(0);
+    };
   }, [currentUser, isOnline]);
 
   const handleLogin = async (userId, pin) => {
@@ -2543,10 +2563,10 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
 function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInfo }) {
   const isTraining = partnerInfo?.isTraining;
   const lastActive = partnerInfo?.lastActive || 0;
-  const isOnline = (Date.now() - lastActive < 300000);
+  const isOnline = lastActive > 0 && (Date.now() - lastActive < 45000); // 45秒以内かつアクティブ時のみオンライン
 
   const getTimeAgo = (timestamp) => {
-    if (!timestamp) return '未ログイン';
+    if (!timestamp || timestamp === 0) return 'しばらく前';
     const diff = Date.now() - timestamp;
     const minutes = Math.floor(diff / 60000);
     if (minutes < 1) return '数秒前';
@@ -2625,7 +2645,9 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
           ) : (
             <div className="mt-4 inline-flex items-center gap-2 bg-black/20 px-4 py-1.5 rounded-full text-sm font-bold backdrop-blur-sm text-slate-200"><Circle fill="currentColor" size={10} className="text-slate-300" /> オフライン</div>
           )}
-          <div className="mt-2 text-xs font-bold text-white/70">最終ログイン: {getTimeAgo(lastActive)}</div>
+          {!isOnline && (
+            <div className="mt-2 text-xs font-bold text-white/70">最終ログイン: {getTimeAgo(lastActive)}</div>
+          )}
         </div>
       </div>
 
