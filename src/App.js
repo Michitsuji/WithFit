@@ -2454,6 +2454,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
   const [newGymName, setNewGymName] = useState('');
   const [selectedGymId, setSelectedGymId] = useState(gyms.length > 0 ? gyms[0].id : '');
   const [filterGymId, setFilterGymId] = useState('all');
+  const [filterCategory, setFilterCategory] = useState('all');
   const [editingGymId, setEditingGymId] = useState(null);
   const [editGymName, setEditGymName] = useState('');
   const [newExName, setNewExName] = useState('');
@@ -2697,19 +2698,28 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
               )}
 
               <div>
-                <div className="flex justify-between items-center mb-3 ml-1">
+                <div className="flex flex-col mb-3 ml-1 gap-2">
                   <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400">登録済みの種目</h3>
-                  <div className="relative w-48">
-                    <select value={filterGymId} onChange={e => setFilterGymId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-xs">
-                      <option value="all">すべてのジム</option>
-                      {gyms.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                    </select>
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[10px]">▼</div>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <select value={filterGymId} onChange={e => setFilterGymId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-xs">
+                        <option value="all">すべてのジム</option>
+                        {gyms.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                      </select>
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[10px]">▼</div>
+                    </div>
+                    <div className="relative flex-1">
+                      <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-xs">
+                        <option value="all">すべての部位</option>
+                        {MUSCLE_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                      </select>
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[10px]">▼</div>
+                    </div>
                   </div>
                 </div>
                 <div className="space-y-4">
                   {gyms.filter(gym => filterGymId === 'all' || gym.id === filterGymId).map(gym => {
-                    const gymExercises = exercises.filter(ex => ex.gymId === gym.id).sort((a, b) => {
+                    const gymExercises = exercises.filter(ex => ex.gymId === gym.id && (filterCategory === 'all' || ex.category === filterCategory)).sort((a, b) => {
                       const idxA = MUSCLE_CATEGORIES.indexOf(a.category);
                       const idxB = MUSCLE_CATEGORIES.indexOf(b.category);
                       return (idxA !== -1 ? idxA : 99) - (idxB !== -1 ? idxB : 99);
