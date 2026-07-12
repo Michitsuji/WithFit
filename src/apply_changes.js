@@ -61,7 +61,7 @@ try {
         console.log(`${TARGET_FILE} のコード置換が完了しました（${updatedCount}箇所）。`);
     }
 
-    fs.writeFileSync(changesFile, '[\n  \n]', 'utf8');
+    fs.writeFileSync(changesFile, '', 'utf8');
     console.log('changes.json の中身をリセットしました。');
 
 } catch (e) {
