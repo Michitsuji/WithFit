@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Contrast } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence } from 'firebase/firestore';
+import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy } from 'firebase/firestore';
 
 // --- Firebase 初期化 ---
 let app, auth, db, appId = 'duofit-app';
@@ -401,6 +401,9 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
              <span className="font-bold text-sm sm:text-base tracking-wide text-slate-800 dark:text-slate-100 shrink-0 whitespace-nowrap flex flex-col items-end">
                <span>L:{lReps || 0} <span className="text-slate-300 dark:text-slate-600 font-normal mx-0.5">/</span> R:{rReps || 0}<span className="text-xs font-normal text-slate-400 ml-0.5">回</span>{forced}</span>
                {prBadgeReps}
+               {Number(displayWeight) > 0 && Math.max(Number(lReps), Number(rReps)) > 0 && wType !== 'bodyWeight' && (
+                 <span className="text-[10px] text-slate-400 font-normal mt-0.5">推定1RM: {Math.round(Number(displayWeight) * (1 + Math.max(Number(lReps), Number(rReps)) / 30))}kg</span>
+               )}
              </span>
            </div>
         ) : (
@@ -412,6 +415,9 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
              <span className="font-bold text-base tracking-wide text-slate-800 dark:text-slate-100 shrink-0 whitespace-nowrap flex flex-col items-end">
                <span>{reps || 0} <span className="text-xs font-normal text-slate-400 ml-0.5">回</span>{forced}</span>
                {prBadgeReps}
+               {Number(displayWeight) > 0 && Number(reps) > 0 && wType !== 'bodyWeight' && (
+                 <span className="text-[10px] text-slate-400 font-normal mt-0.5">推定1RM: {Math.round(Number(displayWeight) * (1 + Number(reps) / 30))}kg</span>
+               )}
              </span>
            </div>
         )}
@@ -595,6 +601,30 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, updateItem, removeItem, moveItemUp, moveItemDown, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet, myPastPosts }) {
   const [localFilter, setLocalFilter] = useState('all');
 
+  const exerciseHistoryMap = useMemo(() => {
+    const history = {};
+    if (!myPastPosts) return history;
+    myPastPosts.forEach(p => {
+      if (!p.items) return;
+      p.items.forEach(i => {
+        const checkAndAdd = (exName, type, sets, pDate) => {
+          if (!exName) return;
+          if (!history[exName]) history[exName] = [];
+          sets?.forEach(s => {
+             history[exName].push({ date: pDate, set: s, type });
+             if (s.dropSets) s.dropSets.forEach(ds => history[exName].push({ date: pDate, set: ds, type }));
+          });
+        };
+        checkAndAdd(i.exerciseName, 'main', i.sets, p.date);
+        if (i.isSuperSet) {
+           checkAndAdd(i.superExerciseName, 'super2', i.sets, p.date);
+           checkAndAdd(i.superExerciseName3, 'super3', i.sets, p.date);
+        }
+      });
+    });
+    return history;
+  }, [myPastPosts]);
+
   const filteredExercises = availableExercises.filter(ex => {
     if (localFilter === 'common' && ex.gymId !== 'common') return false;
     if (localFilter === 'gym' && ex.gymId === 'common') return false;
@@ -653,51 +683,28 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
     let prevRecordText = null;
     const currentWeight = val('weight');
     
-    if (!isCardio && currentWeight !== '' && myPastPosts) {
+    if (!isCardio && currentWeight !== '' && exerciseHistoryMap) {
        const targetExName = type === 'super2' ? item.superExerciseName : type === 'super3' ? item.superExerciseName3 : item.exerciseName;
-       if (targetExName) {
-         for (let p of myPastPosts) {
-           let foundSet = null;
-           let pastType = null;
-           const foundItem = p.items?.find(i => {
-              if (i.exerciseName === targetExName) { pastType = 'main'; return true; }
-              if (i.isSuperSet && i.superExerciseName === targetExName) { pastType = 'super2'; return true; }
-              if (i.isSuperSet && i.superExerciseName3 === targetExName) { pastType = 'super3'; return true; }
-              return false;
-           });
-           
-           if (foundItem && foundItem.sets && pastType) {
-              for (let s of foundItem.sets) {
-                 const checkSet = (checkS) => {
-                    const w = pastType === 'super2' ? checkS.superWeight : pastType === 'super3' ? checkS.superWeight3 : checkS.weight;
-                    if (String(w) === String(currentWeight) && w !== '' && w !== undefined) {
-                       foundSet = checkS;
-                       return true;
-                    }
-                    if (checkS.dropSets) {
-                       for (let ds of checkS.dropSets) {
-                          if (checkSet(ds)) return true;
-                       }
-                    }
-                    return false;
-                 };
-                 if (checkSet(s)) break;
-              }
-              
-              if (foundSet) {
-                 const pDate = formatDateWithDay(p.date);
+       if (targetExName && exerciseHistoryMap[targetExName]) {
+          const pastRecords = exerciseHistoryMap[targetExName];
+          for (let record of pastRecords) {
+             const checkS = record.set;
+             const pastType = record.type;
+             const w = pastType === 'super2' ? checkS.superWeight : pastType === 'super3' ? checkS.superWeight3 : checkS.weight;
+             
+             if (String(w) === String(currentWeight) && w !== '' && w !== undefined) {
+                 const pDate = formatDateWithDay(record.date);
                  if (wType === 'lr') {
-                    const l = pastType === 'super2' ? foundSet.superLReps : pastType === 'super3' ? foundSet.superLReps3 : foundSet.lReps;
-                    const r = pastType === 'super2' ? foundSet.superRReps : pastType === 'super3' ? foundSet.superRReps3 : foundSet.rReps;
+                    const l = pastType === 'super2' ? checkS.superLReps : pastType === 'super3' ? checkS.superLReps3 : checkS.lReps;
+                    const r = pastType === 'super2' ? checkS.superRReps : pastType === 'super3' ? checkS.superRReps3 : checkS.rReps;
                     prevRecordText = `前回${pDate}: L${l||0}/R${r||0}回`;
                  } else {
-                    const r = pastType === 'super2' ? foundSet.superReps : pastType === 'super3' ? foundSet.superReps3 : foundSet.reps;
+                    const r = pastType === 'super2' ? checkS.superReps : pastType === 'super3' ? checkS.superReps3 : checkS.reps;
                     prevRecordText = `前回${pDate}: ${r||0}回`;
                  }
                  break;
-              }
-           }
-         }
+             }
+          }
        }
     }
 
@@ -1006,31 +1013,40 @@ export default function App() {
   const [showProfileModal, setShowProfileModal] = useState(false);
 
   useEffect(() => {
-    if (currentUser) {
-      try {
-        const savedDraft = localStorage.getItem(`duofit_draft_${currentUser}`);
-        if (savedDraft) {
-          setDraftWorkoutItems(JSON.parse(savedDraft));
+    if (currentUser && db) {
+      const loadDraft = async () => {
+        try {
+          const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists() && docSnap.data().currentWorkoutItems) {
+             setDraftWorkoutItems(docSnap.data().currentWorkoutItems);
+          } else {
+             const savedDraft = localStorage.getItem(`duofit_draft_${currentUser}`);
+             if (savedDraft) setDraftWorkoutItems(JSON.parse(savedDraft));
+          }
+        } catch (e) {
+          console.error("Failed to load draft", e);
         }
-      } catch (e) {
-        console.error("Failed to load draft from localStorage", e);
-      }
+      };
+      loadDraft();
     }
-  }, [currentUser]);
+  }, [currentUser, db]);
 
   useEffect(() => {
-    if (currentUser) {
+    if (currentUser && db) {
       try {
         if (draftWorkoutItems.length > 0) {
           localStorage.setItem(`duofit_draft_${currentUser}`, JSON.stringify(draftWorkoutItems));
+          setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { currentWorkoutItems: draftWorkoutItems }, { merge: true }).catch(()=>{});
         } else {
           localStorage.removeItem(`duofit_draft_${currentUser}`);
+          setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { currentWorkoutItems: deleteField() }, { merge: true }).catch(()=>{});
         }
       } catch (e) {
-        console.error("Failed to save draft to localStorage", e);
+        console.error("Failed to save draft", e);
       }
     }
-  }, [draftWorkoutItems, currentUser]);
+  }, [draftWorkoutItems, currentUser, db]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -1071,8 +1087,9 @@ export default function App() {
     }, () => setDataLoaded(prev => ({ ...prev, exercises: true })));
 
     const workoutsRef = collection(db, 'artifacts', appId, 'public', 'data', 'workouts');
-    const u4 = onSnapshot(workoutsRef, (snapshot) => {
-      const workoutsData = []; snapshot.forEach(doc => { workoutsData.push({ id: doc.id, ...doc.data() }); }); workoutsData.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); setPosts(workoutsData); setDataLoaded(prev => ({ ...prev, workouts: true }));
+    const workoutsQuery = query(workoutsRef, orderBy('timestamp', 'desc'), limit(50));
+    const u4 = onSnapshot(workoutsQuery, (snapshot) => {
+      const workoutsData = []; snapshot.forEach(doc => { workoutsData.push({ id: doc.id, ...doc.data() }); }); setPosts(workoutsData); setDataLoaded(prev => ({ ...prev, workouts: true }));
     }, () => setDataLoaded(prev => ({ ...prev, workouts: true })));
 
     return () => { u1(); u2(); u3(); u4(); };
@@ -1936,6 +1953,30 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
 // --- 記録入力画面 ---
 function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workoutItems, setWorkoutItems, selectedCategories, setSelectedCategories, posts, currentUser, isManual, setIsManual }) {
   const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (gyms.filter(g => g.id !== 'common')[0]?.id || ''));
+  const [restTimerStart, setRestTimerStart] = useState(null);
+  const [restTimeElapsed, setRestTimeElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!restTimerStart) return;
+    const interval = setInterval(() => setRestTimeElapsed(Math.floor((Date.now() - restTimerStart) / 1000)), 1000);
+    return () => clearInterval(interval);
+  }, [restTimerStart]);
+
+  const toggleRestTimer = () => {
+    if (restTimerStart) {
+      setRestTimerStart(null);
+      setRestTimeElapsed(0);
+    } else {
+      setRestTimerStart(Date.now());
+    }
+  };
+
+  const formatRestTime = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bodyWeight, setBodyWeight] = useState('');
   const [bodyFat, setBodyFat] = useState('');
@@ -2185,6 +2226,10 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
             <div className="text-2xl text-emerald-400 flex items-center gap-2"><Clock size={20} className={!isSubmitting ? "animate-pulse" : ""} /> <TimerDisplay startTime={myInfo.trainingStartTime} isStopped={isSubmitting} /></div>
             <div className="text-xs text-slate-400 font-bold mt-1">{formatTimeFromTimestamp(myInfo.trainingStartTime)} から開始</div>
           </div>
+          <button onClick={toggleRestTimer} className={`flex flex-col items-center justify-center w-16 h-16 rounded-full border-2 transition-colors ${restTimerStart ? 'bg-rose-500/20 border-rose-500 text-rose-400' : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'}`}>
+             <Clock size={20} className={restTimerStart ? 'animate-pulse' : ''} />
+             <span className="text-xs font-bold mt-1">{restTimerStart ? formatRestTime(restTimeElapsed) : 'レスト'}</span>
+          </button>
         </div>
       ) : (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-4">
@@ -2920,7 +2965,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.12, 17:58, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
