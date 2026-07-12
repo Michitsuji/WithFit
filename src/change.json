@@ -1,0 +1,15 @@
+[
+  {
+    "file": "src/App.js",
+    "changes": [
+      {
+        "search": "  const totalMonthVolume = myMonthVolume + partnerMonthVolume;\n  const targetVolume = 100000; \n  const progressPercent = Math.min(100, (totalMonthVolume / targetVolume) * 100);",
+        "replace": "  const totalMonthVolume = myMonthVolume + partnerMonthVolume;\n  const targetVolume = 500000; \n  const progressPercent = Math.min(100, (totalMonthVolume / targetVolume) * 100);"
+      },
+      {
+        "search": "           <h3 className=\"font-bold text-lg flex items-center gap-2 mb-2\"><Target size={20}/> 今月のふたりで100トンチャレンジ！</h3>\n           <p className=\"text-xs text-indigo-100 font-bold mb-4\">ふたりの合計総負荷量で100,000kgを目指そう！</p>\n           \n           <div className=\"flex justify-between items-end mb-2\">\n              <span className=\"text-2xl font-bold\">{totalMonthVolume.toLocaleString()} <span className=\"text-sm font-normal\">kg</span></span>\n              <span className=\"text-sm font-bold text-indigo-200\">/ 100,000 kg</span>\n           </div>",
+        "replace": "           <h3 className=\"font-bold text-lg flex items-center gap-2 mb-2\"><Target size={20}/> 今月のふたりで500トンチャレンジ！</h3>\n           <p className=\"text-xs text-indigo-100 font-bold mb-4\">ふたりの合計総負荷量で500,000kgを目指そう！</p>\n           \n           <div className=\"flex justify-between items-end mb-2\">\n              <span className=\"text-2xl font-bold\">{totalMonthVolume.toLocaleString()} <span className=\"text-sm font-normal\">kg</span></span>\n              <span className=\"text-sm font-bold text-indigo-200\">/ 500,000 kg</span>\n           </div>"
+      }
+    ]
+  }
+]

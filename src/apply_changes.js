@@ -7,7 +7,6 @@ if (!fs.existsSync(changesFile)) {
     process.exit(0);
 }
 
-// ご指定のフォーマット（YYYY.M.D, HH:mm, updated）に合わせて日時を生成
 const now = new Date();
 const yyyy = now.getFullYear();
 const m = now.getMonth() + 1;
@@ -18,10 +17,17 @@ const currentDateTimeStr = `${yyyy}.${m}.${d}, ${hh}:${min}, updated`;
 
 try {
     console.log('変更情報を読み込んでいます...');
-    const modifications = JSON.parse(fs.readFileSync(changesFile, 'utf8'));
+    
+    // 中身が空の場合（リセット直後など）は安全に終了する
+    const fileContent = fs.readFileSync(changesFile, 'utf8').trim();
+    if (!fileContent || fileContent === '[]' || fileContent === '[\n  \n]') {
+        console.log('変更内容が空のため、処理を終了します。');
+        process.exit(0);
+    }
+
+    const modifications = JSON.parse(fileContent);
     
     modifications.forEach(mod => {
-        // apply_changes.jsがsrc内にあるため、App.jsは同じ階層として処理
         const targetFile = path.join(__dirname, mod.file);
         if (!fs.existsSync(targetFile)) {
             console.error(`エラー: ${mod.file} が見つかりません。`);
@@ -53,7 +59,9 @@ try {
         }
     });
 
-    console.log('changes.json を削除しました。');
+    // ファイルを削除せず、中身を空の配列にリセットする
+    fs.writeFileSync(changesFile, '[\n  \n]', 'utf8');
+    console.log('changes.json の中身をリセットしました。');
 
 } catch (e) {
     console.error('処理中にエラーが発生しました:', e);
