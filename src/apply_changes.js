@@ -53,7 +53,6 @@ try {
         }
     });
 
-    fs.unlinkSync(changesFile);
     console.log('changes.json を削除しました。');
 
 } catch (e) {
