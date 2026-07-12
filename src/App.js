@@ -1367,7 +1367,7 @@ export default function App() {
             --tw-shadow-color: rgba(236, 72, 153, 0.4) !important;
             --tw-shadow: var(--tw-shadow-colored) !important;
           }
-          .theme-pop .text-slate-800, .theme-pop .text-slate-900, .theme-pop .text-white {
+          .theme-pop .text-slate-800, .theme-pop .text-slate-900 {
             color: #831843 !important;
           }
           .theme-pop .text-slate-500, .theme-pop .text-slate-400 {
@@ -3003,7 +3003,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.12, 19:44, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.12, 19:48, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
