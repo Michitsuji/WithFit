@@ -2580,10 +2580,10 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
     if (!newExName.trim() || !selectedGymId) return;
     if (selectedGymId === 'common' && (newExName.includes('スミス') || newExName.includes('ケーブル'))) return;
     setIsAdding(true);
-    const finalName = selectedGymId === 'common' ? `${newExFreeType}${newExName.trim()}` : newExName.trim();
+    const finalName = newExName.trim();
     const newDocId = `ex_${Date.now()}`;
     try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', newDocId), { name: finalName, maker: newExMaker.trim(), gymId: selectedGymId, weightType: newExWeightType, category: newExCategory, createdAt: Date.now() });
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', newDocId), { name: finalName, maker: newExMaker.trim(), gymId: selectedGymId, weightType: newExWeightType, category: newExCategory, freeType: selectedGymId === 'common' ? newExFreeType : null, createdAt: Date.now() });
       setNewExName(''); setNewExMaker(''); setNewExWeightType('total'); setNewExCategory('胸');
     } catch (e) {}
     setIsAdding(false);
@@ -2591,12 +2591,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
 
   const startEdit = (ex) => { 
     setEditingExId(ex.id); setEditingExOldName(ex.name); 
-    let baseName = ex.name; let freeType = 'バーベル';
-    if (ex.gymId === 'common') {
-       if (baseName.startsWith('バーベル')) { freeType = 'バーベル'; baseName = baseName.replace(/^バーベル/, ''); }
-       else if (baseName.startsWith('ダンベル')) { freeType = 'ダンベル'; baseName = baseName.replace(/^ダンベル/, ''); }
-    }
-    setEditExName(baseName); setEditExFreeType(freeType);
+    setEditExName(ex.name); setEditExFreeType(ex.freeType || 'バーベル');
     setEditExMaker(ex.maker || ''); setEditExWeightType(ex.weightType || 'total'); setEditExCategory(ex.category || 'その他'); setEditingExGymId(ex.gymId || ''); window.scrollTo({ top: 0, behavior: 'smooth' }); 
   };
   const cancelEdit = () => { setEditingExId(null); setEditingExOldName(''); };
@@ -2605,10 +2600,10 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
     e.preventDefault();
     if (!editExName.trim()) return;
     if (editingExGymId === 'common' && (editExName.includes('スミス') || editExName.includes('ケーブル'))) return;
-    const finalName = editingExGymId === 'common' ? `${editExFreeType}${editExName.trim()}` : editExName.trim();
+    const finalName = editExName.trim();
     try { 
       // 種目マスターデータの更新
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', editingExId), { name: finalName, maker: editExMaker.trim(), weightType: editExWeightType, category: editExCategory, gymId: editingExGymId }, { merge: true }); 
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', editingExId), { name: finalName, maker: editExMaker.trim(), weightType: editExWeightType, category: editExCategory, gymId: editingExGymId, freeType: editingExGymId === 'common' ? editExFreeType : null }, { merge: true }); 
 
       // 過去の投稿を一括更新（種目名・カテゴリ・重量タイプの変更を反映）
       if (posts && posts.length > 0) {
@@ -3046,7 +3041,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.12, 22:59, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.12, 23:02, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
