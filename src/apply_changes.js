@@ -3,12 +3,10 @@ const path = require('path');
 
 const changesFile = path.join(__dirname, 'changes.json');
 
-// changes.jsonがなければ何もせずに終了
 if (!fs.existsSync(changesFile)) {
     process.exit(0);
 }
 
-// 実行時の現在日時を取得（YYYY/MM/DD HH:mm）
 const now = new Date();
 const yyyy = now.getFullYear();
 const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -31,17 +29,22 @@ try {
         let code = fs.readFileSync(targetFile, 'utf8');
         let updatedCount = 0;
 
+        // 1. JSONに基づくコードの置換
         mod.changes.forEach((change, index) => {
-            // {{CURRENT_DATETIME}} という文字列があれば現在日時に置換
-            const finalReplace = change.replace.replace(/\{\{CURRENT_DATETIME\}\}/g, currentDateTimeStr);
-
             if (code.includes(change.search)) {
-                code = code.replace(change.search, finalReplace);
+                code = code.replace(change.search, change.replace);
                 updatedCount++;
             } else {
                 console.warn(`警告: ${mod.file} の ${index + 1} 番目の置換対象文字列が見つかりません。`);
             }
         });
+
+        // 2. バージョン更新日時の自動書き換え（DuoFit専用の便利機能）
+        const versionRegex = /(DuoFit v\d+\.\d+\.\d+)(?: \([^)]+\))?/;
+        if (versionRegex.test(code)) {
+            code = code.replace(versionRegex, `$1 (${currentDateTimeStr} 更新)`);
+            console.log(`バージョン更新日時を ${currentDateTimeStr} に自動更新しました。`);
+        }
 
         if (updatedCount > 0) {
             fs.writeFileSync(targetFile, code, 'utf8');
@@ -49,7 +52,6 @@ try {
         }
     });
 
-    // 適用が完了したら変更ファイルを削除
     fs.unlinkSync(changesFile);
     console.log('changes.json を削除しました。');
 
