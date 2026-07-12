@@ -2892,7 +2892,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
   const myMonthVolume = currentMonthPosts.filter(p => p.author === currentUser).reduce((sum, p) => sum + (Number(p.volume) || 0), 0);
   const partnerMonthVolume = currentMonthPosts.filter(p => p.author === partnerName).reduce((sum, p) => sum + (Number(p.volume) || 0), 0);
   const totalMonthVolume = myMonthVolume + partnerMonthVolume;
-  const targetVolume = 100000; 
+  const targetVolume = 500000; 
   const progressPercent = Math.min(100, (totalMonthVolume / targetVolume) * 100);
   
   const myPercent = Math.min(100, (myMonthVolume / targetVolume) * 100);
@@ -2950,12 +2950,12 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       <div className="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
          <div className="absolute top-2 right-2 text-white/20"><Trophy size={80}/></div>
          <div className="relative z-10">
-           <h3 className="font-bold text-lg flex items-center gap-2 mb-2"><Target size={20}/> 今月のふたりで100トンチャレンジ！</h3>
-           <p className="text-xs text-indigo-100 font-bold mb-4">ふたりの合計総負荷量で100,000kgを目指そう！</p>
+           <h3 className="font-bold text-lg flex items-center gap-2 mb-2"><Target size={20}/> 今月のふたりで500トンチャレンジ！</h3>
+           <p className="text-xs text-indigo-100 font-bold mb-4">ふたりの合計総負荷量で500,000kgを目指そう！</p>
            
            <div className="flex justify-between items-end mb-2">
               <span className="text-2xl font-bold">{totalMonthVolume.toLocaleString()} <span className="text-sm font-normal">kg</span></span>
-              <span className="text-sm font-bold text-indigo-200">/ 100,000 kg</span>
+              <span className="text-sm font-bold text-indigo-200">/ 500,000 kg</span>
            </div>
            
            <div className="w-full h-4 bg-black/30 rounded-full overflow-hidden flex">
@@ -3003,7 +3003,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.12, 19:48, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.12, 22:36, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
