@@ -2548,6 +2548,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
   const [newExMaker, setNewExMaker] = useState('');
   const [newExWeightType, setNewExWeightType] = useState('total'); 
   const [newExCategory, setNewExCategory] = useState('胸');
+  const [newExFreeType, setNewExFreeType] = useState('バーベル');
   const [isAdding, setIsAdding] = useState(false);
 
   const [editingExId, setEditingExId] = useState(null);
@@ -2556,6 +2557,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
   const [editExMaker, setEditExMaker] = useState('');
   const [editExWeightType, setEditExWeightType] = useState('total'); 
   const [editExCategory, setEditExCategory] = useState('胸');
+  const [editExFreeType, setEditExFreeType] = useState('バーベル');
   const [editingExGymId, setEditingExGymId] = useState('');
 
   const handleAddGym = async (e) => {
@@ -2576,24 +2578,37 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
   const handleAddExercise = async (e) => {
     e.preventDefault();
     if (!newExName.trim() || !selectedGymId) return;
+    if (selectedGymId === 'common' && (newExName.includes('スミス') || newExName.includes('ケーブル'))) return;
     setIsAdding(true);
+    const finalName = selectedGymId === 'common' ? `${newExFreeType}${newExName.trim()}` : newExName.trim();
     const newDocId = `ex_${Date.now()}`;
     try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', newDocId), { name: newExName.trim(), maker: newExMaker.trim(), gymId: selectedGymId, weightType: newExWeightType, category: newExCategory, createdAt: Date.now() });
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', newDocId), { name: finalName, maker: newExMaker.trim(), gymId: selectedGymId, weightType: newExWeightType, category: newExCategory, createdAt: Date.now() });
       setNewExName(''); setNewExMaker(''); setNewExWeightType('total'); setNewExCategory('胸');
     } catch (e) {}
     setIsAdding(false);
   };
 
-  const startEdit = (ex) => { setEditingExId(ex.id); setEditingExOldName(ex.name); setEditExName(ex.name); setEditExMaker(ex.maker || ''); setEditExWeightType(ex.weightType || 'total'); setEditExCategory(ex.category || 'その他'); setEditingExGymId(ex.gymId || ''); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const startEdit = (ex) => { 
+    setEditingExId(ex.id); setEditingExOldName(ex.name); 
+    let baseName = ex.name; let freeType = 'バーベル';
+    if (ex.gymId === 'common') {
+       if (baseName.startsWith('バーベル')) { freeType = 'バーベル'; baseName = baseName.replace(/^バーベル/, ''); }
+       else if (baseName.startsWith('ダンベル')) { freeType = 'ダンベル'; baseName = baseName.replace(/^ダンベル/, ''); }
+    }
+    setEditExName(baseName); setEditExFreeType(freeType);
+    setEditExMaker(ex.maker || ''); setEditExWeightType(ex.weightType || 'total'); setEditExCategory(ex.category || 'その他'); setEditingExGymId(ex.gymId || ''); window.scrollTo({ top: 0, behavior: 'smooth' }); 
+  };
   const cancelEdit = () => { setEditingExId(null); setEditingExOldName(''); };
 
   const handleUpdateExercise = async (e) => {
     e.preventDefault();
     if (!editExName.trim()) return;
+    if (editingExGymId === 'common' && (editExName.includes('スミス') || editExName.includes('ケーブル'))) return;
+    const finalName = editingExGymId === 'common' ? `${editExFreeType}${editExName.trim()}` : editExName.trim();
     try { 
       // 種目マスターデータの更新
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', editingExId), { name: editExName.trim(), maker: editExMaker.trim(), weightType: editExWeightType, category: editExCategory, gymId: editingExGymId }, { merge: true }); 
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', editingExId), { name: finalName, maker: editExMaker.trim(), weightType: editExWeightType, category: editExCategory, gymId: editingExGymId }, { merge: true }); 
 
       // 過去の投稿を一括更新（種目名・カテゴリ・重量タイプの変更を反映）
       if (posts && posts.length > 0) {
@@ -2728,7 +2743,19 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
                       </div>
                     </div>
-                    <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">種目名 <span className="text-rose-500">*</span></label><input type="text" value={editExName} onChange={e => setEditExName(e.target.value)} required className="w-full bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/></div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">種目名 <span className="text-rose-500">*</span></label>
+                      <div className="flex gap-2">
+                        {editingExGymId === 'common' && (
+                          <select value={editExFreeType} onChange={e => setEditExFreeType(e.target.value)} className="w-32 bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
+                            <option value="バーベル">バーベル</option>
+                            <option value="ダンベル">ダンベル</option>
+                          </select>
+                        )}
+                        <input type="text" value={editExName} onChange={e => setEditExName(e.target.value)} required className="flex-1 min-w-0 bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/>
+                      </div>
+                      {editingExGymId === 'common' && (editExName.includes('スミス') || editExName.includes('ケーブル')) && <p className="text-xs text-rose-500 mt-1 font-bold">スミスやケーブルはフリーウェイトとして登録できません</p>}
+                    </div>
                     <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">メーカー (任意)</label><input type="text" value={editExMaker} onChange={e => setEditExMaker(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/></div>
                     <div>
                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">重さの単位/記録方法 <span className="text-rose-500">*</span></label>
@@ -2741,7 +2768,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'cardio' ? 'bg-cyan-500 text-white border-cyan-600' : 'bg-white dark:bg-slate-900 border-cyan-200 dark:border-cyan-800 text-cyan-600 dark:text-slate-300'}`}><input type="radio" value="cardio" checked={editExWeightType === 'cardio'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>有酸素(距離/時間/kcal)</label>
                        </div>
                     </div>
-                    <button type="submit" disabled={!editExName.trim()} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded-xl mt-2 transition-colors disabled:opacity-50 shadow-md">更新して保存</button>
+                    <button type="submit" disabled={!editExName.trim() || (editingExGymId === 'common' && (editExName.includes('スミス') || editExName.includes('ケーブル')))} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded-xl mt-2 transition-colors disabled:opacity-50 shadow-md">更新して保存</button>
                   </div>
                 </form>
               ) : (
@@ -2766,7 +2793,19 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
                       </div>
                     </div>
-                    <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">種目名 <span className="text-rose-500">*</span></label><input type="text" value={newExName} onChange={e => setNewExName(e.target.value)} required placeholder="例: ベンチプレス" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/></div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">種目名 <span className="text-rose-500">*</span></label>
+                      <div className="flex gap-2">
+                        {selectedGymId === 'common' && (
+                          <select value={newExFreeType} onChange={e => setNewExFreeType(e.target.value)} className="w-32 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
+                            <option value="バーベル">バーベル</option>
+                            <option value="ダンベル">ダンベル</option>
+                          </select>
+                        )}
+                        <input type="text" value={newExName} onChange={e => setNewExName(e.target.value)} required placeholder="例: ベンチプレス" className="flex-1 min-w-0 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/>
+                      </div>
+                      {selectedGymId === 'common' && (newExName.includes('スミス') || newExName.includes('ケーブル')) && <p className="text-xs text-rose-500 mt-1 font-bold">スミスやケーブルはフリーウェイトとして登録できません</p>}
+                    </div>
                     <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">メーカー (任意)</label><input type="text" value={newExMaker} onChange={e => setNewExMaker(e.target.value)} placeholder="例: Hammer Strength" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/></div>
                     <div>
                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">重さの単位/記録方法 <span className="text-rose-500">*</span></label>
@@ -2779,7 +2818,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'cardio' ? 'bg-cyan-50 dark:bg-cyan-950 border-cyan-500 text-cyan-600 dark:text-cyan-400' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}><input type="radio" value="cardio" checked={newExWeightType === 'cardio'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>有酸素(距離/時間/kcal)</label>
                        </div>
                     </div>
-                    <button type="submit" disabled={isAdding || !newExName.trim()} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold py-3 rounded-xl mt-2 transition-colors disabled:opacity-50">リストに追加</button>
+                    <button type="submit" disabled={isAdding || !newExName.trim() || (selectedGymId === 'common' && (newExName.includes('スミス') || newExName.includes('ケーブル')))} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold py-3 rounded-xl mt-2 transition-colors disabled:opacity-50">リストに追加</button>
                   </div>
                 </form>
               )}
@@ -3007,7 +3046,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.12, 22:49, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.12, 22:59, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
