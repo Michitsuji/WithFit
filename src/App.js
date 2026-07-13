@@ -455,7 +455,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
         )}
       </div>
 
-      <div className="pl-3 mb-3 flex flex-wrap gap-2">
+      <div className="pl-3 mb-3 flex flex-wrap items-center gap-2">
         {(post.bodyWeight || post.bodyFat) && (
           <div className="flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 text-xs font-bold px-2.5 py-1 rounded-md border border-indigo-100 dark:border-indigo-900">
             <Scale size={14} />
@@ -467,6 +467,27 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
         {displaySets > 0 && (
           <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700">
              <ListPlus size={14} /> 計 {displaySets} Set
+          </div>
+        )}
+        {onImport && post.items && post.items.length > 0 && (
+          <div className="relative ml-auto">
+            {!showImportOptions ? (
+              <button onClick={() => setShowImportOptions(true)} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-2 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/80 transition-colors border border-emerald-100 dark:border-emerald-900">
+                <Copy size={14} /> 構成をコピー
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
+                <button onClick={() => { setShowImportOptions(false); onImport(post, false); }} className="flex items-center gap-1 text-[11px] font-bold text-white bg-emerald-500 px-2 py-1.5 rounded hover:bg-emerald-600 transition-colors shadow-sm">
+                  <Play size={10} fill="currentColor" /> 今から
+                </button>
+                <button onClick={() => { setShowImportOptions(false); onImport(post, true); }} className="flex items-center gap-1 text-[11px] font-bold text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-300 px-2 py-1.5 rounded border border-slate-200 dark:border-slate-700 transition-colors shadow-sm">
+                  <CalendarIcon size={10} /> 過去
+                </button>
+                <button onClick={() => setShowImportOptions(false)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-50 dark:bg-slate-800 rounded-full">
+                  <X size={14} />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -571,34 +592,14 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
           </button>
         )}
         
-        {onImport && post.items && post.items.length > 0 && (
-          <div className="relative">
-            {!showImportOptions ? (
-              <button onClick={() => setShowImportOptions(true)} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-2 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/80 transition-colors border border-emerald-100 dark:border-emerald-900">
-                <Copy size={14} /> 構成をコピー
-              </button>
-            ) : (
-              <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
-                <button onClick={() => { setShowImportOptions(false); onImport(post, false); }} className="flex items-center gap-1 text-xs font-bold text-white bg-emerald-500 px-2.5 py-1.5 rounded hover:bg-emerald-600 transition-colors shadow-sm">
-                  <Play size={12} fill="currentColor" /> 今から
-                </button>
-                <button onClick={() => { setShowImportOptions(false); onImport(post, true); }} className="flex items-center gap-1 text-xs font-bold text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-300 px-2.5 py-1.5 rounded border border-slate-200 dark:border-slate-700 transition-colors shadow-sm">
-                  <CalendarIcon size={12} /> 過去
-                </button>
-                <button onClick={() => setShowImportOptions(false)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-50 dark:bg-slate-800 rounded-full">
-                  <X size={14} />
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+
       </div>
     </div>
   );
 }
 
 // --- 共通コンポーネント：ワークアウト入力フォーム ---
-function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, updateItem, removeItem, moveItemUp, moveItemDown, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet, reorderSet, myPastPosts }) {
+function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, updateItem, removeItem, moveItemUp, moveItemDown, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet, reorderSet, myPastPosts, onActive }) {
   const [localFilter, setLocalFilter] = useState('all');
   const [draggedSetIndex, setDraggedSetIndex] = useState(null);
   const [dragOverSetIndex, setDragOverSetIndex] = useState(null);
@@ -813,7 +814,7 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm relative w-full overflow-hidden mb-6 transition-all duration-200">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm relative w-full overflow-hidden mb-6 transition-all duration-200" onClickCapture={() => onActive && onActive(item.exerciseName)}>
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-start gap-1.5 flex-1 min-w-0">
           <div className="flex flex-col gap-0.5 mt-2">
@@ -1367,19 +1368,20 @@ export default function App() {
       if (!myInfo.isTraining) {
         if (gymId) await handleStartTraining(gymId);
       }
+      if (newItems.length > 0 && newItems[0].exerciseName) {
+        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { currentExerciseName: newItems[0].exerciseName }, { merge: true }).catch(()=>{});
+      }
     }
     
     setCurrentTab('record');
   };
 
-  useEffect(() => {
-    if(myInfo.isTraining && draftWorkoutItems.length > 0 && db) {
-        const currentEx = draftWorkoutItems[draftWorkoutItems.length - 1].exerciseName;
-        if(currentEx && currentEx !== myInfo.currentExerciseName) {
-            setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { currentExerciseName: currentEx }, { merge: true }).catch(()=>{});
-        }
+  const handleActiveExerciseChange = (exerciseName) => {
+    if (!exerciseName || !myInfo.isTraining || !db) return;
+    if (exerciseName !== myInfo.currentExerciseName) {
+      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { currentExerciseName: exerciseName }, { merge: true }).catch(()=>{});
     }
-  }, [draftWorkoutItems, myInfo.isTraining, myInfo.currentExerciseName, currentUser]);
+  };
 
   if (!isFullyLoaded) {
     return (
@@ -1495,7 +1497,7 @@ export default function App() {
       <main className="p-4 max-w-md mx-auto w-full pb-40">
         {currentTab === 'timeline' && <TimelineView posts={posts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} />}
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={posts} accountsInfo={accountsInfo} />}
-        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={posts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} />}
+        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={posts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} partnerName={partnerName} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
         {currentTab === 'friends' && <FriendsView partnerName={partnerName} partnerInfo={partnerInfo} currentUser={currentUser} posts={posts} accountsInfo={accountsInfo} />}
       </main>
@@ -2071,7 +2073,7 @@ function DataView({ posts, currentUser, partnerName, accountsInfo, onEdit, onDel
 }
 
 // --- 記録入力画面 ---
-function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workoutItems, setWorkoutItems, selectedCategories, setSelectedCategories, posts, currentUser, isManual, setIsManual }) {
+function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workoutItems, setWorkoutItems, selectedCategories, setSelectedCategories, posts, currentUser, isManual, setIsManual, onActiveExerciseChange }) {
   const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (gyms.filter(g => g.id !== 'common')[0]?.id || ''));
   const [restTimerStart, setRestTimerStart] = useState(null);
   const [restTimeElapsed, setRestTimeElapsed] = useState(0);
@@ -2428,6 +2430,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
              updateDropSet={updateDropSetField}
              reorderSet={reorderSet}
              myPastPosts={myPastPosts}
+             onActive={onActiveExerciseChange}
            />
         ))}
 
@@ -3147,7 +3150,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 13:42, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 13:54, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
