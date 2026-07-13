@@ -4,6 +4,16 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy } from 'firebase/firestore';
 
+// --- カスタムアイコン ---
+const WithFitLogo = ({ className = "", size = 24 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="7" cy="12" r="3" />
+    <circle cx="17" cy="12" r="3" />
+    <line x1="10" y1="12" x2="14" y2="12" />
+    <path d="M4 12a8 8 0 0 1 16 0" strokeOpacity="0.5" />
+  </svg>
+);
+
 // --- Firebase 初期化 ---
 let app, auth, db, appId = 'withfit-app';
 const FIREBASE_PROJECT_ID = "duofit-app-75cb2";
@@ -1717,7 +1727,7 @@ export default function App() {
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20 shadow-sm flex flex-col transition-colors">
         <div className="p-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Activity className="text-emerald-500" /> With<span className="text-emerald-500">Fit</span>
+            <WithFitLogo className="text-indigo-500" /> With<span className="text-indigo-500">Fit</span>
           </h1>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 px-2 py-1.5 rounded-full border border-slate-200 dark:border-slate-800">
@@ -1928,7 +1938,7 @@ function LoginScreen({ onLogin, isOnline }) {
       
       <div className="w-full max-w-sm flex flex-col items-center">
         <div className="mb-6 flex flex-col items-center">
-          <Activity className="text-emerald-500 w-16 h-16 mb-2" />
+          <WithFitLogo className="text-indigo-500 w-16 h-16 mb-2" />
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">WithFit</h1>
           <p className="text-sm text-slate-500 font-bold mt-1">みんなで鍛える、記録アプリ</p>
         </div>
@@ -3308,7 +3318,7 @@ function FriendsView({ currentUser, myInfo, posts, accountsInfo, onAddFriend, on
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.13, 22:55, updated)</p>
       </div>
     </div>
   );
@@ -3319,13 +3329,13 @@ function NavButton({ icon, label, isActive, onClick, isPrimary, isTraining }) {
   if (isPrimary) {
     return (
       <button onClick={onClick} className="flex flex-col items-center justify-center -mt-8 relative group">
-        <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 text-white ${isTraining ? 'bg-amber-500 shadow-amber-500/40 scale-110' : isActive ? 'bg-emerald-500 shadow-emerald-500/40 scale-110' : 'bg-slate-800 dark:bg-slate-700 border-4 border-white dark:border-slate-800 group-hover:bg-slate-700 dark:group-hover:bg-slate-600'}`}><div>{icon}</div></div>
-        <span className={`text-[10px] mt-1 font-bold transition-colors ${isTraining ? 'text-amber-500' : isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'}`}>{label}</span>
+        <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 text-white ${isTraining ? 'bg-amber-500 shadow-amber-500/40 scale-110' : isActive ? 'bg-indigo-500 shadow-indigo-500/40 scale-110' : 'bg-slate-800 dark:bg-slate-700 border-4 border-white dark:border-slate-800 group-hover:bg-slate-700 dark:group-hover:bg-slate-600'}`}><div>{icon}</div></div>
+        <span className={`text-[10px] mt-1 font-bold transition-colors ${isTraining ? 'text-amber-500' : isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 dark:text-slate-400'}`}>{label}</span>
       </button>
     );
   }
   return (
-    <button onClick={onClick} className={`flex flex-col items-center justify-center w-16 transition-colors duration-200 ${isActive ? 'text-emerald-500 dark:text-emerald-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>
+    <button onClick={onClick} className={`flex flex-col items-center justify-center w-16 transition-colors duration-200 ${isActive ? 'text-indigo-500 dark:text-indigo-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>
       <div className={`mb-1 transition-transform duration-200 ${isActive ? 'scale-110' : ''}`}>{icon}</div>
       <span className="text-[10px] font-bold">{label}</span>
     </button>
