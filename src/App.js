@@ -1445,40 +1445,41 @@ export default function App() {
     };
   }, [currentUser, isOnline]);
 
-  const handleLogin = async () => {
-    if (!auth || !db) return false;
-    const provider = new GoogleAuthProvider();
-    try {
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-      const uid = user.uid;
-      
-      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'accounts', uid);
-      const docSnap = await getDoc(docRef);
-      
-      if (!docSnap.exists()) {
-        const friendCode = Math.floor(10000 + Math.random() * 90000).toString();
-        await setDoc(docRef, { 
-          displayName: user.displayName || '名無し',
-          email: user.email,
-          friendCode: friendCode,
-          isTraining: false, 
-          lastActive: Date.now(), 
-          isAppOnline: true, 
-          theme: 'light', 
-          friends: [],
-          friendRequests: []
-        }, { merge: true });
-      } else {
-        await setDoc(docRef, { lastActive: Date.now(), isAppOnline: true }, { merge: true });
-      }
-      
-      setCurrentUser(uid);
-      localStorage.setItem('withfit_login_session', JSON.stringify({ userId: uid, lastActive: Date.now() }));
-      return true;
-    } catch (error) {
-      console.error(error);
-      return false;
+  const handleLogin = async (username, pin) => {
+    if (!db) return { success: false, error: 'データベースに接続できません。' };
+    const accountData = accountsInfo[username];
+    if (!accountData) return { success: false, error: 'ユーザーが見つかりません。' };
+    if (accountData.pin !== pin) return { success: false, error: 'PINコードが間違っています。' };
+    
+    setCurrentUser(username);
+    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { lastActive: Date.now(), isAppOnline: true }, { merge: true }); } catch (e) {}
+    localStorage.setItem('withfit_login_session', JSON.stringify({ userId: username, lastActive: Date.now() }));
+    return { success: true };
+  };
+
+  const handleRegister = async (username, pin) => {
+    if (!db) return { success: false, error: 'データベースに接続できません。' };
+    const accountData = accountsInfo[username];
+    if (accountData) return { success: false, error: 'そのユーザー名は既に使われています。' };
+    
+    try { 
+      const friendCode = Math.floor(10000 + Math.random() * 90000).toString();
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { 
+        pin: pin, 
+        displayName: username,
+        friendCode: friendCode,
+        isTraining: false, 
+        lastActive: Date.now(), 
+        isAppOnline: true, 
+        theme: 'light', 
+        friends: [],
+        friendRequests: []
+      }, { merge: true }); 
+      setCurrentUser(username); 
+      localStorage.setItem('withfit_login_session', JSON.stringify({ userId: username, lastActive: Date.now() }));
+      return { success: true };
+    } catch (e) { 
+      return { success: false, error: '登録に失敗しました。' }; 
     }
   };
 
@@ -1488,9 +1489,6 @@ export default function App() {
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isAppOnline: false, lastActive: Date.now() }, { merge: true });
       } catch (e) {}
     }
-    try {
-      await signOut(auth);
-    } catch (e) {}
     localStorage.removeItem('withfit_login_session');
     setCurrentUser(null); setCurrentTab('timeline'); setEditingPost(null); 
   };
@@ -3407,7 +3405,7 @@ function FriendsView({ currentUser, myInfo, posts, accountsInfo, onSendFriendReq
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.1.0 (2026.7.14, 08:11, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.1.0 (2026.7.14, 08:15, updated)</p>
       </div>
     </div>
   );
