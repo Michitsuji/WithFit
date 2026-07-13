@@ -1385,24 +1385,25 @@ export default function App() {
 
   useEffect(() => {
     if (!currentUser) return;
-    const updatePresence = async (activeTime) => { 
-      if (activeTime > 0) {
-         localStorage.setItem('duofit_login_session', JSON.stringify({ userId: currentUser, lastActive: activeTime }));
+    const updatePresence = async (isVisible) => { 
+      const now = Date.now();
+      if (isVisible) {
+         localStorage.setItem('duofit_login_session', JSON.stringify({ userId: currentUser, lastActive: now }));
       }
       if (!db || !isOnline) return;
       try { 
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { lastActive: activeTime }, { merge: true }); 
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { lastActive: now, isAppOnline: isVisible }, { merge: true }); 
       } catch (e) {} 
     };
     
-    updatePresence(Date.now());
-    const intervalId = setInterval(() => updatePresence(Date.now()), 15000);
+    updatePresence(true);
+    const intervalId = setInterval(() => updatePresence(true), 15000);
     
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        updatePresence(0);
+        updatePresence(false);
       } else {
-        updatePresence(Date.now());
+        updatePresence(true);
       }
     };
     
@@ -1411,7 +1412,7 @@ export default function App() {
     return () => {
       clearInterval(intervalId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      updatePresence(0);
+      updatePresence(false);
     };
   }, [currentUser, isOnline]);
 
@@ -3255,10 +3256,11 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
   const isOnline = isAppOnline && lastActive > 0 && (currentTime - lastActive < 45000);
 
   const getTimeAgo = (timestamp) => {
-    if (!timestamp || timestamp === 0) return 'バックグラウンド';
-    const diff = Math.max(0, currentTime - timestamp); // 負の数を防止
-    const minutes = Math.floor(diff / 60000);
-    if (minutes < 1) return 'たった今';
+    if (!timestamp || timestamp === 0) return '不明';
+    const diff = Math.max(0, currentTime - timestamp);
+    const seconds = Math.floor(diff / 1000);
+    if (seconds < 60) return `${seconds}秒前`;
+    const minutes = Math.floor(seconds / 60);
     if (minutes < 60) return `${minutes}分前`;
     const hours = Math.floor(minutes / 60);
     if (hours < 24) return `${hours}時間前`;
@@ -3336,7 +3338,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
           )}
           {!isOnline && (
             <div className="mt-2 text-xs font-bold text-white/70">
-              {getTimeAgo(lastActive) === 'バックグラウンド' ? 'バックグラウンド' : `最終ログイン: ${getTimeAgo(lastActive)}`}
+              最終アクセス: {getTimeAgo(lastActive)}
             </div>
           )}
         </div>
@@ -3398,7 +3400,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 15:45, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 15:48, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
