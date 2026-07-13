@@ -1285,7 +1285,7 @@ export default function App() {
     if (sessionStr) {
        try {
           const session = JSON.parse(sessionStr);
-          if (session.userId && session.lastActive && Date.now() - session.lastActive <= 10 * 60 * 1000) {
+          if (session.userId && session.lastActive && Date.now() - session.lastActive <= 7 * 24 * 60 * 60 * 1000) {
              setCurrentUser(session.userId);
           } else {
              localStorage.removeItem('withfit_login_session');
@@ -1729,7 +1729,7 @@ export default function App() {
   }
 
   if (!currentUser) {
-    return <LoginScreen onLogin={handleLogin} isOnline={isOnline} />;
+    return <LoginScreen onLogin={handleLogin} onRegister={handleRegister} isOnline={isOnline} />;
   }
 
   const myFriends = myInfo.friends || [];
@@ -3407,7 +3407,7 @@ function FriendsView({ currentUser, myInfo, posts, accountsInfo, onSendFriendReq
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.1.0 (2026.7.14, 08:07, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.1.0 (2026.7.14, 08:11, updated)</p>
       </div>
     </div>
   );
