@@ -742,11 +742,40 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
     for (let p of myPastPosts) {
       const found = p.items?.find(i => i.exerciseName === item.exerciseName);
       if (found && found.sets?.length > 0) {
-        return { date: p.date, sets: found.sets, weightType: found.weightType };
+        return { date: p.date, sets: found.sets, weightType: found.weightType, fullItem: found };
       }
     }
     return null;
   }, [item.exerciseName, myPastPosts]);
+
+  const handleCopyPrevRecord = () => {
+    if (!prevRecord || !prevRecord.fullItem) return;
+    const prevItem = prevRecord.fullItem;
+    const newSets = prevItem.sets.map(s => {
+      const clearReps = (ds) => ({ ...ds, id: generateId(), reps: '', lReps: '', rReps: '', forcedReps: '', superReps: '', superLReps: '', superRReps: '', superForcedReps: '', superReps3: '', superLReps3: '', superRReps3: '', superForcedReps3: '' });
+      return {
+        ...s,
+        id: generateId(),
+        reps: '', lReps: '', rReps: '', forcedReps: '', distance: '', time: '', calories: '',
+        superReps: '', superLReps: '', superRReps: '', superForcedReps: '',
+        superReps3: '', superLReps3: '', superRReps3: '', superForcedReps3: '',
+        dropSets: s.dropSets ? s.dropSets.map(clearReps) : undefined,
+        superDropSets: s.superDropSets ? s.superDropSets.map(clearReps) : undefined,
+        superDropSets3: s.superDropSets3 ? s.superDropSets3.map(clearReps) : undefined,
+      };
+    });
+
+    updateItem(item.id, {
+      sets: newSets,
+      isSuperSet: prevItem.isSuperSet || false,
+      isDropSet: prevItem.isDropSet || false,
+      isForcedReps: prevItem.isForcedReps || false,
+      superExerciseName: prevItem.superExerciseName || '',
+      superWeightType: prevItem.superWeightType || 'total',
+      superExerciseName3: prevItem.superExerciseName3 || '',
+      superWeightType3: prevItem.superWeightType3 || 'total'
+    });
+  };
 
   const renderInputRow = (setObj, wType, type, isDrop, dropId = null) => {
     const isLR = wType === 'lr';
@@ -3352,7 +3381,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 15:27, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 15:30, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
