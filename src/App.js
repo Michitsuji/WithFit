@@ -915,9 +915,9 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, sIndex)}
             onDragEnd={handleDragEnd}
-            className={`bg-slate-50/50 dark:bg-slate-950/50 p-2.5 rounded-xl border transition-all relative ${draggedSetIndex === sIndex ? (dragOverSetIndex === sIndex ? 'opacity-90 border-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'opacity-40') : 'border-slate-100 dark:border-slate-800'} ${draggedSetIndex !== null ? 'space-y-0' : 'space-y-3'}`}
+            className={`bg-slate-50/50 dark:bg-slate-950/50 p-2.5 rounded-xl border transition-all relative ${draggedSetIndex === sIndex ? (dragOverSetIndex === sIndex ? 'opacity-70 border-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'opacity-40 border-dashed border-slate-300 dark:border-slate-600') : 'border-slate-100 dark:border-slate-800'} ${draggedSetIndex !== null ? 'space-y-0' : 'space-y-3'}`}
           >
-            {dragOverSetIndex === sIndex && draggedSetIndex !== sIndex && <div className={`absolute left-0 w-full h-1 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${draggedSetIndex < dragOverSetIndex ? '-bottom-2' : '-top-2'}`} />}
+            {dragOverSetIndex === sIndex && draggedSetIndex !== sIndex && <div className={`absolute left-0 w-full h-1 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${draggedSetIndex < dragOverSetIndex ? '-bottom-1.5' : '-top-1.5'}`} />}
             <div className="flex items-center gap-2">
               <div 
                  className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-emerald-500 p-1 -ml-1 shrink-0 touch-none"
@@ -1044,18 +1044,44 @@ function useDragAndDrop(items, setItems) {
   const [draggableId, setDraggableId] = useState(null);
   const refs = useRef([]);
 
-  const centerElement = (idx) => {
-    // 折りたたまれて高さが変わった後にスクロールさせるため少し遅延させる
-    setTimeout(() => {
-      const el = refs.current[idx];
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }, 50);
+  const adjustPosition = (idx) => {
+    const el = refs.current[idx];
+    if (!el) return;
+    const initialTop = el.getBoundingClientRect().top;
+
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const currentEl = refs.current[idx];
+        if (!currentEl) return;
+        
+        // 1. 折りたたみによる高さ変化分を瞬時に補正し、カーソルや指から要素が逃げないようにする
+        const currentTop = currentEl.getBoundingClientRect().top;
+        window.scrollBy({ top: currentTop - initialTop, behavior: 'instant' });
+
+        // 2. その後、リスト内のインデックスに応じて画面内の適切な位置にヌルっと移動させる
+        setTimeout(() => {
+          const rect = currentEl.getBoundingClientRect();
+          const scrollTop = window.scrollY || document.documentElement.scrollTop;
+          const absoluteTop = rect.top + scrollTop;
+          const windowHeight = window.innerHeight;
+          const totalItems = items.length;
+          
+          // 要素が全体のどの位置にいるか (0: 先頭, 1: 末尾)
+          const ratio = totalItems > 1 ? idx / (totalItems - 1) : 0.5;
+          // 画面の 15% 〜 85% の位置を目標にする (上なら上寄り、下なら下寄り)
+          const targetViewportY = windowHeight * (0.15 + 0.7 * ratio);
+          const targetScrollY = absoluteTop - targetViewportY + (rect.height / 2);
+          
+          window.scrollTo({ top: targetScrollY, behavior: 'smooth' });
+        }, 50);
+      }, 50);
+    });
   };
 
   const handleDragStart = (e, idx) => {
     setDraggedIndex(idx);
     e.dataTransfer.effectAllowed = 'move';
-    centerElement(idx);
+    adjustPosition(idx);
   };
   const handleDragOver = (e, idx) => {
     e.preventDefault();
@@ -1084,7 +1110,7 @@ function useDragAndDrop(items, setItems) {
   const handleTouchStart = (e, idx) => {
     setDraggedIndex(idx);
     document.body.style.overflow = 'hidden';
-    centerElement(idx);
+    adjustPosition(idx);
   };
   const handleTouchMove = (e) => {
     if (draggedIndex === null) return;
@@ -2545,9 +2571,9 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
              onDragLeave={itemDnd.handlers.onDragLeave}
              onDrop={(e) => itemDnd.handlers.onDrop(e, index)}
              onDragEnd={itemDnd.handlers.onDragEnd}
-             className={`relative transition-all duration-200 ${itemDnd.draggedIndex === index ? (itemDnd.dragOverIndex === index ? 'opacity-90 scale-[0.98] ring-2 ring-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.8)] rounded-2xl' : 'opacity-40 scale-[0.98]') : ''}`}
+             className={`relative transition-all duration-200 ${itemDnd.draggedIndex === index ? (itemDnd.dragOverIndex === index ? 'opacity-70 scale-[0.98] ring-2 ring-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] rounded-2xl' : 'opacity-40 scale-[0.98] border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl') : ''}`}
           >
-             {itemDnd.dragOverIndex === index && itemDnd.draggedIndex !== index && <div className={`absolute left-0 w-full h-1.5 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${itemDnd.draggedIndex < itemDnd.dragOverIndex ? '-bottom-3' : '-top-3'}`} />}
+             {itemDnd.dragOverIndex === index && itemDnd.draggedIndex !== index && <div className={`absolute left-0 w-full h-1.5 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${itemDnd.draggedIndex < itemDnd.dragOverIndex ? '-bottom-2' : '-top-2'}`} />}
              <WorkoutItemForm 
                item={item} 
                index={index}
@@ -3294,7 +3320,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 15:21, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 15:25, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
