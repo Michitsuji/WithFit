@@ -626,8 +626,12 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
   }, [myPastPosts]);
 
   const filteredExercises = availableExercises.filter(ex => {
-    if (localFilter === 'common' && ex.gymId !== 'common') return false;
-    if (localFilter === 'gym' && ex.gymId === 'common') return false;
+    const isCommon = ex.gymId === 'common';
+    const fwType = ex.freeWeightType || (ex.name.includes('ダンベル') ? 'dumbbell' : ex.name.includes('スミス') ? 'smith' : 'barbell');
+    if (localFilter === 'barbell' && (!isCommon || fwType !== 'barbell')) return false;
+    if (localFilter === 'dumbbell' && (!isCommon || fwType !== 'dumbbell')) return false;
+    if (localFilter === 'smith' && (!isCommon || fwType !== 'smith')) return false;
+    if (localFilter === 'gym' && isCommon) return false;
     return true;
   });
 
@@ -766,10 +770,12 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
             <button onClick={() => moveItemDown(index)} disabled={isLast} className="p-1 text-slate-400 hover:text-emerald-500 disabled:opacity-30 bg-slate-50 dark:bg-slate-800 rounded transition-colors"><ArrowDown size={14}/></button>
           </div>
           <div className="flex flex-col flex-1 min-w-0 ml-1 gap-2">
-            <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg">
-              <button onClick={() => setLocalFilter('all')} className={`flex-1 py-1.5 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'all' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>すべて表示</button>
-              <button onClick={() => setLocalFilter('common')} className={`flex-1 py-1.5 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'common' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>フリーウェイト</button>
-              <button onClick={() => setLocalFilter('gym')} className={`flex-1 py-1.5 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'gym' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>マシン等</button>
+            <div className="flex flex-wrap bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg gap-1">
+              <button onClick={() => setLocalFilter('all')} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'all' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>すべて</button>
+              <button onClick={() => setLocalFilter('barbell')} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'barbell' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>バーベル</button>
+              <button onClick={() => setLocalFilter('dumbbell')} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'dumbbell' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>ダンベル</button>
+              <button onClick={() => setLocalFilter('smith')} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'smith' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>スミス</button>
+              <button onClick={() => setLocalFilter('gym')} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'gym' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>マシン等</button>
             </div>
             <div className="relative w-full">
               <select value={item.exerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, 0)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base pr-8" style={{ fontSize: '16px' }}>
@@ -2549,6 +2555,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
   const [newExMaker, setNewExMaker] = useState('');
   const [newExWeightType, setNewExWeightType] = useState('total'); 
   const [newExCategory, setNewExCategory] = useState('胸');
+  const [newExFreeWeightType, setNewExFreeWeightType] = useState('barbell');
   const [isAdding, setIsAdding] = useState(false);
 
   const [editingExId, setEditingExId] = useState(null);
@@ -2558,6 +2565,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
   const [editExWeightType, setEditExWeightType] = useState('total'); 
   const [editExCategory, setEditExCategory] = useState('胸');
   const [editingExGymId, setEditingExGymId] = useState('');
+  const [editExFreeWeightType, setEditExFreeWeightType] = useState('barbell');
 
   const handleAddGym = async (e) => {
     e.preventDefault();
@@ -2580,13 +2588,13 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
     setIsAdding(true);
     const newDocId = `ex_${Date.now()}`;
     try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', newDocId), { name: newExName.trim(), maker: newExMaker.trim(), gymId: selectedGymId, weightType: newExWeightType, category: newExCategory, createdAt: Date.now() });
-      setNewExName(''); setNewExMaker(''); setNewExWeightType('total'); setNewExCategory('胸');
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', newDocId), { name: newExName.trim(), maker: newExMaker.trim(), gymId: selectedGymId, weightType: newExWeightType, category: newExCategory, freeWeightType: selectedGymId === 'common' ? newExFreeWeightType : null, createdAt: Date.now() });
+      setNewExName(''); setNewExMaker(''); setNewExWeightType('total'); setNewExCategory('胸'); setNewExFreeWeightType('barbell');
     } catch (e) {}
     setIsAdding(false);
   };
 
-  const startEdit = (ex) => { setEditingExId(ex.id); setEditingExOldName(ex.name); setEditExName(ex.name); setEditExMaker(ex.maker || ''); setEditExWeightType(ex.weightType || 'total'); setEditExCategory(ex.category || 'その他'); setEditingExGymId(ex.gymId || ''); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const startEdit = (ex) => { setEditingExId(ex.id); setEditingExOldName(ex.name); setEditExName(ex.name); setEditExMaker(ex.maker || ''); setEditExWeightType(ex.weightType || 'total'); setEditExCategory(ex.category || 'その他'); setEditingExGymId(ex.gymId || ''); setEditExFreeWeightType(ex.freeWeightType || (ex.name.includes('ダンベル') ? 'dumbbell' : ex.name.includes('スミス') ? 'smith' : 'barbell')); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const cancelEdit = () => { setEditingExId(null); setEditingExOldName(''); };
 
   const handleUpdateExercise = async (e) => {
@@ -2594,7 +2602,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
     if (!editExName.trim()) return;
     try { 
       // 種目マスターデータの更新
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', editingExId), { name: editExName.trim(), maker: editExMaker.trim(), weightType: editExWeightType, category: editExCategory, gymId: editingExGymId }, { merge: true }); 
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', editingExId), { name: editExName.trim(), maker: editExMaker.trim(), weightType: editExWeightType, category: editExCategory, gymId: editingExGymId, freeWeightType: editingExGymId === 'common' ? editExFreeWeightType : null }, { merge: true }); 
 
       // 過去の投稿を一括更新（種目名・カテゴリ・重量タイプの変更を反映）
       if (posts && posts.length > 0) {
@@ -2720,6 +2728,19 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
                       </div>
                     </div>
+                    {editingExGymId === 'common' && (
+                      <div className="bg-emerald-50 dark:bg-emerald-950/30 p-3 rounded-xl border border-emerald-100 dark:border-emerald-900/50 space-y-2">
+                         <p className="text-xs text-emerald-700 dark:text-emerald-400 font-bold mb-2">
+                           ※フリーウェイトとして登録できるのは「ダンベル」「バーベル（EZバー含む）」「スミス」のみです。マシンやケーブル等は各ジム固有の設備として登録してください。
+                         </p>
+                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">フリーウェイトの種類 <span className="text-rose-500">*</span></label>
+                         <div className="flex gap-2">
+                           <label className={`flex-1 text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExFreeWeightType === 'barbell' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="barbell" checked={editExFreeWeightType === 'barbell'} onChange={(e) => setEditExFreeWeightType(e.target.value)} className="hidden"/>バーベル</label>
+                           <label className={`flex-1 text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExFreeWeightType === 'dumbbell' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="dumbbell" checked={editExFreeWeightType === 'dumbbell'} onChange={(e) => setEditExFreeWeightType(e.target.value)} className="hidden"/>ダンベル</label>
+                           <label className={`flex-1 text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExFreeWeightType === 'smith' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="smith" checked={editExFreeWeightType === 'smith'} onChange={(e) => setEditExFreeWeightType(e.target.value)} className="hidden"/>スミス</label>
+                         </div>
+                      </div>
+                    )}
                     <div>
                       <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">部位カテゴリ</label>
                       <div className="relative">
@@ -2758,6 +2779,19 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
                       </div>
                     </div>
+                    {selectedGymId === 'common' && (
+                      <div className="bg-slate-100 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/50 space-y-2">
+                         <p className="text-xs text-slate-600 dark:text-slate-300 font-bold mb-2">
+                           ※フリーウェイトとして登録できるのは「ダンベル」「バーベル（EZバー含む）」「スミス」のみです。マシンやケーブル等は各ジム固有の設備として登録してください。
+                         </p>
+                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">フリーウェイトの種類 <span className="text-rose-500">*</span></label>
+                         <div className="flex gap-2">
+                           <label className={`flex-1 text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExFreeWeightType === 'barbell' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="barbell" checked={newExFreeWeightType === 'barbell'} onChange={(e) => setNewExFreeWeightType(e.target.value)} className="hidden"/>バーベル</label>
+                           <label className={`flex-1 text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExFreeWeightType === 'dumbbell' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="dumbbell" checked={newExFreeWeightType === 'dumbbell'} onChange={(e) => setNewExFreeWeightType(e.target.value)} className="hidden"/>ダンベル</label>
+                           <label className={`flex-1 text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExFreeWeightType === 'smith' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="smith" checked={newExFreeWeightType === 'smith'} onChange={(e) => setNewExFreeWeightType(e.target.value)} className="hidden"/>スミス</label>
+                         </div>
+                      </div>
+                    )}
                     <div>
                       <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">部位カテゴリ <span className="text-rose-500">*</span></label>
                       <div className="relative">
@@ -2791,8 +2825,12 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <select value={filterGymId} onChange={e => setFilterGymId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-xs">
-                        <option value="all">すべてのジム</option>
-                        {gyms.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                        <option value="all">すべてのジム・器具</option>
+                        <option value="common">フリーウェイト (すべて)</option>
+                        <option value="common_barbell">フリーウェイト (バーベル)</option>
+                        <option value="common_dumbbell">フリーウェイト (ダンベル)</option>
+                        <option value="common_smith">フリーウェイト (スミス)</option>
+                        {gyms.filter(g => g.id !== 'common').map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                       </select>
                       <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[10px]">▼</div>
                     </div>
@@ -2806,8 +2844,17 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
                   </div>
                 </div>
                 <div className="space-y-4">
-                  {gyms.filter(gym => filterGymId === 'all' || gym.id === filterGymId).map(gym => {
-                    const gymExercises = exercises.filter(ex => ex.gymId === gym.id && (filterCategory === 'all' || ex.category === filterCategory)).sort((a, b) => {
+                  {gyms.filter(gym => filterGymId === 'all' || gym.id === filterGymId || (filterGymId.startsWith('common_') && gym.id === 'common')).map(gym => {
+                    const gymExercises = exercises.filter(ex => {
+                      if (ex.gymId !== gym.id) return false;
+                      if (filterCategory !== 'all' && ex.category !== filterCategory) return false;
+                      if (gym.id === 'common' && filterGymId.startsWith('common_')) {
+                        const targetType = filterGymId.replace('common_', '');
+                        const fwType = ex.freeWeightType || (ex.name.includes('ダンベル') ? 'dumbbell' : ex.name.includes('スミス') ? 'smith' : 'barbell');
+                        if (fwType !== targetType) return false;
+                      }
+                      return true;
+                    }).sort((a, b) => {
                       const idxA = MUSCLE_CATEGORIES.indexOf(a.category);
                       const idxB = MUSCLE_CATEGORIES.indexOf(b.category);
                       return (idxA !== -1 ? idxA : 99) - (idxB !== -1 ? idxB : 99);
@@ -2820,7 +2867,15 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
                           {gymExercises.map(ex => (
                             <div key={ex.id} className="p-3 flex justify-between items-center group">
                               <div>
-                                <p className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">{ex.name}{ex.category && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${getCategoryColor(ex.category)}`}>{ex.category}</span>}</p>
+                                <p className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">
+                                  {ex.name}
+                                  {ex.category && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${getCategoryColor(ex.category)}`}>{ex.category}</span>}
+                                  {gym.id === 'common' && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                                      {ex.freeWeightType === 'dumbbell' ? 'ダンベル' : ex.freeWeightType === 'smith' ? 'スミス' : 'バーベル'}
+                                    </span>
+                                  )}
+                                </p>
                                 <div className="flex gap-2 mt-1">
                                   {ex.maker && <span className="text-xs text-slate-400 dark:text-slate-500 font-bold bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{ex.maker}</span>}
                                   {ex.weightType && <span className="text-[10px] text-emerald-500 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-900">
@@ -3008,7 +3063,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 13:16, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 13:25, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
