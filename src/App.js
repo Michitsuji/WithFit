@@ -915,9 +915,9 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, sIndex)}
             onDragEnd={handleDragEnd}
-            className={`bg-slate-50/50 dark:bg-slate-950/50 p-2.5 rounded-xl border transition-all relative ${draggedSetIndex === sIndex ? 'opacity-40' : 'border-slate-100 dark:border-slate-800'} space-y-3`}
+            className={`bg-slate-50/50 dark:bg-slate-950/50 p-2.5 rounded-xl border transition-all relative ${draggedSetIndex === sIndex ? (dragOverSetIndex === sIndex ? 'opacity-90 border-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'opacity-40') : 'border-slate-100 dark:border-slate-800'} ${draggedSetIndex !== null ? 'space-y-0' : 'space-y-3'}`}
           >
-            {dragOverSetIndex === sIndex && <div className={`absolute left-0 w-full h-1 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${draggedSetIndex < dragOverSetIndex ? '-bottom-2' : '-top-2'}`} />}
+            {dragOverSetIndex === sIndex && draggedSetIndex !== sIndex && <div className={`absolute left-0 w-full h-1 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${draggedSetIndex < dragOverSetIndex ? '-bottom-2' : '-top-2'}`} />}
             <div className="flex items-center gap-2">
               <div 
                  className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-emerald-500 p-1 -ml-1 shrink-0 touch-none"
@@ -931,84 +931,95 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
                 <GripVertical size={16} />
               </div>
               <div className="w-6 text-center text-slate-400 dark:text-slate-500 font-bold text-sm shrink-0">{sIndex + 1}</div>
-              {renderInputRow(set, item.weightType, 'main', false)}
-              <button onClick={() => removeSet(item.id, set.id)} disabled={item.sets.length === 1} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 disabled:opacity-30 flex justify-center"><X size={18} /></button>
+              
+              {draggedSetIndex !== null ? (
+                <div className="flex-1 text-sm font-bold text-slate-500 dark:text-slate-400 py-1">SET {sIndex + 1}</div>
+              ) : (
+                <>
+                  {renderInputRow(set, item.weightType, 'main', false)}
+                  <button onClick={() => removeSet(item.id, set.id)} disabled={item.sets.length === 1} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 disabled:opacity-30 flex justify-center"><X size={18} /></button>
+                </>
+              )}
             </div>
 
-            {item.isDropSet && item.weightType !== 'cardio' && set.dropSets && set.dropSets.map(ds => (
-              <div key={ds.id} className="border-l-2 border-orange-200 dark:border-orange-800 pl-3 flex items-center gap-2 ml-4">
-                <TrendingDown size={16} className="text-orange-400 flex-shrink-0" />
-                {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'dropSets' }, item.weightType, 'main', true, ds.id)}
-                <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'dropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
-              </div>
-            ))}
-
-            {item.isDropSet && item.weightType !== 'cardio' && (
-              <button onClick={() => addDropSet(item.id, set.id, 'dropSets')} className="ml-4 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900 border border-orange-200 dark:border-orange-800 px-3 py-1.5 rounded transition-colors font-bold flex items-center gap-1 w-max"><Plus size={12}/>ドロップ追加</button>
-            )}
-
-            {item.isSuperSet && item.superExerciseName && item.weightType !== 'cardio' && (
-              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-3">
-                <div className="flex items-center gap-2 pl-4 border-l-2 border-indigo-300 dark:border-indigo-700 ml-1">
-                  <Zap size={16} className="text-indigo-400 flex-shrink-0" />
-                  {renderInputRow(set, item.superWeightType || 'total', 'super2', false)}
-                  <div className="w-6 shrink-0"></div>
-                </div>
-                
-                {item.isDropSet && set.dropSets && !set.superDropSets && set.dropSets.map(ds => (
-                  ds.superWeight !== undefined ? (
-                  <div key={`super2-old-ds-${ds.id}`} className="flex items-center gap-2 pl-8 border-l-2 border-orange-300 dark:border-orange-700 ml-5">
-                    <TrendingDown size={14} className="text-orange-400 flex-shrink-0" />
-                    {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'dropSets' }, item.superWeightType || 'total', 'super2', true, ds.id)}
+            {draggedSetIndex === null && (
+              <>
+                {item.isDropSet && item.weightType !== 'cardio' && set.dropSets && set.dropSets.map(ds => (
+                  <div key={ds.id} className="border-l-2 border-orange-200 dark:border-orange-800 pl-3 flex items-center gap-2 ml-4">
+                    <TrendingDown size={16} className="text-orange-400 flex-shrink-0" />
+                    {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'dropSets' }, item.weightType, 'main', true, ds.id)}
                     <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'dropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
                   </div>
-                  ) : null
                 ))}
-                
-                {item.isDropSet && set.superDropSets && set.superDropSets.map(ds => (
-                  <div key={`super2-ds-${ds.id}`} className="flex items-center gap-2 pl-8 border-l-2 border-orange-300 dark:border-orange-700 ml-5">
-                    <TrendingDown size={14} className="text-orange-400 flex-shrink-0" />
-                    {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'superDropSets' }, item.superWeightType || 'total', 'super2', true, ds.id)}
-                    <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'superDropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
-                  </div>
-                ))}
-                
-                {item.isDropSet && (
-                  <button onClick={() => addDropSet(item.id, set.id, 'superDropSets')} className="ml-12 mt-1 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900 border border-orange-200 dark:border-orange-800 px-3 py-1.5 rounded transition-colors font-bold flex items-center gap-1 w-max"><Plus size={12}/>ドロップ追加</button>
+
+                {item.isDropSet && item.weightType !== 'cardio' && (
+                  <button onClick={() => addDropSet(item.id, set.id, 'dropSets')} className="ml-4 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900 border border-orange-200 dark:border-orange-800 px-3 py-1.5 rounded transition-colors font-bold flex items-center gap-1 w-max"><Plus size={12}/>ドロップ追加</button>
                 )}
-              </div>
-            )}
-            
-            {item.isSuperSet && item.superExerciseName3 && item.weightType !== 'cardio' && (
-              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-3">
-                <div className="flex items-center gap-2 pl-4 border-l-2 border-indigo-300 dark:border-indigo-700 ml-1">
-                  <Zap size={16} className="text-indigo-400 flex-shrink-0" />
-                  {renderInputRow(set, item.superWeightType3 || 'total', 'super3', false)}
-                  <div className="w-6 shrink-0"></div>
-                </div>
-                
-                {item.isDropSet && set.dropSets && !set.superDropSets3 && set.dropSets.map(ds => (
-                  ds.superWeight3 !== undefined ? (
-                  <div key={`super3-old-ds-${ds.id}`} className="flex items-center gap-2 pl-8 border-l-2 border-orange-300 dark:border-orange-700 ml-5">
-                    <TrendingDown size={14} className="text-orange-400 flex-shrink-0" />
-                    {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'dropSets' }, item.superWeightType3 || 'total', 'super3', true, ds.id)}
-                    <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'dropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
+
+                {item.isSuperSet && item.superExerciseName && item.weightType !== 'cardio' && (
+                  <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-3">
+                    <div className="flex items-center gap-2 pl-4 border-l-2 border-indigo-300 dark:border-indigo-700 ml-1">
+                      <Zap size={16} className="text-indigo-400 flex-shrink-0" />
+                      {renderInputRow(set, item.superWeightType || 'total', 'super2', false)}
+                      <div className="w-6 shrink-0"></div>
+                    </div>
+                    
+                    {item.isDropSet && set.dropSets && !set.superDropSets && set.dropSets.map(ds => (
+                      ds.superWeight !== undefined ? (
+                      <div key={`super2-old-ds-${ds.id}`} className="flex items-center gap-2 pl-8 border-l-2 border-orange-300 dark:border-orange-700 ml-5">
+                        <TrendingDown size={14} className="text-orange-400 flex-shrink-0" />
+                        {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'dropSets' }, item.superWeightType || 'total', 'super2', true, ds.id)}
+                        <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'dropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
+                      </div>
+                      ) : null
+                    ))}
+                    
+                    {item.isDropSet && set.superDropSets && set.superDropSets.map(ds => (
+                      <div key={`super2-ds-${ds.id}`} className="flex items-center gap-2 pl-8 border-l-2 border-orange-300 dark:border-orange-700 ml-5">
+                        <TrendingDown size={14} className="text-orange-400 flex-shrink-0" />
+                        {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'superDropSets' }, item.superWeightType || 'total', 'super2', true, ds.id)}
+                        <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'superDropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
+                      </div>
+                    ))}
+                    
+                    {item.isDropSet && (
+                      <button onClick={() => addDropSet(item.id, set.id, 'superDropSets')} className="ml-12 mt-1 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900 border border-orange-200 dark:border-orange-800 px-3 py-1.5 rounded transition-colors font-bold flex items-center gap-1 w-max"><Plus size={12}/>ドロップ追加</button>
+                    )}
                   </div>
-                  ) : null
-                ))}
-                
-                {item.isDropSet && set.superDropSets3 && set.superDropSets3.map(ds => (
-                  <div key={`super3-ds-${ds.id}`} className="flex items-center gap-2 pl-8 border-l-2 border-orange-300 dark:border-orange-700 ml-5">
-                    <TrendingDown size={14} className="text-orange-400 flex-shrink-0" />
-                    {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'superDropSets3' }, item.superWeightType3 || 'total', 'super3', true, ds.id)}
-                    <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'superDropSets3')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
-                  </div>
-                ))}
-                
-                {item.isDropSet && (
-                  <button onClick={() => addDropSet(item.id, set.id, 'superDropSets3')} className="ml-12 mt-1 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900 border border-orange-200 dark:border-orange-800 px-3 py-1.5 rounded transition-colors font-bold flex items-center gap-1 w-max"><Plus size={12}/>ドロップ追加</button>
                 )}
-              </div>
+                
+                {item.isSuperSet && item.superExerciseName3 && item.weightType !== 'cardio' && (
+                  <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-3">
+                    <div className="flex items-center gap-2 pl-4 border-l-2 border-indigo-300 dark:border-indigo-700 ml-1">
+                      <Zap size={16} className="text-indigo-400 flex-shrink-0" />
+                      {renderInputRow(set, item.superWeightType3 || 'total', 'super3', false)}
+                      <div className="w-6 shrink-0"></div>
+                    </div>
+                    
+                    {item.isDropSet && set.dropSets && !set.superDropSets3 && set.dropSets.map(ds => (
+                      ds.superWeight3 !== undefined ? (
+                      <div key={`super3-old-ds-${ds.id}`} className="flex items-center gap-2 pl-8 border-l-2 border-orange-300 dark:border-orange-700 ml-5">
+                        <TrendingDown size={14} className="text-orange-400 flex-shrink-0" />
+                        {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'dropSets' }, item.superWeightType3 || 'total', 'super3', true, ds.id)}
+                        <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'dropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
+                      </div>
+                      ) : null
+                    ))}
+                    
+                    {item.isDropSet && set.superDropSets3 && set.superDropSets3.map(ds => (
+                      <div key={`super3-ds-${ds.id}`} className="flex items-center gap-2 pl-8 border-l-2 border-orange-300 dark:border-orange-700 ml-5">
+                        <TrendingDown size={14} className="text-orange-400 flex-shrink-0" />
+                        {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'superDropSets3' }, item.superWeightType3 || 'total', 'super3', true, ds.id)}
+                        <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'superDropSets3')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
+                      </div>
+                    ))}
+                    
+                    {item.isDropSet && (
+                      <button onClick={() => addDropSet(item.id, set.id, 'superDropSets3')} className="ml-12 mt-1 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900 border border-orange-200 dark:border-orange-800 px-3 py-1.5 rounded transition-colors font-bold flex items-center gap-1 w-max"><Plus size={12}/>ドロップ追加</button>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
         ))}
@@ -1037,7 +1048,7 @@ function useDragAndDrop(items, setItems) {
     // 折りたたまれて高さが変わった後にスクロールさせるため少し遅延させる
     setTimeout(() => {
       const el = refs.current[idx];
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, 50);
   };
 
@@ -2534,9 +2545,9 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
              onDragLeave={itemDnd.handlers.onDragLeave}
              onDrop={(e) => itemDnd.handlers.onDrop(e, index)}
              onDragEnd={itemDnd.handlers.onDragEnd}
-             className={`relative transition-all duration-200 ${itemDnd.draggedIndex === index ? 'opacity-70 scale-[0.98]' : ''}`}
+             className={`relative transition-all duration-200 ${itemDnd.draggedIndex === index ? (itemDnd.dragOverIndex === index ? 'opacity-90 scale-[0.98] ring-2 ring-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.8)] rounded-2xl' : 'opacity-40 scale-[0.98]') : ''}`}
           >
-             {itemDnd.dragOverIndex === index && <div className={`absolute left-0 w-full h-1.5 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${itemDnd.draggedIndex < itemDnd.dragOverIndex ? '-bottom-3' : '-top-3'}`} />}
+             {itemDnd.dragOverIndex === index && itemDnd.draggedIndex !== index && <div className={`absolute left-0 w-full h-1.5 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${itemDnd.draggedIndex < itemDnd.dragOverIndex ? '-bottom-3' : '-top-3'}`} />}
              <WorkoutItemForm 
                item={item} 
                index={index}
@@ -3283,7 +3294,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 14:19, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 15:21, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
