@@ -2055,6 +2055,7 @@ function TimelineView({ posts, onToggleLike, onImport, currentUser, onDelete, on
 // --- 月間レポートコンポーネント ---
 function MonthlyReport({ monthDate, posts, userName, accountsInfo }) {
   const displayName = accountsInfo[userName]?.displayName || userName;
+  const displayName = accountsInfo[userName]?.displayName || userName;
   const year = monthDate.getFullYear();
   const month = monthDate.getMonth();
   const monthPosts = posts.filter(p => {
@@ -3405,7 +3406,7 @@ function FriendsView({ currentUser, myInfo, posts, accountsInfo, onSendFriendReq
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.1.0 (2026.7.14, 08:15, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.1.0 (2026.7.14, 08:27, updated)</p>
       </div>
     </div>
   );
