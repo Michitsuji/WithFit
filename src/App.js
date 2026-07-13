@@ -917,7 +917,7 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
             onDragEnd={handleDragEnd}
             className={`bg-slate-50/50 dark:bg-slate-950/50 p-2.5 rounded-xl border transition-all relative ${draggedSetIndex === sIndex ? 'opacity-40' : 'border-slate-100 dark:border-slate-800'} space-y-3`}
           >
-            {dragOverSetIndex === sIndex && <div className="absolute -top-2 left-0 w-full h-1 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />}
+            {dragOverSetIndex === sIndex && <div className={`absolute left-0 w-full h-1 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${draggedSetIndex < dragOverSetIndex ? '-bottom-2' : '-top-2'}`} />}
             <div className="flex items-center gap-2">
               <div 
                  className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-emerald-500 p-1 -ml-1 shrink-0 touch-none"
@@ -1139,6 +1139,20 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState('timeline');
   const [isRecordManual, setIsRecordManual] = useState(false); // 追加
   const [importGymId, setImportGymId] = useState(''); // 追加
+
+  useEffect(() => {
+    const sessionStr = localStorage.getItem('duofit_login_session');
+    if (sessionStr) {
+       try {
+          const session = JSON.parse(sessionStr);
+          if (session.userId && session.lastActive && Date.now() - session.lastActive <= 10 * 60 * 1000) {
+             setCurrentUser(session.userId);
+          } else {
+             localStorage.removeItem('duofit_login_session');
+          }
+       } catch(e) {}
+    }
+  }, []);
   
   const scrollPositions = useRef({});
   const prevTabRef = useRef('timeline');
@@ -1262,21 +1276,25 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!currentUser || !db || !isOnline) return;
+    if (!currentUser) return;
     const updatePresence = async (activeTime) => { 
+      if (activeTime > 0) {
+         localStorage.setItem('duofit_login_session', JSON.stringify({ userId: currentUser, lastActive: activeTime }));
+      }
+      if (!db || !isOnline) return;
       try { 
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { lastActive: activeTime }, { merge: true }); 
       } catch (e) {} 
     };
     
     updatePresence(Date.now());
-    const intervalId = setInterval(() => updatePresence(Date.now()), 15000); // 15秒に1回更新
+    const intervalId = setInterval(() => updatePresence(Date.now()), 15000);
     
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        updatePresence(0); // アプリを閉じたりバックグラウンドに入ったらオフラインにする
+        updatePresence(0);
       } else {
-        updatePresence(Date.now()); // アプリに戻ったらオンラインにする
+        updatePresence(Date.now());
       }
     };
     
@@ -1317,6 +1335,7 @@ export default function App() {
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isAppOnline: false, lastActive: Date.now() }, { merge: true });
       } catch (e) {}
     }
+    localStorage.removeItem('duofit_login_session');
     setCurrentUser(null); setCurrentTab('timeline'); setEditingPost(null); 
   };
 
@@ -2507,7 +2526,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
              onDragEnd={itemDnd.handlers.onDragEnd}
              className={`relative transition-all duration-200 ${itemDnd.draggedIndex === index ? 'opacity-70 scale-[0.98]' : ''}`}
           >
-             {itemDnd.dragOverIndex === index && <div className="absolute -top-3 left-0 w-full h-1.5 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />}
+             {itemDnd.dragOverIndex === index && <div className={`absolute left-0 w-full h-1.5 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${itemDnd.draggedIndex < itemDnd.dragOverIndex ? '-bottom-3' : '-top-3'}`} />}
              <WorkoutItemForm 
                item={item} 
                index={index}
@@ -3254,7 +3273,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 14:09, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 14:13, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
