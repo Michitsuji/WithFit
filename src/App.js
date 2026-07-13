@@ -1033,9 +1033,18 @@ function useDragAndDrop(items, setItems) {
   const [draggableId, setDraggableId] = useState(null);
   const refs = useRef([]);
 
+  const centerElement = (idx) => {
+    // 折りたたまれて高さが変わった後にスクロールさせるため少し遅延させる
+    setTimeout(() => {
+      const el = refs.current[idx];
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 50);
+  };
+
   const handleDragStart = (e, idx) => {
     setDraggedIndex(idx);
     e.dataTransfer.effectAllowed = 'move';
+    centerElement(idx);
   };
   const handleDragOver = (e, idx) => {
     e.preventDefault();
@@ -1064,6 +1073,7 @@ function useDragAndDrop(items, setItems) {
   const handleTouchStart = (e, idx) => {
     setDraggedIndex(idx);
     document.body.style.overflow = 'hidden';
+    centerElement(idx);
   };
   const handleTouchMove = (e) => {
     if (draggedIndex === null) return;
@@ -3273,7 +3283,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 14:13, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 14:19, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
