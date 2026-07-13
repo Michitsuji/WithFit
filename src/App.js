@@ -599,8 +599,8 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 }
 
 // --- 共通コンポーネント：ワークアウト入力フォーム ---
-function WorkoutItemForm({ item, index, availableExercises, updateItem, removeItem, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet, reorderSet, myPastPosts, onActive, isDragging, dragHandleProps }) {
-  const [localFilter, setLocalFilter] = useState('all');
+function WorkoutItemForm({ item, index, availableExercises, updateItem, removeItem, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet, reorderSet, myPastPosts, onActive, isDragging, isAnyDragging, dragHandleProps }) {
+  const [localFilter, setLocalFilter] = useState('barbell');
   const [draggedSetIndex, setDraggedSetIndex] = useState(null);
   const [dragOverSetIndex, setDragOverSetIndex] = useState(null);
   const [draggableSetId, setDraggableSetId] = useState(null);
@@ -824,13 +824,14 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
             <GripVertical size={20}/>
           </div>
           <div className="flex flex-col flex-1 min-w-0 ml-1 gap-2">
-            <div className="flex flex-wrap bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg gap-1">
-              <button onClick={() => setLocalFilter('all')} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'all' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>すべて</button>
-              <button onClick={() => setLocalFilter('barbell')} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'barbell' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>バーベル</button>
-              <button onClick={() => setLocalFilter('dumbbell')} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'dumbbell' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>ダンベル</button>
-              <button onClick={() => setLocalFilter('smith')} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'smith' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>スミス</button>
-              <button onClick={() => setLocalFilter('gym')} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'gym' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>マシン等</button>
-            </div>
+            {!isAnyDragging && (
+              <div className="flex flex-wrap bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg gap-1">
+                <button onClick={() => setLocalFilter('barbell')} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'barbell' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>バーベル</button>
+                <button onClick={() => setLocalFilter('dumbbell')} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'dumbbell' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>ダンベル</button>
+                <button onClick={() => setLocalFilter('smith')} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'smith' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>スミス</button>
+                <button onClick={() => setLocalFilter('gym')} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'gym' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>マシン等</button>
+              </div>
+            )}
             <div className="relative w-full">
               <select value={item.exerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, 0)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base pr-8" style={{ fontSize: '16px' }}>
                 <option value="" disabled>{filteredExercises.length === 0 ? (availableExercises.length === 0 ? "上の部位を選択してください" : "該当する種目がありません") : "種目を選択"}</option>
@@ -846,7 +847,7 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
         <button onClick={() => removeItem(item.id)} className="ml-2 text-slate-400 hover:text-rose-500 p-2 flex-shrink-0 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors mt-2"><Trash2 size={18} /></button>
       </div>
 
-      <div className={`transition-all overflow-hidden ${isDragging ? 'h-0 opacity-0' : 'h-auto opacity-100'}`}>
+      <div className={`transition-all overflow-hidden ${isAnyDragging ? 'h-0 opacity-0' : 'h-auto opacity-100'}`}>
       {prevRecord && (
         <div className="mb-4 pl-8 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950/50 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
           <span className="text-emerald-600 dark:text-emerald-400 mr-2 flex items-center inline-flex gap-1"><Clock size={12}/>前回 ({formatDateWithDay(prevRecord.date)})</span>
@@ -1178,9 +1179,12 @@ export default function App() {
           const docSnap = await getDoc(docRef);
           if (docSnap.exists() && docSnap.data().currentWorkoutItems) {
              setDraftWorkoutItems(docSnap.data().currentWorkoutItems);
+             setSelectedCategories(docSnap.data().currentSelectedCategories || []);
           } else {
              const savedDraft = localStorage.getItem(`duofit_draft_${currentUser}`);
              if (savedDraft) setDraftWorkoutItems(JSON.parse(savedDraft));
+             const savedCats = localStorage.getItem(`duofit_cats_${currentUser}`);
+             if (savedCats) setSelectedCategories(JSON.parse(savedCats));
           }
         } catch (e) {
           console.error("Failed to load draft", e);
@@ -1436,6 +1440,8 @@ export default function App() {
       }))
     }));
     
+    const importedCategories = Array.from(new Set(newItems.map(item => item.category).filter(Boolean)));
+    setSelectedCategories(importedCategories);
     setDraftWorkoutItems(newItems);
     
     if (isManual) {
@@ -1485,7 +1491,7 @@ export default function App() {
   const themeContainerClass = myInfo.theme === 'ocean' ? 'theme-ocean' : myInfo.theme === 'pop' ? 'theme-pop' : '';
 
   return (
-    <div className={`min-h-screen font-sans pb-32 overflow-x-hidden selection:bg-emerald-200 transition-colors duration-300 ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'} ${themeContainerClass}`}>
+    <div className={`min-h-screen font-sans pb-32 overflow-x-hidden select-none transition-colors duration-300 ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'} ${themeContainerClass}`}>
       {myInfo.theme === 'ocean' && (
         <style>{`
           .theme-ocean.dark, .theme-ocean .bg-slate-950 { background-color: #021526 !important; }
@@ -2518,6 +2524,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
                myPastPosts={myPastPosts}
                onActive={onActiveExerciseChange}
                isDragging={itemDnd.draggedIndex === index}
+               isAnyDragging={itemDnd.draggedIndex !== null}
                dragHandleProps={{
                  onMouseEnter: () => itemDnd.setDraggableId(item.id),
                  onMouseLeave: () => itemDnd.setDraggableId(null),
@@ -3247,7 +3254,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 14:01, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 14:09, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
