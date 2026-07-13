@@ -606,14 +606,46 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
   const [draggableSetId, setDraggableSetId] = useState(null);
   const setRefs = useRef([]);
 
+  const adjustPosition = (idx) => {
+    const el = setRefs.current[idx];
+    if (!el) return;
+    const initialTop = el.getBoundingClientRect().top;
+
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const currentEl = setRefs.current[idx];
+        if (!currentEl) return;
+        
+        const currentTop = currentEl.getBoundingClientRect().top;
+        window.scrollBy({ top: currentTop - initialTop, behavior: 'instant' });
+
+        setTimeout(() => {
+          const rect = currentEl.getBoundingClientRect();
+          const scrollTop = window.scrollY || document.documentElement.scrollTop;
+          const absoluteTop = rect.top + scrollTop;
+          const windowHeight = window.innerHeight;
+          const totalItems = item.sets ? item.sets.length : 1;
+          
+          const ratio = totalItems > 1 ? idx / (totalItems - 1) : 0.5;
+          const targetViewportY = windowHeight * (0.15 + 0.7 * ratio);
+          const targetScrollY = absoluteTop - targetViewportY + (rect.height / 2);
+          
+          window.scrollTo({ top: targetScrollY, behavior: 'smooth' });
+        }, 50);
+      }, 50);
+    });
+  };
+
   const handleDragStart = (e, idx) => {
     setDraggedSetIndex(idx);
     e.dataTransfer.effectAllowed = 'move';
+    adjustPosition(idx);
   };
 
   const handleTouchStart = (e, idx) => {
     setDraggedSetIndex(idx);
     document.body.style.overflow = 'hidden';
+    adjustPosition(idx);
   };
   const handleTouchMove = (e) => {
     if (draggedSetIndex === null) return;
@@ -3320,7 +3352,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 15:25, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 15:27, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
