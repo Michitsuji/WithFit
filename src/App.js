@@ -2825,26 +2825,43 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
           )}
 
           {workoutItems.map((item, index) => (
-             <WorkoutItemForm 
-               key={item.id} 
-               item={item} 
-               index={index}
-               isFirst={index === 0}
-               isLast={index === workoutItems.length - 1}
-               availableExercises={availableExercises} 
-               updateItem={updateItem} 
-               removeItem={removeExerciseItem}
-               moveItemUp={moveItemUp}
-               moveItemDown={moveItemDown}
-               addSet={addSet} 
-               removeSet={removeSet} 
-               updateSet={updateSetField} 
-               addDropSet={addDropSet} 
-               removeDropSet={removeDropSet} 
-               updateDropSet={updateDropSetField}
-               reorderSet={reorderSet}
-               myPastPosts={myPastPosts}
-             />
+             <div key={item.id}
+                ref={(el) => (itemDnd.refs.current[index] = el)}
+                draggable={itemDnd.draggableId === item.id}
+                onDragStart={(e) => itemDnd.handlers.onDragStart(e, index)}
+                onDragOver={(e) => itemDnd.handlers.onDragOver(e, index)}
+                onDragLeave={itemDnd.handlers.onDragLeave}
+                onDrop={(e) => itemDnd.handlers.onDrop(e, index)}
+                onDragEnd={itemDnd.handlers.onDragEnd}
+                className={`relative transition-all duration-200 ${itemDnd.draggedIndex === index ? (itemDnd.dragOverIndex === index ? 'opacity-70 scale-[0.98] ring-2 ring-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] rounded-2xl' : 'opacity-40 scale-[0.98] border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl') : ''}`}
+             >
+                {itemDnd.dragOverIndex === index && itemDnd.draggedIndex !== index && <div className={`absolute left-0 w-full h-1.5 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${itemDnd.draggedIndex < itemDnd.dragOverIndex ? '-bottom-2' : '-top-2'}`} />}
+                <WorkoutItemForm 
+                  item={item} 
+                  index={index}
+                  availableExercises={availableExercises} 
+                  updateItem={updateItem} 
+                  removeItem={removeExerciseItem}
+                  addSet={addSet} 
+                  removeSet={removeSet} 
+                  updateSet={updateSetField} 
+                  addDropSet={addDropSet} 
+                  removeDropSet={removeDropSet} 
+                  updateDropSet={updateDropSetField}
+                  reorderSet={reorderSet}
+                  myPastPosts={myPastPosts}
+                  isDragging={itemDnd.draggedIndex === index}
+                  isAnyDragging={itemDnd.draggedIndex !== null}
+                  dragHandleProps={{
+                    onMouseEnter: () => itemDnd.setDraggableId(item.id),
+                    onMouseLeave: () => itemDnd.setDraggableId(null),
+                    onTouchStart: (e) => { itemDnd.setDraggableId(item.id); itemDnd.handlers.onTouchStart(e, index); },
+                    onTouchMove: itemDnd.handlers.onTouchMove,
+                    onTouchEnd: itemDnd.handlers.onTouchEnd,
+                    onTouchCancel: itemDnd.handlers.onTouchCancel
+                  }}
+                />
+             </div>
           ))}
 
           <button onClick={addExerciseItem} className="w-full py-4 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border border-slate-200 dark:border-slate-800"><ListPlus size={18} /> 次の種目を追加</button>
@@ -3381,7 +3398,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 15:30, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 15:45, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
