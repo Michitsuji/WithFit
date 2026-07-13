@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles } from 'lucide-react';
+import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy } from 'firebase/firestore';
@@ -598,8 +598,33 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 }
 
 // --- 共通コンポーネント：ワークアウト入力フォーム ---
-function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, updateItem, removeItem, moveItemUp, moveItemDown, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet, myPastPosts }) {
+function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, updateItem, removeItem, moveItemUp, moveItemDown, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet, reorderSet, myPastPosts }) {
   const [localFilter, setLocalFilter] = useState('all');
+  const [draggedSetIndex, setDraggedSetIndex] = useState(null);
+  const [dragOverSetIndex, setDragOverSetIndex] = useState(null);
+  const [draggableSetId, setDraggableSetId] = useState(null);
+
+  const handleDragStart = (e, idx) => {
+    setDraggedSetIndex(idx);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+  const handleDragOver = (e, idx) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverSetIndex !== idx) setDragOverSetIndex(idx);
+  };
+  const handleDragLeave = () => setDragOverSetIndex(null);
+  const handleDrop = (e, idx) => {
+    e.preventDefault();
+    if (draggedSetIndex !== null && draggedSetIndex !== idx && reorderSet) reorderSet(item.id, draggedSetIndex, idx);
+    setDraggedSetIndex(null);
+    setDragOverSetIndex(null);
+  };
+  const handleDragEnd = () => {
+    setDraggedSetIndex(null);
+    setDragOverSetIndex(null);
+    setDraggableSetId(null);
+  };
 
   const exerciseHistoryMap = useMemo(() => {
     const history = {};
@@ -844,16 +869,33 @@ function WorkoutItemForm({ item, index, isFirst, isLast, availableExercises, upd
       )}
 
       <div className="space-y-4 mb-5 w-full pl-2">
-        <div className="flex text-[10px] text-slate-500 dark:text-slate-400 font-bold px-1 mb-1">
-          <div className="w-10 text-center shrink-0">Set</div>
+        <div className="flex text-[10px] text-slate-500 dark:text-slate-400 font-bold px-1 mb-1 pl-6">
+          <div className="w-6 text-center shrink-0">Set</div>
           <div className="flex-1 text-center min-w-0">記録</div>
           <div className="w-6 shrink-0"></div>
         </div>
         
         {item.sets && Array.isArray(item.sets) && item.sets.map((set, sIndex) => (
-          <div key={set.id} className="bg-slate-50/50 dark:bg-slate-950/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+          <div key={set.id} 
+            draggable={draggableSetId === set.id}
+            onDragStart={(e) => handleDragStart(e, sIndex)}
+            onDragOver={(e) => handleDragOver(e, sIndex)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, sIndex)}
+            onDragEnd={handleDragEnd}
+            className={`bg-slate-50/50 dark:bg-slate-950/50 p-2.5 rounded-xl border transition-all ${draggedSetIndex === sIndex ? 'opacity-40 border-emerald-500 border-dashed' : dragOverSetIndex === sIndex ? 'border-emerald-500 shadow-[0_-4px_0_0_#10b981]' : 'border-slate-100 dark:border-slate-800'} space-y-3`}
+          >
             <div className="flex items-center gap-2">
-              <div className="w-10 text-center text-slate-400 dark:text-slate-500 font-bold text-sm shrink-0">{sIndex + 1}</div>
+              <div 
+                 className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-emerald-500 p-1 -ml-1 shrink-0"
+                 onMouseEnter={() => setDraggableSetId(set.id)}
+                 onMouseLeave={() => setDraggableSetId(null)}
+                 onTouchStart={() => setDraggableSetId(set.id)}
+                 onTouchEnd={() => setDraggableSetId(null)}
+              >
+                <GripVertical size={16} />
+              </div>
+              <div className="w-6 text-center text-slate-400 dark:text-slate-500 font-bold text-sm shrink-0">{sIndex + 1}</div>
               {renderInputRow(set, item.weightType, 'main', false)}
               <button onClick={() => removeSet(item.id, set.id)} disabled={item.sets.length === 1} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 disabled:opacity-30 flex justify-center"><X size={18} /></button>
             </div>
@@ -2110,6 +2152,16 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
 
   const removeSet = (itemId, setId) => setWorkoutItems(prev => prev.map(item => item.id === itemId ? { ...item, sets: item.sets.filter(s => s.id !== setId) } : item));
   
+  const reorderSet = (itemId, dragIndex, dropIndex) => {
+    setWorkoutItems(prev => prev.map(item => {
+      if (item.id !== itemId) return item;
+      const newSets = [...(item.sets || [])];
+      const [dragged] = newSets.splice(dragIndex, 1);
+      newSets.splice(dropIndex, 0, dragged);
+      return { ...item, sets: newSets };
+    }));
+  };
+
   const updateSetField = (itemId, setId, field, value) => {
     setWorkoutItems(prev => prev.map(item => {
       if (item.id !== itemId) return item;
@@ -2345,6 +2397,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
              addDropSet={addDropSet} 
              removeDropSet={removeDropSet} 
              updateDropSet={updateDropSetField}
+             reorderSet={reorderSet}
              myPastPosts={myPastPosts}
            />
         ))}
@@ -2418,6 +2471,7 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
   };
   const addSet = (itemId) => { setWorkoutItems(prev => prev.map(item => { if (item.id === itemId) { const lastSet = (item.sets && item.sets.length > 0) ? item.sets[item.sets.length - 1] : { weight: '', reps: '', lReps: '', rReps: '' }; return { ...item, sets: [...(item.sets || []), { id: generateId(), weight: lastSet.weight || '', reps: lastSet.reps || '', lReps: lastSet.lReps || '', rReps: lastSet.rReps || '', dropSets: lastSet.dropSets ? lastSet.dropSets.map(ds => ({...ds, id: generateId()})) : undefined, superDropSets: lastSet.superDropSets ? lastSet.superDropSets.map(ds => ({...ds, id: generateId()})) : undefined, superDropSets3: lastSet.superDropSets3 ? lastSet.superDropSets3.map(ds => ({...ds, id: generateId()})) : undefined }]}; } return item; })); };
   const removeSet = (itemId, setId) => setWorkoutItems(prev => prev.map(item => item.id === itemId ? { ...item, sets: (item.sets || []).filter(set => set.id !== setId) } : item));
+  const reorderSet = (itemId, dragIndex, dropIndex) => { setWorkoutItems(prev => prev.map(item => { if (item.id !== itemId) return item; const newSets = [...(item.sets || [])]; const [dragged] = newSets.splice(dragIndex, 1); newSets.splice(dropIndex, 0, dragged); return { ...item, sets: newSets }; })); };
   const updateSetField = (itemId, setId, field, value) => { setWorkoutItems(prev => prev.map(item => { if (item.id !== itemId) return item; return { ...item, sets: (item.sets || []).map(set => set.id === setId ? { ...set, [field]: value } : set) }; })); };
 
   const addDropSet = (itemId, parentSetId, targetArray = 'dropSets') => { setWorkoutItems(prev => prev.map(item => { if (item.id !== itemId) return item; return { ...item, sets: item.sets.map(set => { if (set.id !== parentSetId) return set; return { ...set, [targetArray]: [...(set[targetArray] || []), { id: generateId(), weight: '', reps: '', lReps: '', rReps: '' }]}; })}; })); }
@@ -2525,6 +2579,7 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
                addDropSet={addDropSet} 
                removeDropSet={removeDropSet} 
                updateDropSet={updateDropSetField}
+               reorderSet={reorderSet}
                myPastPosts={myPastPosts}
              />
           ))}
@@ -3063,7 +3118,7 @@ function FriendsView({ partnerName, partnerInfo, currentUser, posts, accountsInf
       </div>
 
       <div className="mt-12 text-center pb-4 border-t border-slate-200/50 dark:border-slate-800/50 pt-6">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 13:25, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">DuoFit v2.0.0 (2026.7.13, 13:36, updated)</p>
         <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-1">© 2026 Yuta Michitsuji. All rights reserved.</p>
       </div>
     </div>
