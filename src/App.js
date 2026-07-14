@@ -1324,6 +1324,7 @@ export default function App() {
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [editingPost, setEditingPost] = useState(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [targetDataUser, setTargetDataUser] = useState(null);
 
   useEffect(() => {
     if (currentUser && db) {
@@ -1622,14 +1623,18 @@ export default function App() {
     }
   };
 
-  const handleAddFriend = async (friendUsername) => {
-    if (!currentUser || !db || !friendUsername) return;
-    if (friendUsername === currentUser) {
-      alert("自分自身は追加できません。");
+  const handleAddFriend = async (friendCodeOrName) => {
+    if (!currentUser || !db || !friendCodeOrName) return;
+    
+    const friendEntry = Object.entries(accountsInfo).find(([uname, data]) => data.friendCode === friendCodeOrName || uname === friendCodeOrName);
+    if (!friendEntry) {
+      alert("該当するフレンドコード（またはユーザー名）が見つかりません。");
       return;
     }
-    if (!accountsInfo[friendUsername]) {
-      alert("ユーザーが見つかりません。");
+    const friendUsername = friendEntry[0];
+
+    if (friendUsername === currentUser) {
+      alert("自分自身は追加できません。");
       return;
     }
     const currentFriends = myInfo.friends || [];
@@ -1639,7 +1644,7 @@ export default function App() {
     }
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { friends: [...currentFriends, friendUsername] }, { merge: true });
-      alert(`${friendUsername}さんをフレンドに追加しました！`);
+      alert(`${accountsInfo[friendUsername]?.displayName || friendUsername}さんをフレンドに追加しました！`);
     } catch (e) {}
   };
 
@@ -1663,7 +1668,7 @@ export default function App() {
   }
 
   if (!currentUser) {
-    return <LoginScreen onLogin={handleLogin} isOnline={isOnline} />;
+    return <LoginScreen onLogin={handleLogin} onGoogleLogin={handleGoogleLogin} isOnline={isOnline} />;
   }
 
   const myFriends = myInfo.friends || [];
@@ -1745,7 +1750,7 @@ export default function App() {
               <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-xs overflow-hidden border border-emerald-200 dark:border-emerald-800">
                 {myInfo.photoUrl ? <img src={myInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : currentUser.charAt(0).toUpperCase()}
               </div>
-              <span className="text-sm font-bold text-slate-700 dark:text-slate-200 hidden sm:inline">{currentUser}</span>
+              <span className="text-sm font-bold text-slate-700 dark:text-slate-200 hidden sm:inline">{myInfo.displayName || currentUser}</span>
             </button>
             <button onClick={handleLogout} className="text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 p-1.5 rounded-full transition-colors"><LogOut size={20} /></button>
           </div>
@@ -1761,29 +1766,29 @@ export default function App() {
         {currentTab === 'timeline' && <TimelineView posts={visiblePosts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} />}
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} />}
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} />}
-        {currentTab === 'data' && <DataView posts={visiblePosts} currentUser={currentUser} myFriends={myFriends} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
-        {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} posts={visiblePosts} accountsInfo={accountsInfo} onAddFriend={handleAddFriend} onRemoveFriend={handleRemoveFriend} />}
+        {currentTab === 'data' && <DataView posts={visiblePosts} currentUser={currentUser} myFriends={myFriends} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} defaultPostsTab={targetDataUser || currentUser} />}
+        {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} posts={visiblePosts} accountsInfo={accountsInfo} onAddFriend={handleAddFriend} onRemoveFriend={handleRemoveFriend} onFriendClick={(u) => { setTargetDataUser(u); setCurrentTab('data'); }} />}
       </main>
 
       {editingPost && <EditWorkoutModal post={editingPost} gyms={allGyms} exercises={exercises} onClose={() => setEditingPost(null)} onSave={handleUpdateWorkout} myPastPosts={posts.filter(p => p.author === currentUser)} />}
 
       <nav className="fixed bottom-0 w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pt-1 pb-safe z-30 transition-colors" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
         <div className="flex justify-around items-center p-2 max-w-md mx-auto">
-          <NavButton icon={<Home size={22} />} label="ホーム" isActive={currentTab === 'timeline'} onClick={() => setCurrentTab('timeline')} />
+          <NavButton icon={<Home size={22} />} label="ホーム" isActive={currentTab === 'timeline'} onClick={() => { setTargetDataUser(null); setCurrentTab('timeline'); }} />
           <NavButton icon={<Dumbbell size={22} />} label="種目" isActive={currentTab === 'exercises'} onClick={() => setCurrentTab('exercises')} />
           <NavButton icon={myInfo.isTraining ? <Clock className="animate-pulse" size={28}/> : <PlusCircle size={28} />} label={myInfo.isTraining ? "記録中" : "記録"} isActive={currentTab === 'record'} onClick={() => setCurrentTab('record')} isPrimary isTraining={myInfo.isTraining} />
-          <NavButton icon={<CalendarIcon size={22} />} label="データ" isActive={currentTab === 'data'} onClick={() => setCurrentTab('data')} />
+          <NavButton icon={<CalendarIcon size={22} />} label="データ" isActive={currentTab === 'data'} onClick={() => { setTargetDataUser(null); setCurrentTab('data'); }} />
           <NavButton icon={<Users size={22} />} label="フレンド" isActive={currentTab === 'friends'} onClick={() => setCurrentTab('friends')} />
         </div>
       </nav>
 
-      <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} userInfo={myInfo} onSave={handleSaveProfile} currentUser={currentUser} />
+      <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} userInfo={myInfo} onSave={handleSaveProfile} currentUser={currentUser} onLinkGoogle={handleLinkGoogle} />
     </div>
   );
 }
 
 // --- プロフィール設定モーダル ---
-function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser }) {
+function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGoogle }) {
   const [isUploading, setIsUploading] = useState(false);
   const [goal, setGoal] = useState(userInfo?.goal || '');
   const [theme, setTheme] = useState(userInfo?.theme || 'light');
@@ -1847,6 +1852,15 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser }) {
         <div className="mb-6">
           <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">表示名 (ユーザー名)</label>
           <input type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-base text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+        </div>
+        <div className="mb-6">
+          {userInfo?.googleUid ? (
+             <p className="text-sm text-emerald-600 font-bold bg-emerald-50 p-3 rounded-xl text-center border border-emerald-200">✓ Googleアカウント連携済み</p>
+          ) : (
+             <button onClick={onLinkGoogle} className="w-full bg-white border border-slate-300 text-slate-700 font-bold py-3 rounded-xl shadow-sm flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors">
+                Googleアカウントと連携
+             </button>
+          )}
         </div>
         <div className="flex flex-col items-center space-y-6">
           <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800 border-4 border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center relative">
@@ -1919,7 +1933,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser }) {
 }
 
 // --- ログイン・登録画面 ---
-function LoginScreen({ onLogin, isOnline }) {
+function LoginScreen({ onLogin, onGoogleLogin, isOnline }) {
   const [username, setUsername] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
@@ -1954,7 +1968,7 @@ function LoginScreen({ onLogin, isOnline }) {
           <p className="text-sm text-slate-500 font-bold mt-1">みんなで鍛える、記録アプリ</p>
         </div>
         <div className="w-full bg-white p-6 rounded-3xl border border-slate-200 shadow-xl flex flex-col items-center">
-           <button onClick={() => { const provider = new GoogleAuthProvider(); signInWithPopup(getAuth(), provider).then((result) => { onLogin(result.user.uid, 'google'); }).catch(console.error); }} className="w-full bg-white border border-slate-300 text-slate-700 font-bold py-3 rounded-xl mb-6 shadow-sm flex items-center justify-center gap-2 hover:bg-slate-50">
+           <button onClick={() => { const provider = new GoogleAuthProvider(); signInWithPopup(getAuth(), provider).then((result) => { onGoogleLogin(result.user); }).catch(console.error); }} className="w-full bg-white border border-slate-300 text-slate-700 font-bold py-3 rounded-xl mb-6 shadow-sm flex items-center justify-center gap-2 hover:bg-slate-50">
              Googleでログイン / 登録
            </button>
            <div className="w-full border-t border-slate-200 my-4 relative">
@@ -2164,10 +2178,14 @@ function BodyCompositionInfo({ info, dailyCalories = 0, dateLabel = '' }) {
 }
 
 // --- データ画面 (カレンダー・グラフ・レポート) ---
-function DataView({ posts, currentUser, myFriends, accountsInfo, onEdit, onDelete, onImport }) {
+function DataView({ posts, currentUser, myFriends, accountsInfo, onEdit, onDelete, onImport, defaultPostsTab }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState(formatDateFromTimestamp(Date.now()));
-  const [postsTab, setPostsTab] = useState(currentUser);
+  const [postsTab, setPostsTab] = useState(defaultPostsTab || currentUser);
+
+  useEffect(() => {
+    if (defaultPostsTab) setPostsTab(defaultPostsTab);
+  }, [defaultPostsTab]);
   
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
@@ -3227,7 +3245,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
 }
 
 // --- フレンド画面 ---
-function FriendsView({ currentUser, myInfo, posts, accountsInfo, onAddFriend, onRemoveFriend }) {
+function FriendsView({ currentUser, myInfo, posts, accountsInfo, onAddFriend, onRemoveFriend, onFriendClick }) {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [searchUsername, setSearchUsername] = useState('');
   const [activeTab, setActiveTab] = useState('friends');
@@ -3270,10 +3288,10 @@ function FriendsView({ currentUser, myInfo, posts, accountsInfo, onAddFriend, on
       {activeTab === 'add' && (
         <form onSubmit={handleSearchSubmit} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
           <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2">
-             <UserPlus size={18} className="text-emerald-500" /> ユーザー名で検索
+             <UserPlus size={18} className="text-emerald-500" /> フレンドコードで検索
           </h3>
           <div className="flex gap-2">
-            <input type="text" value={searchUsername} onChange={e => setSearchUsername(e.target.value)} required placeholder="ユーザー名を入力" className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/>
+            <input type="text" value={searchUsername} onChange={e => setSearchUsername(e.target.value)} required placeholder="5桁のコードを入力" className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/>
             <button type="submit" disabled={!searchUsername.trim()} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-6 rounded-xl transition-colors disabled:opacity-50 shadow-sm">追加</button>
           </div>
           <p className="text-xs text-slate-400 dark:text-slate-500 mt-3 font-bold">※追加したフレンドの記録はタイムラインやデータ画面に表示されます。</p>
@@ -3282,6 +3300,13 @@ function FriendsView({ currentUser, myInfo, posts, accountsInfo, onAddFriend, on
 
       {activeTab === 'friends' && (
         <div className="space-y-4">
+          <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 rounded-xl p-4 flex items-center justify-between shadow-sm mb-6">
+            <div>
+              <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 mb-1">あなたのフレンドコード</p>
+              <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-300 tracking-widest">{myInfo.friendCode || '未発行'}</p>
+            </div>
+            <button onClick={() => { navigator.clipboard.writeText(myInfo.friendCode); alert('コピーしました'); }} className="p-2 bg-white dark:bg-slate-900 rounded-lg text-emerald-500 shadow-sm border border-emerald-100 dark:border-emerald-800 transition-colors hover:bg-emerald-100 dark:hover:bg-slate-800"><Copy size={18} /></button>
+          </div>
           {myFriends.length === 0 ? (
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center shadow-sm">
               <Users className="mx-auto text-slate-300 dark:text-slate-600 w-12 h-12 mb-4" />
@@ -3299,7 +3324,7 @@ function FriendsView({ currentUser, myInfo, posts, accountsInfo, onAddFriend, on
               const isOnline = isAppOnline && lastActive > 0 && (currentTime - lastActive < 45000);
 
               return (
-                <div key={friendUsername} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex items-center justify-between group">
+                <div key={friendUsername} onClick={() => onFriendClick && onFriendClick(friendUsername)} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex items-center justify-between group cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                   <div className="flex items-center gap-4">
                     <div className="relative">
                       <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xl font-bold text-slate-600 dark:text-slate-300 overflow-hidden">
@@ -3308,7 +3333,7 @@ function FriendsView({ currentUser, myInfo, posts, accountsInfo, onAddFriend, on
                       <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 border-2 border-white dark:border-slate-900 rounded-full z-10 ${isTraining ? 'bg-amber-400' : isOnline ? 'bg-emerald-400' : 'bg-slate-400'}`}></div>
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800 dark:text-slate-100">{friendUsername}</h3>
+                      <h3 className="font-bold text-slate-800 dark:text-slate-100">{friendInfo.displayName || friendUsername}</h3>
                       {isTraining ? (
                         <p className="text-xs text-amber-500 font-bold flex items-center gap-1"><Flame size={12}/>トレーニング中 {friendInfo.currentExerciseName ? `- ${friendInfo.currentExerciseName}` : ''}</p>
                       ) : isOnline ? (
@@ -3318,7 +3343,7 @@ function FriendsView({ currentUser, myInfo, posts, accountsInfo, onAddFriend, on
                       )}
                     </div>
                   </div>
-                  <button onClick={() => onRemoveFriend(friendUsername)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-full transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
+                  <button onClick={(e) => { e.stopPropagation(); onRemoveFriend(friendUsername); }} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-full transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
                     <Trash2 size={18} />
                   </button>
                 </div>
@@ -3329,7 +3354,7 @@ function FriendsView({ currentUser, myInfo, posts, accountsInfo, onAddFriend, on
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.14, 23:31, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.14, 23:48, updated)</p>
       </div>
     </div>
   );
