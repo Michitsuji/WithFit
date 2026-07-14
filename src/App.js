@@ -1470,6 +1470,43 @@ export default function App() {
     return true;
   };
 
+  const handleGoogleLogin = async (googleUser) => {
+    if (!db) return false;
+    const existingUser = Object.entries(accountsInfo).find(([uname, data]) => data.googleUid === googleUser.uid);
+    if (existingUser) {
+      const username = existingUser[0];
+      setCurrentUser(username);
+      try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { lastActive: Date.now(), isAppOnline: true }, { merge: true }); } catch (e) {}
+      return true;
+    } else {
+      let baseName = googleUser.displayName || (googleUser.email ? googleUser.email.split('@')[0] : 'user');
+      let username = baseName;
+      let counter = 1;
+      while (accountsInfo[username]) {
+        username = `${baseName}${counter}`;
+        counter++;
+      }
+      try { 
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { displayName: username, googleUid: googleUser.uid, friendCode: generateFriendCode(), isTraining: false, lastActive: Date.now(), isAppOnline: true, theme: 'light', friends: [] }, { merge: true }); 
+        setCurrentUser(username); 
+        return true;
+      } catch (e) { return false; }
+    }
+  };
+
+  const handleLinkGoogle = async () => {
+    if (!currentUser || !db || !auth) return;
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { googleUid: result.user.uid }, { merge: true });
+      alert('Googleアカウントと連携しました。');
+    } catch (e) {
+      console.error(e);
+      alert('連携に失敗しました。');
+    }
+  };
+
   const handleLogout = async () => { 
     if (currentUser && db) {
       try {
@@ -3354,7 +3391,7 @@ function FriendsView({ currentUser, myInfo, posts, accountsInfo, onAddFriend, on
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.14, 23:48, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.14, 23:58, updated)</p>
       </div>
     </div>
   );
