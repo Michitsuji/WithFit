@@ -1793,6 +1793,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser }) {
   const [gender, setGender] = useState(userInfo?.gender || 'male');
   const [height, setHeight] = useState(userInfo?.height || '');
   const [weight, setWeight] = useState(userInfo?.weight || '');
+  const [displayName, setDisplayName] = useState(userInfo?.displayName || currentUser);
 
   useEffect(() => {
     if (isOpen) {
@@ -1803,6 +1804,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser }) {
       setGender(userInfo?.gender || 'male');
       setHeight(userInfo?.height || '');
       setWeight(userInfo?.weight || '');
+      setDisplayName(userInfo?.displayName || currentUser);
     }
   }, [isOpen, userInfo, currentUser]);
 
@@ -1829,14 +1831,6 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser }) {
     };
     reader.readAsDataURL(file);
   };
-
-  const [displayName, setDisplayName] = useState(userInfo?.displayName || currentUser);
-
-  useEffect(() => {
-    if (isOpen) {
-      setDisplayName(userInfo?.displayName || currentUser);
-    }
-  }, [isOpen, userInfo, currentUser]);
 
   const handleSave = () => {
     onSave({ displayName: displayName.trim() || currentUser, photoUrl, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null });
@@ -1929,7 +1923,6 @@ function LoginScreen({ onLogin, isOnline }) {
   const [username, setUsername] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
-  const [isRegistering, setIsRegistering] = useState(false);
   
   const handlePinInput = (num) => { 
     if (pin.length < 4) { setPin(prev => prev + num); setError(''); } 
@@ -3336,7 +3329,7 @@ function FriendsView({ currentUser, myInfo, posts, accountsInfo, onAddFriend, on
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.14, 23:29, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.14, 23:31, updated)</p>
       </div>
     </div>
   );
