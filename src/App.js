@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth';
-import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy, where, getDocs } from 'firebase/firestore';
+import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy } from 'firebase/firestore';
 
 // --- カスタムアイコン ---
 const WithFitLogo = ({ className = "", size = 24 }) => (
@@ -73,6 +73,7 @@ const getCategoryTabColor = (category, isSelected) => {
 
 // --- 計算ユーティリティ ---
 const generateId = () => Date.now().toString() + Math.random().toString(36).substring(2, 9);
+const generateFriendCode = () => Math.floor(10000 + Math.random() * 90000).toString();
 
 const getAge = (birthDateStr) => {
   if (!birthDateStr) return 0;
@@ -454,7 +455,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
             {authorInfo?.photoUrl ? <img src={authorInfo.photoUrl} alt={post.author} className="w-full h-full object-cover" /> : post.author ? post.author.charAt(0).toUpperCase() : '?'}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-slate-800 dark:text-slate-100 truncate">{authorInfo?.displayName || post.author || '不明'}</p>
+            <p className="font-bold text-slate-800 dark:text-slate-100 truncate">{post.author || '不明'}</p>
             <div className="flex flex-col gap-1.5 mt-1">
               <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 dark:text-slate-400 font-bold">
                 <span>{formatShortDateTime(post.timestamp)}</span>
@@ -1285,7 +1286,7 @@ export default function App() {
     if (sessionStr) {
        try {
           const session = JSON.parse(sessionStr);
-          if (session.userId && session.lastActive && Date.now() - session.lastActive <= 7 * 24 * 60 * 60 * 1000) {
+          if (session.userId && session.lastActive && Date.now() - session.lastActive <= 10 * 60 * 1000) {
              setCurrentUser(session.userId);
           } else {
              localStorage.removeItem('withfit_login_session');
@@ -1382,6 +1383,8 @@ export default function App() {
 
   useEffect(() => {
     if (!auth) return;
+    const initAuth = async () => { try { await signInAnonymously(auth); } catch (e) {} };
+    initAuth();
     const unsubscribe = onAuthStateChanged(auth, (user) => setFirebaseUser(user));
     return () => unsubscribe();
   }, []);
@@ -1446,41 +1449,24 @@ export default function App() {
   }, [currentUser, isOnline]);
 
   const handleLogin = async (username, pin) => {
-    if (!db) return { success: false, error: 'データベースに接続できません。' };
+    if (!db) return false;
     const accountData = accountsInfo[username];
-    if (!accountData) return { success: false, error: 'ユーザーが見つかりません。' };
-    if (accountData.pin !== pin) return { success: false, error: 'PINコードが間違っています。' };
-    
-    setCurrentUser(username);
-    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { lastActive: Date.now(), isAppOnline: true }, { merge: true }); } catch (e) {}
-    localStorage.setItem('withfit_login_session', JSON.stringify({ userId: username, lastActive: Date.now() }));
-    return { success: true };
-  };
-
-  const handleRegister = async (username, pin) => {
-    if (!db) return { success: false, error: 'データベースに接続できません。' };
-    const accountData = accountsInfo[username];
-    if (accountData) return { success: false, error: 'そのユーザー名は既に使われています。' };
-    
-    try { 
-      const friendCode = Math.floor(10000 + Math.random() * 90000).toString();
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { 
-        pin: pin, 
-        displayName: username,
-        friendCode: friendCode,
-        isTraining: false, 
-        lastActive: Date.now(), 
-        isAppOnline: true, 
-        theme: 'light', 
-        friends: [],
-        friendRequests: []
-      }, { merge: true }); 
-      setCurrentUser(username); 
-      localStorage.setItem('withfit_login_session', JSON.stringify({ userId: username, lastActive: Date.now() }));
-      return { success: true };
-    } catch (e) { 
-      return { success: false, error: '登録に失敗しました。' }; 
+    if (pin === 'google') {
+      if (!accountData) {
+        try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { displayName: '新規ユーザー', friendCode: generateFriendCode(), isTraining: false, lastActive: Date.now(), isAppOnline: true, theme: 'light', friends: [] }, { merge: true }); setCurrentUser(username); } catch (e) { return false; }
+      } else {
+        setCurrentUser(username);
+        try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { lastActive: Date.now(), isAppOnline: true }, { merge: true }); } catch (e) {}
+      }
+    } else {
+      if (!accountData || !accountData.pin) {
+        try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { pin: pin, displayName: username, friendCode: generateFriendCode(), isTraining: false, lastActive: Date.now(), isAppOnline: true, theme: 'light', friends: [] }, { merge: true }); setCurrentUser(username); } catch (e) { return false; }
+      } else if (accountData.pin === pin) {
+        setCurrentUser(username);
+        try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { lastActive: Date.now(), isAppOnline: true }, { merge: true }); } catch (e) {}
+      } else { return false; }
     }
+    return true;
   };
 
   const handleLogout = async () => { 
@@ -1636,83 +1622,33 @@ export default function App() {
     }
   };
 
-  const handleSendFriendRequest = async (friendCode) => {
-    if (!currentUser || !db || !friendCode) return;
-    let targetUid = null;
-    let targetData = null;
-    
-    Object.entries(accountsInfo).forEach(([uid, data]) => {
-      if (data.friendCode === friendCode) {
-        targetUid = uid;
-        targetData = data;
-      }
-    });
-
-    if (!targetUid) {
-      alert("該当するフレンドコードのユーザーが見つかりません。");
-      return;
-    }
-    if (targetUid === currentUser) {
+  const handleAddFriend = async (friendUsername) => {
+    if (!currentUser || !db || !friendUsername) return;
+    if (friendUsername === currentUser) {
       alert("自分自身は追加できません。");
       return;
     }
+    if (!accountsInfo[friendUsername]) {
+      alert("ユーザーが見つかりません。");
+      return;
+    }
     const currentFriends = myInfo.friends || [];
-    if (currentFriends.includes(targetUid)) {
+    if (currentFriends.includes(friendUsername)) {
       alert("既にフレンドです。");
       return;
     }
-    const currentRequests = targetData.friendRequests || [];
-    if (currentRequests.includes(currentUser)) {
-      alert("既に申請済みです。");
-      return;
-    }
-
     try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', targetUid), { friendRequests: [...currentRequests, currentUser] }, { merge: true });
-      alert(`${targetData.displayName || 'ユーザー'}さんにフレンド申請を送りました！`);
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { friends: [...currentFriends, friendUsername] }, { merge: true });
+      alert(`${friendUsername}さんをフレンドに追加しました！`);
     } catch (e) {}
   };
 
-  const handleAcceptFriendRequest = async (requesterUid) => {
+  const handleRemoveFriend = async (friendUsername) => {
     if (!currentUser || !db) return;
+    if (!window.confirm(`${friendUsername}さんをフレンドから削除しますか？`)) return;
     const currentFriends = myInfo.friends || [];
-    const currentRequests = myInfo.friendRequests || [];
-    const requesterInfo = accountsInfo[requesterUid] || {};
-    const requesterFriends = requesterInfo.friends || [];
-
     try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { 
-        friends: [...currentFriends, requesterUid],
-        friendRequests: currentRequests.filter(uid => uid !== requesterUid)
-      }, { merge: true });
-      
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', requesterUid), { 
-        friends: [...requesterFriends, currentUser]
-      }, { merge: true });
-      alert("フレンド申請を承認しました！");
-    } catch (e) {}
-  };
-  
-  const handleRejectFriendRequest = async (requesterUid) => {
-    if (!currentUser || !db) return;
-    const currentRequests = myInfo.friendRequests || [];
-    try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { 
-        friendRequests: currentRequests.filter(uid => uid !== requesterUid)
-      }, { merge: true });
-    } catch (e) {}
-  };
-
-  const handleRemoveFriend = async (friendUid) => {
-    if (!currentUser || !db) return;
-    const friendName = accountsInfo[friendUid]?.displayName || 'ユーザー';
-    if (!window.confirm(`${friendName}さんをフレンドから削除しますか？`)) return;
-    const currentFriends = myInfo.friends || [];
-    const friendInfo = accountsInfo[friendUid] || {};
-    const friendFriends = friendInfo.friends || [];
-    try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { friends: currentFriends.filter(f => f !== friendUid) }, { merge: true });
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', friendUid), { friends: friendFriends.filter(f => f !== currentUser) }, { merge: true });
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { friends: currentFriends.filter(f => f !== friendUsername) }, { merge: true });
     } catch (e) {}
   };
 
@@ -1727,7 +1663,7 @@ export default function App() {
   }
 
   if (!currentUser) {
-    return <LoginScreen onLogin={handleLogin} onRegister={handleRegister} isOnline={isOnline} />;
+    return <LoginScreen onLogin={handleLogin} isOnline={isOnline} />;
   }
 
   const myFriends = myInfo.friends || [];
@@ -1807,16 +1743,16 @@ export default function App() {
             </div>
             <button onClick={() => setShowProfileModal(true)} className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
               <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-xs overflow-hidden border border-emerald-200 dark:border-emerald-800">
-                {myInfo.photoUrl ? <img src={myInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : (myInfo.displayName ? myInfo.displayName.charAt(0).toUpperCase() : '?')}
+                {myInfo.photoUrl ? <img src={myInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : currentUser.charAt(0).toUpperCase()}
               </div>
-              <span className="text-sm font-bold text-slate-700 dark:text-slate-200 hidden sm:inline">{myInfo.displayName || 'ユーザー'}</span>
+              <span className="text-sm font-bold text-slate-700 dark:text-slate-200 hidden sm:inline">{currentUser}</span>
             </button>
             <button onClick={handleLogout} className="text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 p-1.5 rounded-full transition-colors"><LogOut size={20} /></button>
           </div>
         </div>
         {activeFriends.length > 0 && (
           <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-4 py-2 flex flex-col items-center justify-center text-xs font-bold animate-in slide-in-from-top duration-300">
-            <div className="flex items-center gap-2 mb-0.5"><Flame size={14} className="animate-pulse text-amber-300" /> {activeFriends.map(uid => accountsInfo[uid]?.displayName || 'ユーザー').join(', ')}さんがトレーニング中です！</div>
+            <div className="flex items-center gap-2 mb-0.5"><Flame size={14} className="animate-pulse text-amber-300" /> {activeFriends.join(', ')}さんがトレーニング中です！</div>
           </div>
         )}
       </header>
@@ -1825,8 +1761,8 @@ export default function App() {
         {currentTab === 'timeline' && <TimelineView posts={visiblePosts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} />}
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} />}
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} />}
-        {currentTab === 'data' && <DataView posts={posts.filter(p => p.author === currentUser)} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} isMyData={true} />}
-        {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} posts={visiblePosts} accountsInfo={accountsInfo} onSendFriendRequest={handleSendFriendRequest} onAcceptFriendRequest={handleAcceptFriendRequest} onRejectFriendRequest={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} />}
+        {currentTab === 'data' && <DataView posts={visiblePosts} currentUser={currentUser} myFriends={myFriends} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
+        {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} posts={visiblePosts} accountsInfo={accountsInfo} onAddFriend={handleAddFriend} onRemoveFriend={handleRemoveFriend} />}
       </main>
 
       {editingPost && <EditWorkoutModal post={editingPost} gyms={allGyms} exercises={exercises} onClose={() => setEditingPost(null)} onSave={handleUpdateWorkout} myPastPosts={posts.filter(p => p.author === currentUser)} />}
@@ -1852,7 +1788,6 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser }) {
   const [goal, setGoal] = useState(userInfo?.goal || '');
   const [theme, setTheme] = useState(userInfo?.theme || 'light');
   const [photoUrl, setPhotoUrl] = useState(userInfo?.photoUrl || null);
-  const [displayName, setDisplayName] = useState(userInfo?.displayName || '');
   
   const [birthDate, setBirthDate] = useState(userInfo?.birthDate || '');
   const [gender, setGender] = useState(userInfo?.gender || 'male');
@@ -1864,7 +1799,6 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser }) {
       setGoal(userInfo?.goal || '');
       setTheme(userInfo?.theme || 'light');
       setPhotoUrl(userInfo?.photoUrl || null);
-      setDisplayName(userInfo?.displayName || '');
       setBirthDate(userInfo?.birthDate || '');
       setGender(userInfo?.gender || 'male');
       setHeight(userInfo?.height || '');
@@ -1896,8 +1830,16 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser }) {
     reader.readAsDataURL(file);
   };
 
+  const [displayName, setDisplayName] = useState(userInfo?.displayName || currentUser);
+
+  useEffect(() => {
+    if (isOpen) {
+      setDisplayName(userInfo?.displayName || currentUser);
+    }
+  }, [isOpen, userInfo, currentUser]);
+
   const handleSave = () => {
-    onSave({ photoUrl, displayName: displayName.trim(), goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null });
+    onSave({ displayName: displayName.trim() || currentUser, photoUrl, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null });
   };
 
   return (
@@ -1908,6 +1850,10 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser }) {
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={20} /></button>
         </div>
         
+        <div className="mb-6">
+          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">表示名 (ユーザー名)</label>
+          <input type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-base text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
+        </div>
         <div className="flex flex-col items-center space-y-6">
           <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800 border-4 border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center relative">
             {photoUrl ? <img src={photoUrl} alt="profile" className="w-full h-full object-cover" /> : <Users size={40} className="text-slate-300 dark:text-slate-500" />}
@@ -1928,10 +1874,6 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser }) {
         </div>
 
         <div className="mt-6 space-y-4">
-          <div>
-            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">ユーザー名</label>
-            <input type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-base text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
-          </div>
           <div className="grid grid-cols-2 gap-2 sm:gap-3">
              <div className="min-w-0 overflow-hidden">
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">性別</label>
@@ -1984,12 +1926,27 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser }) {
 
 // --- ログイン・登録画面 ---
 function LoginScreen({ onLogin, isOnline }) {
+  const [username, setUsername] = useState('');
+  const [pin, setPin] = useState('');
   const [error, setError] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
   
-  const handleGoogleLogin = async () => {
-    const success = await onLogin();
-    if (!success) { setError('ログインに失敗しました。'); }
+  const handlePinInput = (num) => { 
+    if (pin.length < 4) { setPin(prev => prev + num); setError(''); } 
   };
+  const handleBackspace = () => { setPin(prev => prev.slice(0, -1)); setError(''); };
+  
+  const handleSubmit = async () => {
+    if (pin.length !== 4 || !username.trim()) return;
+    const success = await onLogin(username.trim(), pin);
+    if (!success) { setError('パスワードが間違っています。新規登録の場合は異なるユーザー名をお試しください。'); setPin(''); }
+  };
+
+  useEffect(() => { 
+    if (pin.length === 4) {
+      handleSubmit();
+    }
+  }, [pin]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 relative">
@@ -1997,28 +1954,34 @@ function LoginScreen({ onLogin, isOnline }) {
         <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`}></div>
         <span className="text-[10px] font-bold text-slate-500">{isOnline ? 'オンライン' : 'オフライン'}</span>
       </div>
-      
       <div className="w-full max-w-sm flex flex-col items-center">
-        <div className="mb-10 flex flex-col items-center">
-          <WithFitLogo className="text-indigo-500 w-20 h-20 mb-4" />
-          <h1 className="text-4xl font-bold text-slate-900 tracking-tight">WithFit</h1>
-          <p className="text-sm text-slate-500 font-bold mt-2">みんなで鍛える、記録アプリ</p>
+        <div className="mb-6 flex flex-col items-center">
+          <WithFitLogo className="text-indigo-500 w-16 h-16 mb-2" />
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">WithFit</h1>
+          <p className="text-sm text-slate-500 font-bold mt-1">みんなで鍛える、記録アプリ</p>
         </div>
-
-        <div className="w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl flex flex-col items-center">
-           {error && <p className="text-rose-500 text-sm mb-6 font-bold text-center bg-rose-50 w-full py-2 rounded-lg">{error}</p>}
-           
-           <button onClick={handleGoogleLogin} className="w-full bg-white border-2 border-slate-200 text-slate-700 font-bold py-4 rounded-xl flex items-center justify-center gap-3 hover:bg-slate-50 transition-colors shadow-sm">
-             <svg width="24" height="24" viewBox="0 0 48 48">
-               <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-               <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-               <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-               <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-             </svg>
-             Google アカウントでログイン
+        <div className="w-full bg-white p-6 rounded-3xl border border-slate-200 shadow-xl flex flex-col items-center">
+           <button onClick={() => { const provider = new GoogleAuthProvider(); signInWithPopup(getAuth(), provider).then((result) => { onLogin(result.user.uid, 'google'); }).catch(console.error); }} className="w-full bg-white border border-slate-300 text-slate-700 font-bold py-3 rounded-xl mb-6 shadow-sm flex items-center justify-center gap-2 hover:bg-slate-50">
+             Googleでログイン / 登録
            </button>
-           
-           <p className="text-xs text-slate-400 mt-6 font-bold text-center">※初回ログイン時に自動でアカウントが作成されます。</p>
+           <div className="w-full border-t border-slate-200 my-4 relative">
+             <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-2 text-xs text-slate-400 font-bold">または既存アカウントでログイン</span>
+           </div>
+           <div className="w-full mb-6 mt-4">
+              <label className="block text-sm font-bold text-slate-700 mb-2">ユーザー名</label>
+              <input type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder="例: yuta123" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-bold focus:outline-none focus:border-emerald-500" />
+           </div>
+           <p className="text-slate-500 text-sm mb-4 flex items-center gap-2 font-bold"><Lock size={14} />PINコード (4桁)</p>
+           <div className="flex gap-4 mb-6">
+             {[0, 1, 2, 3].map(i => <div key={i} className={`w-4 h-4 rounded-full transition-colors duration-200 ${i < pin.length ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-slate-200'}`} />)}
+           </div>
+           {error && <p className="text-rose-500 text-xs mb-4 font-bold text-center">{error}</p>}
+           <div className="grid grid-cols-3 gap-4 w-full max-w-[280px]">
+             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => <button key={num} onClick={() => handlePinInput(num.toString())} disabled={!username.trim()} className="h-16 rounded-full bg-white border border-slate-200 text-slate-800 text-2xl font-bold hover:bg-slate-50 active:bg-slate-100 transition-colors shadow-sm disabled:opacity-50">{num}</button>)}
+             <div />
+             <button onClick={() => handlePinInput('0')} disabled={!username.trim()} className="h-16 rounded-full bg-white border border-slate-200 text-slate-800 text-2xl font-bold hover:bg-slate-50 active:bg-slate-100 transition-colors shadow-sm disabled:opacity-50">0</button>
+             <button onClick={handleBackspace} className="h-16 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-800 active:bg-slate-100 transition-colors">⌫</button>
+           </div>
         </div>
       </div>
     </div>
@@ -2054,8 +2017,6 @@ function TimelineView({ posts, onToggleLike, onImport, currentUser, onDelete, on
 
 // --- 月間レポートコンポーネント ---
 function MonthlyReport({ monthDate, posts, userName, accountsInfo }) {
-  const displayName = accountsInfo[userName]?.displayName || userName;
-  const displayName = accountsInfo[userName]?.displayName || userName;
   const year = monthDate.getFullYear();
   const month = monthDate.getMonth();
   const monthPosts = posts.filter(p => {
@@ -2093,7 +2054,7 @@ function MonthlyReport({ monthDate, posts, userName, accountsInfo }) {
          <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center font-bold text-white text-xs bg-slate-600">
             {accountsInfo[userName]?.photoUrl ? <img src={accountsInfo[userName].photoUrl} alt={userName} className="w-full h-full object-cover" /> : userName.charAt(0).toUpperCase()}
          </div>
-         <h3 className="font-bold text-slate-800 dark:text-slate-100">{displayName} のレポート</h3>
+         <h3 className="font-bold text-slate-800 dark:text-slate-100">{userName} のレポート</h3>
       </div>
       
       {!hasData ? (
@@ -2210,9 +2171,10 @@ function BodyCompositionInfo({ info, dailyCalories = 0, dateLabel = '' }) {
 }
 
 // --- データ画面 (カレンダー・グラフ・レポート) ---
-function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport, isMyData = false }) {
+function DataView({ posts, currentUser, myFriends, accountsInfo, onEdit, onDelete, onImport }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState(formatDateFromTimestamp(Date.now()));
+  const [postsTab, setPostsTab] = useState(currentUser);
   
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
@@ -2220,11 +2182,15 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const todayStr = formatDateFromTimestamp(Date.now());
   
+  const myPosts = posts.filter(p => p.author === currentUser);
+  const friendPosts = posts.filter(p => myFriends.includes(p.author));
+
   const blanks = Array.from({ length: firstDay || 0 }).map((_, i) => <div key={`blank-${i}`} className="p-2"></div>);
   const days = Array.from({ length: daysInMonth || 0 }).map((_, i) => {
     const date = i + 1;
     const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(date).padStart(2,'0')}`;
-    const isTraining = posts.some(p => formatDateFromTimestamp(p.timestamp) === dateStr);
+    const isMyTraining = myPosts.some(p => formatDateFromTimestamp(p.timestamp) === dateStr);
+    const isFriendTraining = friendPosts.some(p => formatDateFromTimestamp(p.timestamp) === dateStr);
     const isSelected = selectedDateStr === dateStr;
     const isToday = dateStr === todayStr;
     
@@ -2232,34 +2198,36 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
       <div key={`day-${date}`} className="p-1 flex flex-col justify-center items-center h-14" onClick={() => setSelectedDateStr(dateStr)}>
         <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold transition-all cursor-pointer 
           ${isSelected ? 'ring-2 ring-offset-1 ring-emerald-500 dark:ring-offset-slate-900' : ''} 
-          ${isTraining ? 'bg-slate-100 dark:bg-slate-800' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}
+          ${isMyTraining || isFriendTraining ? 'bg-slate-100 dark:bg-slate-800' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}
           ${isToday ? 'border-2 border-emerald-400 text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}
         `}>
           {date}
         </div>
         <div className="flex gap-1 mt-1 h-1.5">
-          {isTraining && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>}
+          {isMyTraining && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>}
+          {isFriendTraining && <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>}
         </div>
       </div>
     );
   });
   
-  const weightData = posts.filter(p => p.bodyWeight && !isNaN(p.bodyWeight)).map(p => ({ date: p.date, value: Number(p.bodyWeight) })).reverse();
-  const fatData = posts.filter(p => p.bodyFat && !isNaN(p.bodyFat)).map(p => ({ date: p.date, value: Number(p.bodyFat) })).reverse();
+  const weightData = myPosts.filter(p => p.bodyWeight && !isNaN(p.bodyWeight)).map(p => ({ date: p.date, value: Number(p.bodyWeight) })).reverse();
+  const fatData = myPosts.filter(p => p.bodyFat && !isNaN(p.bodyFat)).map(p => ({ date: p.date, value: Number(p.bodyFat) })).reverse();
 
-  const selectedPosts = posts.filter(p => formatDateFromTimestamp(p.timestamp) === selectedDateStr);
+  const selectedPosts = posts.filter(p => p.author === postsTab && formatDateFromTimestamp(p.timestamp) === selectedDateStr);
 
-  const userInfo = accountsInfo[currentUser] || {};
-  const lastFatPost = posts.find(p => p.bodyFat);
-  const compositionInfo = { ...userInfo, lastFat: lastFatPost ? lastFatPost.bodyFat : null };
+  const myUserInfo = accountsInfo[currentUser] || {};
+  const lastMyFatPost = myPosts.find(p => p.bodyFat);
+  const myCompositionInfo = { ...myUserInfo, lastFat: lastMyFatPost ? lastMyFatPost.bodyFat : null };
 
-  const dailyCalories = selectedPosts.reduce((sum, p) => sum + (Number(p.calories) || 0), 0);
+  const mySelectedPosts = myPosts.filter(p => formatDateFromTimestamp(p.timestamp) === selectedDateStr);
+  const myDailyCalories = mySelectedPosts.reduce((sum, p) => sum + (Number(p.calories) || 0), 0);
+  
   const dateLabel = selectedDateStr ? selectedDateStr.substring(5).replace('-', '/') : '';
-  const displayName = userInfo.displayName || currentUser;
 
   return (
     <div className="space-y-6">
-      {isMyData && <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">データ</h2>}
+      <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">データ</h2>
 
       <div>
         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">月間レポート ({month + 1}月)</h3>
@@ -2276,12 +2244,24 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
           {['日', '月', '火', '水', '木', '金', '土'].map(d => <div key={d} className={`text-xs font-bold ${d === '日' ? 'text-rose-400' : d === '土' ? 'text-blue-400' : 'text-slate-400 dark:text-slate-500'}`}>{d}</div>)}
         </div>
         <div className="grid grid-cols-7 text-center">{blanks}{days}</div>
+        
+        <div className="flex justify-center gap-4 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> 自分</div>
+           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400"><div className="w-2 h-2 rounded-full bg-blue-500"></div> フレンド</div>
+        </div>
       </div>
       
       {selectedDateStr && (
         <div className="pt-2 animate-in fade-in">
           <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-3">{selectedDateStr.replace(/-/g, '/')} の記録</h3>
           
+          <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl mb-4 overflow-x-auto">
+            <button onClick={() => setPostsTab(currentUser)} className={`flex-shrink-0 px-4 py-2 text-sm font-bold text-center rounded-lg transition-colors ${postsTab === currentUser ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>自分</button>
+            {myFriends.map(friend => (
+              <button key={friend} onClick={() => setPostsTab(friend)} className={`flex-shrink-0 px-4 py-2 text-sm font-bold text-center rounded-lg transition-colors ${postsTab === friend ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{friend}</button>
+            ))}
+          </div>
+
           {selectedPosts.length > 0 ? (
             selectedPosts.map(post => <WorkoutCard key={post.id} post={post} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={onEdit} onDelete={onDelete} onImport={onImport} />)
           ) : (
@@ -2292,13 +2272,13 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
 
       <div className="pt-4">
         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">体組成データ</h3>
-        <BodyCompositionInfo info={compositionInfo} dailyCalories={dailyCalories} dateLabel={dateLabel} />
+        <BodyCompositionInfo info={myCompositionInfo} dailyCalories={myDailyCalories} dateLabel={dateLabel} />
       </div>
 
       <div className="space-y-6 pt-4">
          <h3 className="text-lg font-bold text-slate-900 dark:text-white">体重・体脂肪率の推移</h3>
-         <SimpleChart data={weightData} color="#10b981" title={`${displayName}の体重推移 (kg)`} />
-         <SimpleChart data={fatData} color="#6366f1" title={`${displayName}の体脂肪率推移 (%)`} />
+         <SimpleChart data={weightData} color="#10b981" title={`${currentUser}の体重推移 (kg)`} />
+         <SimpleChart data={fatData} color="#6366f1" title={`${currentUser}の体脂肪率推移 (%)`} />
       </div>
     </div>
   );
@@ -3254,11 +3234,10 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
 }
 
 // --- フレンド画面 ---
-function FriendsView({ currentUser, myInfo, posts, accountsInfo, onSendFriendRequest, onAcceptFriendRequest, onRejectFriendRequest, onRemoveFriend }) {
+function FriendsView({ currentUser, myInfo, posts, accountsInfo, onAddFriend, onRemoveFriend }) {
   const [currentTime, setCurrentTime] = useState(Date.now());
-  const [searchCode, setSearchCode] = useState('');
+  const [searchUsername, setSearchUsername] = useState('');
   const [activeTab, setActiveTab] = useState('friends');
-  const [selectedFriendUid, setSelectedFriendUid] = useState(null);
 
   useEffect(() => {
     const timerId = setInterval(() => setCurrentTime(Date.now()), 5000);
@@ -3280,27 +3259,11 @@ function FriendsView({ currentUser, myInfo, posts, accountsInfo, onSendFriendReq
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    onSendFriendRequest(searchCode.trim());
-    setSearchCode('');
+    onAddFriend(searchUsername.trim());
+    setSearchUsername('');
   };
 
-  if (selectedFriendUid) {
-    const friendInfo = accountsInfo[selectedFriendUid];
-    const friendName = friendInfo?.displayName || 'フレンド';
-    const friendPosts = posts.filter(p => p.author === selectedFriendUid);
-    return (
-      <div className="space-y-6 animate-in fade-in">
-        <button onClick={() => setSelectedFriendUid(null)} className="flex items-center gap-2 text-slate-500 dark:text-slate-400 font-bold hover:text-emerald-500 transition-colors">
-           &larr; 戻る
-        </button>
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">{friendName} さんのデータ</h2>
-        <DataView posts={friendPosts} currentUser={selectedFriendUid} accountsInfo={accountsInfo} isMyData={false} />
-      </div>
-    );
-  }
-
   const myFriends = myInfo.friends || [];
-  const friendRequests = myInfo.friendRequests || [];
 
   return (
     <div className="space-y-6 animate-in fade-in">
@@ -3308,52 +3271,20 @@ function FriendsView({ currentUser, myInfo, posts, accountsInfo, onSendFriendReq
       
       <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl mb-6">
         <button onClick={() => setActiveTab('friends')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'friends' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>フレンド一覧</button>
-        <button onClick={() => setActiveTab('add')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'add' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>フレンド追加 {friendRequests.length > 0 && <span className="ml-1 bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{friendRequests.length}</span>}</button>
+        <button onClick={() => setActiveTab('add')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'add' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>フレンド追加</button>
       </div>
 
       {activeTab === 'add' && (
-        <div className="space-y-6">
-          <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-center shadow-sm">
-             <p className="text-xs text-slate-500 dark:text-slate-400 font-bold mb-2">あなたのフレンドコード</p>
-             <p className="text-3xl font-bold text-slate-800 dark:text-slate-100 tracking-widest">{myInfo.friendCode || '----'}</p>
+        <form onSubmit={handleSearchSubmit} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2">
+             <UserPlus size={18} className="text-emerald-500" /> ユーザー名で検索
+          </h3>
+          <div className="flex gap-2">
+            <input type="text" value={searchUsername} onChange={e => setSearchUsername(e.target.value)} required placeholder="ユーザー名を入力" className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/>
+            <button type="submit" disabled={!searchUsername.trim()} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-6 rounded-xl transition-colors disabled:opacity-50 shadow-sm">追加</button>
           </div>
-
-          {friendRequests.length > 0 && (
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm">
-              <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-4">フレンド申請</h3>
-              <div className="space-y-3">
-                {friendRequests.map(uid => {
-                  const reqInfo = accountsInfo[uid];
-                  if (!reqInfo) return null;
-                  return (
-                    <div key={uid} className="flex items-center justify-between bg-slate-50 dark:bg-slate-950 p-3 rounded-xl">
-                       <div className="flex items-center gap-3">
-                         <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden flex justify-center items-center font-bold text-slate-600">
-                           {reqInfo.photoUrl ? <img src={reqInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : (reqInfo.displayName ? reqInfo.displayName.charAt(0).toUpperCase() : '?')}
-                         </div>
-                         <span className="font-bold text-slate-800 dark:text-slate-100">{reqInfo.displayName || 'ユーザー'}</span>
-                       </div>
-                       <div className="flex gap-2">
-                         <button onClick={() => onAcceptFriendRequest(uid)} className="bg-emerald-500 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm">承認</button>
-                         <button onClick={() => onRejectFriendRequest(uid)} className="bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold px-3 py-2 rounded-lg shadow-sm">拒否</button>
-                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          <form onSubmit={handleSearchSubmit} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2">
-               <UserPlus size={18} className="text-emerald-500" /> フレンドコードで追加
-            </h3>
-            <div className="flex gap-2">
-              <input type="text" inputMode="numeric" value={searchCode} onChange={e => setSearchCode(e.target.value)} required placeholder="5桁の数字" maxLength={5} className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base tracking-widest text-center" style={{ fontSize: '16px' }}/>
-              <button type="submit" disabled={searchCode.trim().length !== 5} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-6 rounded-xl transition-colors disabled:opacity-50 shadow-sm">申請</button>
-            </div>
-          </form>
-        </div>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-3 font-bold">※追加したフレンドの記録はタイムラインやデータ画面に表示されます。</p>
+        </form>
       )}
 
       {activeTab === 'friends' && (
@@ -3365,27 +3296,26 @@ function FriendsView({ currentUser, myInfo, posts, accountsInfo, onSendFriendReq
               <button onClick={() => setActiveTab('add')} className="mt-4 text-emerald-500 font-bold text-sm bg-emerald-50 dark:bg-emerald-950/50 px-4 py-2 rounded-full border border-emerald-100 dark:border-emerald-900">フレンドを追加する</button>
             </div>
           ) : (
-            myFriends.map(friendUid => {
-              const friendInfo = accountsInfo[friendUid];
+            myFriends.map(friendUsername => {
+              const friendInfo = accountsInfo[friendUsername];
               if (!friendInfo) return null;
               
               const isTraining = friendInfo.isTraining;
               const lastActive = friendInfo.lastActive || 0;
               const isAppOnline = friendInfo.isAppOnline !== false;
               const isOnline = isAppOnline && lastActive > 0 && (currentTime - lastActive < 45000);
-              const displayName = friendInfo.displayName || 'ユーザー';
 
               return (
-                <div key={friendUid} onClick={() => setSelectedFriendUid(friendUid)} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex items-center justify-between group cursor-pointer hover:border-emerald-500 transition-colors">
-                  <div className="flex items-center gap-4 pointer-events-none">
+                <div key={friendUsername} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex items-center justify-between group">
+                  <div className="flex items-center gap-4">
                     <div className="relative">
                       <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xl font-bold text-slate-600 dark:text-slate-300 overflow-hidden">
-                        {friendInfo.photoUrl ? <img src={friendInfo.photoUrl} alt={displayName} className="w-full h-full object-cover" /> : displayName.charAt(0).toUpperCase()}
+                        {friendInfo.photoUrl ? <img src={friendInfo.photoUrl} alt={friendUsername} className="w-full h-full object-cover" /> : friendUsername.charAt(0).toUpperCase()}
                       </div>
                       <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 border-2 border-white dark:border-slate-900 rounded-full z-10 ${isTraining ? 'bg-amber-400' : isOnline ? 'bg-emerald-400' : 'bg-slate-400'}`}></div>
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800 dark:text-slate-100">{displayName}</h3>
+                      <h3 className="font-bold text-slate-800 dark:text-slate-100">{friendUsername}</h3>
                       {isTraining ? (
                         <p className="text-xs text-amber-500 font-bold flex items-center gap-1"><Flame size={12}/>トレーニング中 {friendInfo.currentExerciseName ? `- ${friendInfo.currentExerciseName}` : ''}</p>
                       ) : isOnline ? (
@@ -3395,7 +3325,7 @@ function FriendsView({ currentUser, myInfo, posts, accountsInfo, onSendFriendReq
                       )}
                     </div>
                   </div>
-                  <button onClick={(e) => { e.stopPropagation(); onRemoveFriend(friendUid); }} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-full transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 z-10">
+                  <button onClick={() => onRemoveFriend(friendUsername)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-full transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
                     <Trash2 size={18} />
                   </button>
                 </div>
@@ -3406,7 +3336,7 @@ function FriendsView({ currentUser, myInfo, posts, accountsInfo, onSendFriendReq
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.1.0 (2026.7.14, 08:27, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.14, 23:29, updated)</p>
       </div>
     </div>
   );
