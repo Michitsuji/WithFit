@@ -1341,6 +1341,7 @@ export default function App() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [selectedFriendUser, setSelectedFriendUser] = useState(null);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [focusedPost, setFocusedPost] = useState(null);
 
   useEffect(() => {
     if (currentUser && db) {
@@ -1645,14 +1646,14 @@ export default function App() {
      posts.forEach(post => {
         if (myFriends.includes(post.author) && post.timestamp > yesterday) {
            notifs.push({
-              id: `post_${post.id}`, type: 'workout_complete', user: post.author,
+              id: `post_${post.id}`, type: 'workout_complete', user: post.author, postId: post.id,
               message: 'さんがトレーニングを完了しました',
               time: post.timestamp
            });
         }
         if (post.author === currentUser && post.likes > 0) {
            notifs.push({
-              id: `like_${post.id}`, type: 'like', user: '誰か',
+              id: `like_${post.id}`, type: 'like', user: '誰か', postId: post.id,
               message: 'さんがいいねしました',
               time: post.timestamp
            });
@@ -1708,6 +1709,25 @@ export default function App() {
     if (!exerciseName || !myInfo.isTraining || !db) return;
     if (exerciseName !== myInfo.currentExerciseName) {
       setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { currentExerciseName: exerciseName }, { merge: true }).catch(()=>{});
+    }
+  };
+
+  const unreadNotificationCount = notifications.filter(n => n.time > (myInfo.lastNotificationCheck || 0)).length;
+
+  const handleOpenNotifications = () => {
+    setShowNotifications(!showNotifications);
+    if (!showNotifications && db && currentUser) {
+      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { lastNotificationCheck: Date.now() }, { merge: true }).catch(()=>{});
+    }
+  };
+
+  const handleNotificationClick = (notif) => {
+    setShowNotifications(false);
+    if (notif.type === 'friend_request') {
+       setCurrentTab('friends');
+    } else if (notif.postId) {
+       const targetPost = posts.find(p => p.id === notif.postId);
+       if (targetPost) setFocusedPost(targetPost);
     }
   };
 
@@ -1871,9 +1891,9 @@ export default function App() {
             <WithFitLogo className="text-indigo-500" /> With<span className="text-indigo-500">Fit</span>
           </h1>
           <div className="flex items-center gap-3">
-            <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-1.5 text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors">
+            <button onClick={handleOpenNotifications} className="relative p-1.5 text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors">
               <Bell size={20} />
-              {notifications.length > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border border-white dark:border-slate-900"></span>}
+              {unreadNotificationCount > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border border-white dark:border-slate-900"></span>}
             </button>
             <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 px-2 py-1.5 rounded-full border border-slate-200 dark:border-slate-800">
               <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`}></div>
@@ -1897,25 +1917,32 @@ export default function App() {
           <>
           <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)}></div>
           <div className="absolute top-16 right-4 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold text-sm text-slate-700 dark:text-slate-300">通知</div>
-            <div className="max-h-64 overflow-y-auto p-2 space-y-1">
+            <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold text-sm text-slate-700 dark:text-slate-300 flex justify-between items-center">
+              <span>通知</span>
+              {unreadNotificationCount > 0 && <span className="text-[10px] bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded-full">{unreadNotificationCount}件の未読</span>}
+            </div>
+            <div className="max-h-80 overflow-y-auto p-2 space-y-1">
                {notifications.length === 0 ? (
                   <div className="text-center text-xs text-slate-400 p-4">通知はありません</div>
                ) : (
-                  notifications.map(notif => (
-                     <div key={notif.id} className="flex gap-3 items-center p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                        <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-xs shrink-0 overflow-hidden">
-                           {accountsInfo[notif.user]?.photoUrl ? <img src={accountsInfo[notif.user].photoUrl} alt="" className="w-full h-full object-cover"/> : notif.user.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                           <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
-                              <span className="text-emerald-600 dark:text-emerald-400 mr-1">{accountsInfo[notif.user]?.displayName || notif.user}</span>
-                              {notif.message}
-                           </p>
-                           <p className="text-[10px] text-slate-400 mt-0.5">{getRelativeTime(notif.time)}</p>
-                        </div>
-                     </div>
-                  ))
+                  notifications.map(notif => {
+                     const isUnread = notif.time > (myInfo.lastNotificationCheck || 0);
+                     return (
+                       <div key={notif.id} onClick={() => handleNotificationClick(notif)} className={`flex gap-3 items-center p-2 rounded-xl cursor-pointer transition-colors ${isUnread ? 'bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-100/50 dark:hover:bg-emerald-950/40' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                          <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-xs shrink-0 overflow-hidden">
+                             {accountsInfo[notif.user]?.photoUrl ? <img src={accountsInfo[notif.user].photoUrl} alt="" className="w-full h-full object-cover"/> : notif.user.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                             <p className="text-xs font-bold text-slate-800 dark:text-slate-200 break-words whitespace-pre-wrap">
+                                <span className="text-emerald-600 dark:text-emerald-400 mr-1">{accountsInfo[notif.user]?.displayName || notif.user}</span>
+                                {notif.message}
+                             </p>
+                             <p className="text-[10px] text-slate-400 mt-0.5">{getRelativeTime(notif.time)}</p>
+                          </div>
+                          {isUnread && <div className="w-2 h-2 rounded-full bg-rose-500 shrink-0"></div>}
+                       </div>
+                     );
+                  })
                )}
             </div>
           </div>
@@ -1933,6 +1960,20 @@ export default function App() {
 
       {editingPost && <EditWorkoutModal post={editingPost} gyms={allGyms} exercises={exercises} onClose={() => setEditingPost(null)} onSave={handleUpdateWorkout} myPastPosts={posts.filter(p => p.author === currentUser)} />}
       {selectedFriendUser && <FriendDetailModal friendUsername={selectedFriendUser} posts={posts} accountsInfo={accountsInfo} onClose={() => setSelectedFriendUser(null)} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} />}
+      
+      {focusedPost && (
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setFocusedPost(null)}>
+          <div className="bg-slate-50 dark:bg-slate-950 w-full max-w-md max-h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+             <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+                <h2 className="text-lg font-bold text-slate-800 dark:text-white">投稿詳細</h2>
+                <button onClick={() => setFocusedPost(null)} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={20} /></button>
+             </div>
+             <div className="p-4 overflow-y-auto flex-1">
+               <WorkoutCard post={focusedPost} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onToggleLike={toggleLike} onImport={handleImportWorkout} />
+             </div>
+          </div>
+        </div>
+      )}
 
       <nav className="fixed bottom-0 w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pt-1 pb-safe z-30 transition-colors" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
         <div className="flex justify-around items-center p-2 max-w-md mx-auto">
@@ -3706,7 +3747,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 21:58, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 22:07, updated)</p>
       </div>
     </div>
   );
