@@ -3430,13 +3430,13 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
              <input type="text" value={gymSearchQuery} onChange={e => setGymSearchQuery(e.target.value)} placeholder="ジムの名前で検索..." className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 shadow-sm" style={{ fontSize: '16px' }} />
           </div>
           <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-2 ml-1">世界のジムグループ</h3>
-          {discoverableGyms.length === 0 ? (
+          {displayGyms.length === 0 ? (
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center shadow-sm">
               <MapPin className="mx-auto text-slate-300 dark:text-slate-600 w-12 h-12 mb-3" />
               <p className="text-slate-500 dark:text-slate-400 font-bold text-sm">該当するジムが見つかりません。</p>
             </div>
           ) : (
-            discoverableGyms.map(gym => {
+            displayGyms.map(gym => {
               const membersList = gym.members || [];
               const creatorName = accountsInfo[gym.owner]?.displayName || gym.owner || 'システム';
               const hasFriend = myFriends.some(f => membersList.includes(f) || gym.owner === f);
@@ -3784,7 +3784,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 22:39, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 22:46, updated)</p>
       </div>
     </div>
   );
