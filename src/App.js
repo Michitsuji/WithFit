@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus } from 'lucide-react';
+import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus, EyeOff } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy } from 'firebase/firestore';
@@ -1452,19 +1452,20 @@ export default function App() {
   const handleLogin = async (username, pin) => {
     if (!db) return false;
     const accountData = accountsInfo[username];
+    const joinedGyms = accountData?.joinedGyms || ['common'];
     if (pin === 'google') {
       if (!accountData) {
-        try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { displayName: '新規ユーザー', friendCode: generateFriendCode(), isTraining: false, lastActive: Date.now(), isAppOnline: true, theme: 'light', friends: [] }, { merge: true }); setCurrentUser(username); } catch (e) { return false; }
+        try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { displayName: '新規ユーザー', friendCode: generateFriendCode(), isTraining: false, lastActive: Date.now(), isAppOnline: true, theme: 'light', friends: [], joinedGyms: ['common'] }, { merge: true }); setCurrentUser(username); } catch (e) { return false; }
       } else {
         setCurrentUser(username);
-        try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { lastActive: Date.now(), isAppOnline: true }, { merge: true }); } catch (e) {}
+        try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { lastActive: Date.now(), isAppOnline: true, joinedGyms }, { merge: true }); } catch (e) {}
       }
     } else {
       if (!accountData || !accountData.pin) {
-        try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { pin: pin, displayName: username, friendCode: generateFriendCode(), isTraining: false, lastActive: Date.now(), isAppOnline: true, theme: 'light', friends: [] }, { merge: true }); setCurrentUser(username); } catch (e) { return false; }
+        try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { pin: pin, displayName: username, friendCode: generateFriendCode(), isTraining: false, lastActive: Date.now(), isAppOnline: true, theme: 'light', friends: [], joinedGyms: ['common'] }, { merge: true }); setCurrentUser(username); } catch (e) { return false; }
       } else if (accountData.pin === pin) {
         setCurrentUser(username);
-        try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { lastActive: Date.now(), isAppOnline: true }, { merge: true }); } catch (e) {}
+        try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { lastActive: Date.now(), isAppOnline: true, joinedGyms }, { merge: true }); } catch (e) {}
       } else { return false; }
     }
     return true;
@@ -1476,7 +1477,8 @@ export default function App() {
     if (existingUser) {
       const username = existingUser[0];
       setCurrentUser(username);
-      try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { lastActive: Date.now(), isAppOnline: true }, { merge: true }); } catch (e) {}
+      const joinedGyms = existingUser[1]?.joinedGyms || ['common'];
+      try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { lastActive: Date.now(), isAppOnline: true, joinedGyms }, { merge: true }); } catch (e) {}
       return true;
     } else {
       let baseName = googleUser.displayName || (googleUser.email ? googleUser.email.split('@')[0] : 'user');
@@ -1487,7 +1489,7 @@ export default function App() {
         counter++;
       }
       try { 
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { displayName: username, googleUid: googleUser.uid, friendCode: generateFriendCode(), isTraining: false, lastActive: Date.now(), isAppOnline: true, theme: 'light', friends: [] }, { merge: true }); 
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { displayName: username, googleUid: googleUser.uid, friendCode: generateFriendCode(), isTraining: false, lastActive: Date.now(), isAppOnline: true, theme: 'light', friends: [], joinedGyms: ['common'] }, { merge: true }); 
         setCurrentUser(username); 
         return true;
       } catch (e) { return false; }
@@ -1842,8 +1844,8 @@ export default function App() {
 
       <main className="p-4 max-w-md mx-auto w-full pb-40">
         {currentTab === 'timeline' && <TimelineView posts={visiblePosts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} />}
-        {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} />}
-        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} />}
+        {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} currentUser={currentUser} myInfo={myInfo} />}
+        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
         {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} />}
       </main>
@@ -2359,8 +2361,9 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
 }
 
 // --- 記録入力画面 ---
-function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workoutItems, setWorkoutItems, selectedCategories, setSelectedCategories, posts, currentUser, isManual, setIsManual, onActiveExerciseChange }) {
-  const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (gyms.filter(g => g.id !== 'common')[0]?.id || ''));
+function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workoutItems, setWorkoutItems, selectedCategories, setSelectedCategories, posts, currentUser, isManual, setIsManual, onActiveExerciseChange, accountsInfo }) {
+  const joinedGyms = myInfo.joinedGyms || ['common'];
+  const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (gyms.filter(g => joinedGyms.includes(g.id))[0]?.id || 'common'));
   const itemDnd = useDragAndDrop(workoutItems, setWorkoutItems);
   const [restTimerStart, setRestTimerStart] = useState(null);
   const [restTimeElapsed, setRestTimeElapsed] = useState(0);
@@ -2399,8 +2402,10 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const isTraining = myInfo.isTraining;
   const myPastPosts = posts.filter(p => p.author === currentUser);
 
+  const mutedExercises = myInfo.mutedExercises || [];
   const availableExercises = exercises.filter(ex => {
-    if (ex.gymId !== selectedGymId && ex.gymId !== 'common' && selectedGymId !== 'common') return false; 
+    if (ex.gymId !== selectedGymId) return false; 
+    if (mutedExercises.includes(ex.name)) return false;
     if (selectedCategories.length === 0) return false;
     return selectedCategories.includes(ex.category || 'その他');
   });
@@ -2607,7 +2612,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
           <div className="w-full relative mb-6">
             <select value={selectedGymId} onChange={(e) => setSelectedGymId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
               <option value="" disabled>ジムを選択</option>
-              {gyms.filter(g => g.id !== 'common').map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
+              {gyms.filter(g => joinedGyms.includes(g.id)).map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
             </select>
             <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">▼</div>
           </div>
@@ -2656,7 +2661,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
              <div className="w-full relative">
                <select value={selectedGymId} onChange={(e) => setSelectedGymId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
                  <option value="" disabled>ジムを選択</option>
-                 {gyms.filter(g => g.id !== 'common').map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
+                 {gyms.filter(g => joinedGyms.includes(g.id)).map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
                </select>
                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">▼</div>
              </div>
@@ -2950,10 +2955,10 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
 }
 
 // --- 種目・ジム管理画面 ---
-function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
+function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myInfo }) {
   const [activeTab, setActiveTab] = useState('exercises'); 
   const [newGymName, setNewGymName] = useState('');
-  const [selectedGymId, setSelectedGymId] = useState(gyms.length > 0 ? gyms[0].id : '');
+  const [selectedGymId, setSelectedGymId] = useState('common');
   const [filterGymId, setFilterGymId] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [editingGymId, setEditingGymId] = useState(null);
@@ -2964,6 +2969,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
   const [newExCategory, setNewExCategory] = useState('胸');
   const [newExFreeWeightType, setNewExFreeWeightType] = useState('barbell');
   const [isAdding, setIsAdding] = useState(false);
+  const [showMembersGymId, setShowMembersGymId] = useState(null);
 
   const [editingExId, setEditingExId] = useState(null);
   const [editingExOldName, setEditingExOldName] = useState('');
@@ -2974,12 +2980,27 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
   const [editingExGymId, setEditingExGymId] = useState('');
   const [editExFreeWeightType, setEditExFreeWeightType] = useState('barbell');
 
+  const joinedGyms = myInfo.joinedGyms || ['common'];
+  const mutedExercises = myInfo.mutedExercises || [];
+
   const handleAddGym = async (e) => {
     e.preventDefault();
     if (!newGymName.trim()) return;
     setIsAdding(true);
     const newDocId = `gym_${Date.now()}`;
-    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gyms', newDocId), { name: newGymName.trim(), createdAt: Date.now() }); setNewGymName(''); if (gyms.length === 0) setSelectedGymId(newDocId); } catch (e) {}
+    try { 
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gyms', newDocId), { 
+        name: newGymName.trim(), 
+        createdAt: Date.now(),
+        owner: currentUser,
+        members: [currentUser]
+      }); 
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { 
+        joinedGyms: [...new Set([...joinedGyms, newDocId])] 
+      }, { merge: true });
+      setNewGymName(''); 
+      setSelectedGymId(newDocId); 
+    } catch (e) {}
     setIsAdding(false);
   };
 
@@ -2987,6 +3008,55 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
     e.preventDefault();
     if (!editGymName.trim()) return;
     try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gyms', gymId), { name: editGymName.trim() }, { merge: true }); setEditingGymId(null); } catch (e) {}
+  };
+
+  const handleJoinGym = async (gymId) => {
+    if (joinedGyms.includes(gymId)) return;
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { 
+        joinedGyms: [...new Set([...joinedGyms, gymId])] 
+      }, { merge: true });
+      const targetGym = gyms.find(g => g.id === gymId);
+      if (targetGym) {
+        const members = targetGym.members || [];
+        if (!members.includes(currentUser)) {
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gyms', gymId), { 
+            members: [...members, currentUser] 
+          }, { merge: true });
+        }
+      }
+    } catch (e) {}
+  };
+
+  const handleLeaveGym = async (gymId) => {
+    if (gymId === 'common') {
+      alert("フリーウェイト（共通）グループは退会できません。");
+      return;
+    }
+    if (!window.confirm("このジムグループから退会しますか？登録されているマシンなどの種目が表示されなくなります。")) return;
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { 
+        joinedGyms: joinedGyms.filter(id => id !== gymId) 
+      }, { merge: true });
+      const targetGym = gyms.find(g => g.id === gymId);
+      if (targetGym) {
+        const members = targetGym.members || [];
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gyms', gymId), { 
+          members: members.filter(m => m !== currentUser) 
+        }, { merge: true });
+      }
+    } catch (e) {}
+  };
+
+  const handleMuteExercise = async (exName) => {
+    const newMuted = mutedExercises.includes(exName) 
+      ? mutedExercises.filter(name => name !== exName) 
+      : [...mutedExercises, exName];
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { 
+        mutedExercises: newMuted 
+      }, { merge: true });
+    } catch (e) {}
   };
 
   const handleAddExercise = async (e) => {
@@ -3063,60 +3133,160 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
     }
   };
 
-  const handleDelete = async (collectionName, id) => {
-    try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, id)); } catch (e) {}
+  const handleDeleteGym = async (gymId, gymName) => {
+    if (!window.confirm(`${gymName}を削除しますか？登録されている種目や他の参加メンバーの所属情報も削除されます。`)) return;
+    try {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gyms', gymId));
+      const gymExs = exercises.filter(ex => ex.gymId === gymId);
+      for (let ex of gymExs) {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', ex.id));
+      }
+      const targetGym = gyms.find(g => g.id === gymId);
+      if (targetGym && targetGym.members) {
+        for (let mId of targetGym.members) {
+          const mInfo = accountsInfo[mId];
+          if (mInfo && mInfo.joinedGyms) {
+            const nextJoined = mInfo.joinedGyms.filter(id => id !== gymId);
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', mId), { joinedGyms: nextJoined }, { merge: true });
+          } 
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
+
+  const handleDeleteExercise = async (id) => {
+    try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', id)); } catch (e) {}
+  };
+
+  const myFriends = myInfo.friends || [];
+  const discoverableGyms = gyms.filter(gym => {
+    if (gym.id === 'common') return false;
+    if (joinedGyms.includes(gym.id)) return false;
+    return myFriends.some(f => (gym.members || []).includes(f) || gym.owner === f);
+  });
 
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">種目とジムの管理</h2>
       
       <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl mb-6">
-        <button onClick={() => setActiveTab('exercises')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'exercises' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>種目リスト</button>
-        <button onClick={() => setActiveTab('gyms')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'gyms' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>ジムの登録</button>
+        <button onClick={() => setActiveTab('exercises')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'exercises' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>種目リスト</button>
+        <button onClick={() => setActiveTab('gyms')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'gyms' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>参加中のジム</button>
+        <button onClick={() => setActiveTab('discover')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'discover' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>フレンドのジム</button>
       </div>
 
       {activeTab === 'gyms' && (
         <div className="space-y-6 animate-in fade-in">
           <form onSubmit={handleAddGym} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">新しいジムを登録</h3>
+            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">新しいジムグループを作成</h3>
             <div className="flex gap-2">
               <input type="text" value={newGymName} onChange={e => setNewGymName(e.target.value)} required placeholder="例: ビークイック八幡" className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/>
-              <button type="submit" disabled={isAdding || !newGymName.trim()} className="bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold px-4 rounded-xl transition-colors disabled:opacity-50">追加</button>
+              <button type="submit" disabled={isAdding || !newGymName.trim()} className="bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold px-4 rounded-xl transition-colors disabled:opacity-50">作成</button>
             </div>
           </form>
+
           <div>
-            <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-3 ml-1">登録済みのジム</h3>
-            <div className="space-y-2">
-              {gyms.filter(g => g.id !== 'common').map(gym => (
-                <div key={gym.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 flex justify-between items-center shadow-sm">
-                  {editingGymId === gym.id ? (
-                     <form onSubmit={(e) => handleUpdateGym(e, gym.id)} className="flex-1 flex gap-2 mr-2">
-                        <input type="text" value={editGymName} onChange={(e) => setEditGymName(e.target.value)} className="flex-1 bg-slate-50 dark:bg-slate-950 border border-emerald-200 dark:border-emerald-800 rounded-lg px-2 py-1 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-sm" autoFocus />
-                        <button type="submit" className="text-xs bg-emerald-500 text-white px-3 rounded-lg font-bold shadow-sm">保存</button>
-                        <button type="button" onClick={() => setEditingGymId(null)} className="text-xs bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 rounded-lg font-bold shadow-sm">取消</button>
-                     </form>
-                  ) : (
-                     <>
-                        <span className="font-bold text-slate-700 dark:text-slate-200 text-sm">{gym.name}</span>
-                        <div className="flex gap-1">
-                           <button onClick={() => { setEditingGymId(gym.id); setEditGymName(gym.name); }} className="p-2 text-slate-400 hover:text-emerald-500 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors"><Edit2 size={16} /></button>
-                           <button onClick={() => { if(window.confirm(`${gym.name}を削除しますか？`)) handleDelete('gyms', gym.id); }} className="p-2 text-slate-400 hover:text-rose-500 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors"><Trash2 size={16} /></button>
+            <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-3 ml-1">参加中のジムグループ</h3>
+            <div className="space-y-3">
+              {gyms.filter(g => joinedGyms.includes(g.id)).map(gym => {
+                const isOwner = gym.owner === currentUser;
+                const membersList = gym.members || [];
+                const creatorName = accountsInfo[gym.owner]?.displayName || gym.owner || 'システム';
+                return (
+                  <div key={gym.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col gap-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="font-bold text-slate-800 dark:text-slate-100 text-base">{gym.name}</span>
+                        <div className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1">作成者: {creatorName}</div>
+                      </div>
+                      
+                      <div className="flex gap-1">
+                        {gym.id !== 'common' && (
+                          <button onClick={() => setShowMembersGymId(showMembersGymId === gym.id ? null : gym.id)} className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                            メンバー ({membersList.length})
+                          </button>
+                        )}
+                        {gym.id !== 'common' && isOwner && ( 
+                          <>
+                            <button onClick={() => { setEditingGymId(gym.id); setEditGymName(gym.name); }} className="p-2 text-slate-400 hover:text-emerald-500 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors"><Edit2 size={16} /></button>
+                            <button onClick={() => handleDeleteGym(gym.id, gym.name)} className="p-2 text-slate-400 hover:text-rose-500 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors"><Trash2 size={16} /></button>
+                          </>
+                        )}
+                        {gym.id !== 'common' && !isOwner && (
+                          <button onClick={() => handleLeaveGym(gym.id)} className="px-3 py-1 bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 text-xs font-bold rounded-lg border border-rose-200 dark:border-rose-900 hover:bg-rose-100 dark:hover:bg-rose-900/80 transition-colors">退会</button>
+                        )}
+                      </div>
+                    </div>
+
+                    {editingGymId === gym.id && (
+                       <form onSubmit={(e) => handleUpdateGym(e, gym.id)} className="flex gap-2 border-t border-slate-100 dark:border-slate-800 pt-3">
+                          <input type="text" value={editGymName} onChange={(e) => setEditGymName(e.target.value)} className="flex-1 bg-slate-50 dark:bg-slate-950 border border-emerald-200 dark:border-emerald-800 rounded-lg px-2 py-1.5 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-sm" autoFocus />
+                          <button type="submit" className="text-xs bg-emerald-500 text-white px-3 rounded-lg font-bold shadow-sm">保存</button>
+                          <button type="button" onClick={() => setEditingGymId(null)} className="text-xs bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 rounded-lg font-bold shadow-sm">キャンセル</button>
+                       </form>
+                    )}
+
+                    {showMembersGymId === gym.id && (
+                      <div className="border-t border-slate-100 dark:border-slate-800 pt-3 animate-in fade-in">
+                        <div className="text-xs font-bold text-slate-400 dark:text-slate-500 mb-2">参加中メンバー</div>
+                        <div className="flex flex-wrap gap-3">
+                          {membersList.map(mId => {
+                            const mInfo = accountsInfo[mId];
+                            return (
+                              <div key={mId} className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 px-2 py-1.5 rounded-full border border-slate-100 dark:border-slate-800">
+                                <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[9px] font-bold overflow-hidden">
+                                  {mInfo?.photoUrl ? <img src={mInfo.photoUrl} alt="member" className="w-full h-full object-cover"/> : mId.charAt(0).toUpperCase()}
+                                </div>
+                                <span className="text-xs font-bold text-slate-600 dark:text-slate-300 truncate max-w-[80px]">{mInfo?.displayName || mId}</span>
+                              </div>
+                            );
+                          })}
                         </div>
-                     </>
-                  )}
-                </div>
-              ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
       )}
 
+      {activeTab === 'discover' && (
+        <div className="space-y-4 animate-in fade-in">
+          <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-2 ml-1">フレンドが参加しているジムグループ</h3>
+          {discoverableGyms.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center shadow-sm">
+              <MapPin className="mx-auto text-slate-300 dark:text-slate-600 w-12 h-12 mb-3" />
+              <p className="text-slate-500 dark:text-slate-400 font-bold text-sm">現在フレンドから共有された未所属のジムはありません。</p>
+            </div>
+          ) : (
+            discoverableGyms.map(gym => {
+              const membersList = gym.members || [];
+              const creatorName = accountsInfo[gym.owner]?.displayName || gym.owner || 'システム';
+              return (
+                <div key={gym.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex justify-between items-center">
+                  <div>
+                    <h4 className="font-bold text-slate-800 dark:text-slate-100 text-base">{gym.name}</h4>
+                    <div className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1">作成者: {creatorName} ｜ メンバー: {membersList.length}名</div>
+                  </div>
+                  <button onClick={() => handleJoinGym(gym.id)} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-sm transition-colors flex items-center gap-1">
+                    <Plus size={14}/> 参加して共有
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+
       {activeTab === 'exercises' && (
         <div className="space-y-6 animate-in fade-in">
-          {gyms.length === 0 ? (
-            <div className="text-center py-8"><p className="text-slate-500 dark:text-slate-400 text-sm mb-4 font-bold">先に「ジムの登録」タブでジムを追加してください。</p></div>
-          ) : (
+          {gyms.filter(g => joinedGyms.includes(g.id)).length === 0 ? (
+            <div className="text-center py-8"><p className="text-slate-500 dark:text-slate-400 text-sm mb-4 font-bold">先に「参加中のジム」タブから所属するジムを決定してください。</p></div>
+          ) : ( 
             <>
               {editingExId ? (
                 <form onSubmit={handleUpdateExercise} className="bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-900 rounded-2xl p-4 shadow-sm relative animate-in slide-in-from-top-4">
@@ -3124,10 +3294,10 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
                   <button type="button" onClick={cancelEdit} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><X size={20}/></button>
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">対象のジム <span className="text-rose-500">*</span></label>
+                      <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">対象のジムグループ <span className="text-rose-500">*</span></label>
                       <div className="relative">
                         <select value={editingExGymId} onChange={e => setEditingExGymId(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
-                          {gyms.map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
+                          {gyms.filter(g => joinedGyms.includes(g.id)).map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
                         </select>
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
                       </div>
@@ -3135,7 +3305,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
                     {editingExGymId === 'common' && (
                       <div className="bg-emerald-50 dark:bg-emerald-950/30 p-3 rounded-xl border border-emerald-100 dark:border-emerald-900/50 space-y-2">
                          <p className="text-xs text-emerald-700 dark:text-emerald-400 font-bold mb-2">
-                           ※フリーウェイトとして登録できるのは「ダンベル」「バーベル（EZバー含む）」「スミス」のみです。マシンやケーブル等は各ジム固有の設備として登録してください。
+                           ※フリーウェイトとして登録できるのは「ダンベル」「バーベル（EZバー含む）」「スミス」のみです。
                          </p>
                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">フリーウェイトの種類 <span className="text-rose-500">*</span></label>
                          <div className="flex gap-2">
@@ -3161,7 +3331,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
                        <div className="grid grid-cols-2 gap-2">
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'total' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="total" checked={editExWeightType === 'total'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>合計 (kg)</label>
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'oneSide' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="oneSide" checked={editExWeightType === 'oneSide'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>片側 (kg)</label>
-                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'plate' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="plate" checked={editExWeightType === 'plate'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>20kgプレート (枚)</label>
+                          <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'plate' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="plate" checked={editExWeightType === 'plate'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>プレートロード(枚)</label>
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'lr' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="lr" checked={editExWeightType === 'lr'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>片側種目 (kg)</label>
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'bodyWeight' ? 'bg-emerald-500 text-white border-emerald-600' : 'bg-white dark:bg-slate-900 border-emerald-200 dark:border-emerald-800 text-slate-600 dark:text-slate-300'}`}><input type="radio" value="bodyWeight" checked={editExWeightType === 'bodyWeight'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>自重種目(+kg,-kg)</label>
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${editExWeightType === 'cardio' ? 'bg-cyan-500 text-white border-cyan-600' : 'bg-white dark:bg-slate-900 border-cyan-200 dark:border-cyan-800 text-cyan-600 dark:text-slate-300'}`}><input type="radio" value="cardio" checked={editExWeightType === 'cardio'} onChange={(e) => setEditExWeightType(e.target.value)} className="hidden"/>有酸素(距離/時間/kcal)</label>
@@ -3170,15 +3340,15 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
                     <button type="submit" disabled={!editExName.trim()} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-3 rounded-xl mt-2 transition-colors disabled:opacity-50 shadow-md">更新して保存</button>
                   </div>
                 </form>
-              ) : (
+              ) : ( 
                 <form onSubmit={handleAddExercise} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm">
                   <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">新しい種目を登録</h3>
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">対象のジム <span className="text-rose-500">*</span></label>
+                      <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">登録先のジムグループ <span className="text-rose-500">*</span></label>
                       <div className="relative">
                         <select value={selectedGymId} onChange={e => setSelectedGymId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
-                          {gyms.map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
+                          {gyms.filter(g => joinedGyms.includes(g.id)).map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
                         </select>
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
                       </div>
@@ -3186,7 +3356,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
                     {selectedGymId === 'common' && (
                       <div className="bg-slate-100 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700/50 space-y-2">
                          <p className="text-xs text-slate-600 dark:text-slate-300 font-bold mb-2">
-                           ※フリーウェイトとして登録できるのは「ダンベル」「バーベル（EZバー含む）」「スミス」のみです。マシンやケーブル等は各ジム固有の設備として登録してください。
+                           ※フリーウェイトとして登録できるのは「ダンベル」「バーベル（EZバー含む）」「スミス」のみです。
                          </p>
                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">フリーウェイトの種類 <span className="text-rose-500">*</span></label>
                          <div className="flex gap-2">
@@ -3218,7 +3388,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
                           <label className={`text-center py-2 rounded-lg text-sm font-bold border cursor-pointer ${newExWeightType === 'cardio' ? 'bg-cyan-50 dark:bg-cyan-950 border-cyan-500 text-cyan-600 dark:text-cyan-400' : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}><input type="radio" value="cardio" checked={newExWeightType === 'cardio'} onChange={(e) => setNewExWeightType(e.target.value)} className="hidden"/>有酸素(距離/時間/kcal)</label>
                        </div>
                     </div>
-                    <button type="submit" disabled={isAdding || !newExName.trim()} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold py-3 rounded-xl mt-2 transition-colors disabled:opacity-50">リストに追加</button>
+                    <button type="submit" disabled={isAdding || !newExName.trim()} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold py-3 rounded-xl mt-2 transition-colors disabled:opacity-50">種目を登録</button>
                   </div>
                 </form>
               )}
@@ -3230,11 +3400,9 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
                     <div className="relative flex-1">
                       <select value={filterGymId} onChange={e => setFilterGymId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-xs">
                         <option value="all">すべてのジム・器具</option>
-                        <option value="common">フリーウェイト (すべて)</option>
-                        <option value="common_barbell">フリーウェイト (バーベル)</option>
-                        <option value="common_dumbbell">フリーウェイト (ダンベル)</option>
-                        <option value="common_smith">フリーウェイト (スミス)</option>
-                        {gyms.filter(g => g.id !== 'common').map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                        {gyms.filter(g => joinedGyms.includes(g.id)).map(g => (
+                          <option key={g.id} value={g.id}>{g.name}</option>
+                        ))}
                       </select>
                       <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[10px]">▼</div>
                     </div>
@@ -3248,15 +3416,10 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
                   </div>
                 </div>
                 <div className="space-y-4">
-                  {gyms.filter(gym => filterGymId === 'all' || gym.id === filterGymId || (filterGymId.startsWith('common_') && gym.id === 'common')).map(gym => {
+                  {gyms.filter(gym => joinedGyms.includes(gym.id) && (filterGymId === 'all' || gym.id === filterGymId)).map(gym => {
                     const gymExercises = exercises.filter(ex => {
                       if (ex.gymId !== gym.id) return false;
                       if (filterCategory !== 'all' && ex.category !== filterCategory) return false;
-                      if (gym.id === 'common' && filterGymId.startsWith('common_')) {
-                        const targetType = filterGymId.replace('common_', '');
-                        const fwType = ex.freeWeightType || (ex.name.includes('ダンベル') ? 'dumbbell' : ex.name.includes('スミス') ? 'smith' : 'barbell');
-                        if (fwType !== targetType) return false;
-                      }
                       return true;
                     }).sort((a, b) => {
                       const idxA = MUSCLE_CATEGORIES.indexOf(a.category);
@@ -3268,31 +3431,37 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo }) {
                       <div key={gym.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
                         <div className="bg-slate-50 dark:bg-slate-950 px-3 py-2 border-b border-slate-200 dark:border-slate-800 font-bold text-slate-700 dark:text-slate-200 text-sm flex items-center gap-1"><MapPin size={14} className="text-emerald-500"/> {gym.name}</div>
                         <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                          {gymExercises.map(ex => (
-                            <div key={ex.id} className="p-3 flex justify-between items-center group">
-                              <div>
-                                <p className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">
-                                  {ex.name}
-                                  {ex.category && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${getCategoryColor(ex.category)}`}>{ex.category}</span>}
-                                  {gym.id === 'common' && (
-                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                                      {ex.freeWeightType === 'dumbbell' ? 'ダンベル' : ex.freeWeightType === 'smith' ? 'スミス' : 'バーベル'}
-                                    </span>
+                          {gymExercises.map(ex => {
+                            const isMuted = mutedExercises.includes(ex.name);
+                            return (
+                              <div key={ex.id} className={`p-3 flex justify-between items-center group transition-opacity ${isMuted ? 'opacity-40' : 'opacity-100'}`}>
+                                <div>
+                                  <p className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">
+                                    {ex.name}
+                                    {ex.category && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${getCategoryColor(ex.category)}`}>{ex.category}</span>}
+                                    {isMuted && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400">非表示中</span>}
+                                  </p>
+                                  <div className="flex gap-2 mt-1">
+                                    {ex.maker && <span className="text-xs text-slate-400 dark:text-slate-500 font-bold bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{ex.maker}</span>}
+                                    {ex.weightType && <span className="text-[10px] text-emerald-500 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-900">
+                                      {ex.weightType === 'oneSide' ? '片側(kg)' : ex.weightType === 'plate' ? 'プレートロード(枚)' : ex.weightType === 'lr' ? '片側種目' : ex.weightType === 'bodyWeight' ? '加重/アシスト' : ex.weightType === 'cardio' ? '有酸素(距離/時間/kcal)' : '合計(kg)'}
+                                    </span>}
+                                  </div>
+                                </div>
+                                <div className="flex gap-1">
+                                  <button onClick={() => handleMuteExercise(ex.name)} className={`p-2 rounded-lg transition-colors border ${isMuted ? 'text-indigo-400 bg-indigo-50 border-indigo-100 hover:bg-indigo-100 dark:bg-indigo-950/30 dark:border-indigo-900' : 'text-slate-400 bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-800 hover:bg-slate-100'}`} title={isMuted ? '表示する' : '非表示にする'}>
+                                    <EyeOff size={16}/>
+                                  </button>
+                                  {gym.id !== 'common' && gym.owner === currentUser && (
+                                    <>
+                                      <button onClick={() => startEdit(ex)} className="p-2 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 bg-slate-50 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-100 dark:border-slate-800"><Edit2 size={16} /></button>
+                                      <button onClick={() => { if(window.confirm(`${ex.name}を削除しますか？`)) handleDeleteExercise(ex.id); }} className="p-2 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 bg-slate-50 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-100 dark:border-slate-800"><Trash2 size={16} /></button>
+                                    </>
                                   )}
-                                </p>
-                                <div className="flex gap-2 mt-1">
-                                  {ex.maker && <span className="text-xs text-slate-400 dark:text-slate-500 font-bold bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{ex.maker}</span>}
-                                  {ex.weightType && <span className="text-[10px] text-emerald-500 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-900">
-                                    {ex.weightType === 'oneSide' ? '片側(kg)' : ex.weightType === 'plate' ? 'プレートロード(枚)' : ex.weightType === 'lr' ? '片側種目' : ex.weightType === 'bodyWeight' ? '加重/アシスト' : ex.weightType === 'cardio' ? '有酸素(距離/時間/kcal)' : '合計(kg)'}
-                                  </span>}
                                 </div>
                               </div>
-                              <div className="flex gap-1">
-                                <button onClick={() => startEdit(ex)} className="p-2 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 bg-slate-50 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 rounded-lg transition-colors"><Edit2 size={16} /></button>
-                                <button onClick={() => { if(window.confirm(`${ex.name}を削除しますか？`)) handleDelete('exercises', ex.id); }} className="p-2 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 bg-slate-50 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-slate-700 rounded-lg transition-colors"><Trash2 size={16} /></button>
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     );
@@ -3442,7 +3611,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 09:35, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 10:11, updated)</p>
       </div>
     </div>
   );
