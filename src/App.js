@@ -3345,7 +3345,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
           <div className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1 truncate">作成者: {creatorName} ｜ メンバー: {membersList.length}名</div>
         </div>
         <button onClick={() => handleJoinGym(gym.id)} className="shrink-0 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-sm transition-colors flex items-center gap-1">
-          <Plus size={14}/> 参加
+          <Plus size={14} /> 参加
         </button>
       </div>
     );
@@ -3362,6 +3362,18 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
 
       {activeTab === 'gyms' && (
         <div className="space-y-6 animate-in fade-in">
+          {myFriends.length === 0 && (
+             <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900 rounded-2xl p-5 flex flex-col items-center text-center shadow-sm">
+                <Users className="text-indigo-400 mb-2" size={28} />
+                <p className="text-sm font-bold text-indigo-700 dark:text-indigo-300 mb-3">まずはフレンドを追加して、<br/>一緒にトレーニングを共有しましょう！</p>
+                <button onClick={() => setCurrentTab('friends')} className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-sm transition-colors flex items-center gap-2"><UserPlus size={16}/>フレンドを追加する</button>
+             </div>
+          )}
+
+          <div>
+             <input type="text" value={gymSearchQuery} onChange={e => setGymSearchQuery(e.target.value)} placeholder="ジムの名前で検索..." className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 shadow-sm" style={{ fontSize: '16px' }} />
+          </div>
+
           <form onSubmit={handleAddGym} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm">
             <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">新しいジムグループを作成</h3>
             <div className="flex gap-2">
@@ -3370,110 +3382,96 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
             </div>
           </form>
 
-          <div>
-            <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-3 ml-1">参加中のジムグループ</h3>
-            <div className="space-y-3">
-              {gyms.filter(g => joinedGyms.includes(g.id)).map(gym => {
-                const isOwner = gym.owner === currentUser;
-                const membersList = gym.members || [];
-                const creatorName = accountsInfo[gym.owner]?.displayName || gym.owner || 'システム';
-                return (
-                  <div key={gym.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col gap-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <span className="font-bold text-slate-800 dark:text-slate-100 text-base">{gym.name}</span>
-                        <div className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1">作成者: {creatorName}</div>
-                      </div>
-                      
-                      <div className="flex gap-1">
-                        {gym.id !== 'common' && (
-                          <button onClick={() => setShowMembersGymId(showMembersGymId === gym.id ? null : gym.id)} className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-                            メンバー ({membersList.length})
-                          </button>
-                        )}
-                        {gym.id !== 'common' && isOwner && ( 
-                          <>
-                            <button onClick={() => { setEditingGymId(gym.id); setEditGymName(gym.name); }} className="p-2 text-slate-400 hover:text-emerald-500 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors"><Edit2 size={16} /></button>
-                            <button onClick={() => handleDeleteGym(gym.id, gym.name)} className="p-2 text-slate-400 hover:text-rose-500 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors"><Trash2 size={16} /></button>
-                          </>
-                        )}
-                        {gym.id !== 'common' && !isOwner && (
-                          <button onClick={() => handleLeaveGym(gym.id)} className="px-3 py-1 bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 text-xs font-bold rounded-lg border border-rose-200 dark:border-rose-900 hover:bg-rose-100 dark:hover:bg-rose-900/80 transition-colors">退会</button>
-                        )}
-                      </div>
-                    </div>
-
-                    {editingGymId === gym.id && (
-                       <form onSubmit={(e) => handleUpdateGym(e, gym.id)} className="flex gap-2 border-t border-slate-100 dark:border-slate-800 pt-3">
-                          <input type="text" value={editGymName} onChange={(e) => setEditGymName(e.target.value)} className="flex-1 bg-slate-50 dark:bg-slate-950 border border-emerald-200 dark:border-emerald-800 rounded-lg px-2 py-1.5 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }} autoFocus />
-                          <button type="submit" className="text-xs bg-emerald-500 text-white px-3 rounded-lg font-bold shadow-sm">保存</button>
-                          <button type="button" onClick={() => setEditingGymId(null)} className="text-xs bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 rounded-lg font-bold shadow-sm">キャンセル</button>
-                       </form>
-                    )}
-
-                    {showMembersGymId === gym.id && (
-                      <div className="border-t border-slate-100 dark:border-slate-800 pt-3 animate-in fade-in">
-                        <div className="text-xs font-bold text-slate-400 dark:text-slate-500 mb-2">参加中メンバー</div>
-                        <div className="flex flex-wrap gap-3">
-                          {membersList.map(mId => {
-                            const mInfo = accountsInfo[mId];
-                            return (
-                              <div key={mId} className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 px-2 py-1.5 rounded-full border border-slate-100 dark:border-slate-800">
-                                <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[9px] font-bold overflow-hidden">
-                                  {mInfo?.photoUrl ? <img src={mInfo.photoUrl} alt="member" className="w-full h-full object-cover"/> : mId.charAt(0).toUpperCase()}
-                                </div>
-                                <span className="text-xs font-bold text-slate-600 dark:text-slate-300 truncate max-w-[80px]">{mInfo?.displayName || mId}</span>
-                              </div>
-                            );
-                          })}
+          {joinedGymsList.length > 0 && (
+            <div>
+              <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-3 ml-1">参加中のジム</h3>
+              <div className="space-y-3">
+                {joinedGymsList.map(gym => {
+                  const isOwner = gym.owner === currentUser;
+                  const membersList = gym.members || [];
+                  const creatorName = accountsInfo[gym.owner]?.displayName || gym.owner || 'システム';
+                  return (
+                    <div key={gym.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col gap-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="font-bold text-slate-800 dark:text-slate-100 text-base">{gym.name}</span>
+                          <div className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1">作成者: {creatorName}</div>
+                        </div>
+                        
+                        <div className="flex gap-1">
+                          {gym.id !== 'common' && (
+                            <button onClick={() => setShowMembersGymId(showMembersGymId === gym.id ? null : gym.id)} className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                              メンバー ({membersList.length})
+                            </button>
+                          )}
+                          {gym.id !== 'common' && isOwner && ( 
+                            <>
+                              <button onClick={() => { setEditingGymId(gym.id); setEditGymName(gym.name); }} className="p-2 text-slate-400 hover:text-emerald-500 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors"><Edit2 size={16} /></button>
+                              <button onClick={() => handleDeleteGym(gym.id, gym.name)} className="p-2 text-slate-400 hover:text-rose-500 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors"><Trash2 size={16} /></button>
+                            </>
+                          )}
+                          {gym.id !== 'common' && !isOwner && (
+                            <button onClick={() => handleLeaveGym(gym.id)} className="px-3 py-1 bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 text-xs font-bold rounded-lg border border-rose-200 dark:border-rose-900 hover:bg-rose-100 dark:hover:bg-rose-900/80 transition-colors">退会</button>
+                          )}
                         </div>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
 
-      {activeTab === 'discover' && (
-        <div className="space-y-4 animate-in fade-in">
-          {myFriends.length === 0 && (
-             <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900 rounded-2xl p-5 flex flex-col items-center text-center shadow-sm mb-6">
-                <Users className="text-indigo-400 mb-2" size={28} />
-                <p className="text-sm font-bold text-indigo-700 dark:text-indigo-300 mb-3">まずはフレンドを追加して、<br/>一緒にトレーニングを共有しましょう！</p>
-                <button onClick={() => setCurrentTab('friends')} className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-sm transition-colors flex items-center gap-2"><UserPlus size={16}/>フレンドを追加する</button>
-             </div>
+                      {editingGymId === gym.id && (
+                         <form onSubmit={(e) => handleUpdateGym(e, gym.id)} className="flex gap-2 border-t border-slate-100 dark:border-slate-800 pt-3">
+                            <input type="text" value={editGymName} onChange={(e) => setEditGymName(e.target.value)} className="flex-1 bg-slate-50 dark:bg-slate-950 border border-emerald-200 dark:border-emerald-800 rounded-lg px-2 py-1.5 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }} autoFocus />
+                            <button type="submit" className="text-xs bg-emerald-500 text-white px-3 rounded-lg font-bold shadow-sm">保存</button>
+                            <button type="button" onClick={() => setEditingGymId(null)} className="text-xs bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 rounded-lg font-bold shadow-sm">キャンセル</button>
+                         </form>
+                      )}
+
+                      {showMembersGymId === gym.id && (
+                        <div className="border-t border-slate-100 dark:border-slate-800 pt-3 animate-in fade-in">
+                          <div className="text-xs font-bold text-slate-400 dark:text-slate-500 mb-2">参加中メンバー</div>
+                          <div className="flex flex-wrap gap-3">
+                            {membersList.map(mId => {
+                              const mInfo = accountsInfo[mId];
+                              return (
+                                <div key={mId} className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 px-2 py-1.5 rounded-full border border-slate-100 dark:border-slate-800">
+                                  <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[9px] font-bold overflow-hidden">
+                                    {mInfo?.photoUrl ? <img src={mInfo.photoUrl} alt="member" className="w-full h-full object-cover"/> : mId.charAt(0).toUpperCase()}
+                                  </div>
+                                  <span className="text-xs font-bold text-slate-600 dark:text-slate-300 truncate max-w-[80px]">{mInfo?.displayName || mId}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           )}
-          
-          <div className="mb-4">
-             <input type="text" value={gymSearchQuery} onChange={e => setGymSearchQuery(e.target.value)} placeholder="ジムの名前で検索..." className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 shadow-sm" style={{ fontSize: '16px' }} />
-          </div>
-          <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-2 ml-1">世界のジムグループ</h3>
-          {discoverableGyms.length === 0 ? (
+
+          {friendGymsList.length > 0 && (
+            <div>
+              <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-3 ml-1">フレンドが参加中のジム</h3>
+              <div>
+                {friendGymsList.map(gym => renderDiscoverGymCard(gym))}
+              </div>
+            </div>
+          )}
+
+          {otherGymsList.length > 0 && (
+            <div>
+              <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-3 ml-1">その他のジム</h3>
+              <div>
+                {otherGymsList.map(gym => renderDiscoverGymCard(gym))}
+              </div>
+            </div>
+          )}
+
+          {joinedGymsList.length === 0 && friendGymsList.length === 0 && otherGymsList.length === 0 && (
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center shadow-sm">
               <MapPin className="mx-auto text-slate-300 dark:text-slate-600 w-12 h-12 mb-3" />
               <p className="text-slate-500 dark:text-slate-400 font-bold text-sm">該当するジムが見つかりません。</p>
             </div>
-          ) : (
-            discoverableGyms.map(gym => {
-              const membersList = gym.members || [];
-              const creatorName = accountsInfo[gym.owner]?.displayName || gym.owner || 'システム';
-              const hasFriend = myFriends.some(f => membersList.includes(f) || gym.owner === f);
-              return (
-                <div key={gym.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex justify-between items-center relative overflow-hidden">
-                  {hasFriend && <div className="absolute top-0 right-0 bg-amber-400 text-amber-900 text-[9px] font-bold px-2 py-0.5 rounded-bl-lg">フレンド参加中</div>}
-                  <div className="flex-1 min-w-0 pr-2">
-                    <h4 className="font-bold text-slate-800 dark:text-slate-100 text-base truncate">{gym.name}</h4>
-                    <div className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1 truncate">作成者: {creatorName} ｜ メンバー: {membersList.length}名</div>
-                  </div>
-                  <button onClick={() => handleJoinGym(gym.id)} className="shrink-0 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-sm transition-colors flex items-center gap-1">
-                    <Plus size={14}/> 参加
-                  </button>
-                </div>
-              );
-            })
           )}
         </div>
       )}
@@ -3805,7 +3803,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 22:55, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 22:57, updated)</p>
       </div>
     </div>
   );
