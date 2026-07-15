@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus, EyeOff } from 'lucide-react';
+import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus, EyeOff, Bell } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy } from 'firebase/firestore';
@@ -74,6 +74,16 @@ const getCategoryTabColor = (category, isSelected) => {
 // --- 計算ユーティリティ ---
 const generateId = () => Date.now().toString() + Math.random().toString(36).substring(2, 9);
 const generateFriendCode = () => Math.floor(10000 + Math.random() * 90000).toString();
+
+const getRelativeTime = (timestamp) => {
+  const diff = Math.max(0, Date.now() - timestamp);
+  const m = Math.floor(diff / 60000);
+  if (m === 0) return 'たった今';
+  if (m < 60) return `${m}分前`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}時間前`;
+  return `${Math.floor(h / 24)}日前`;
+};
 
 const getAge = (birthDateStr) => {
   if (!birthDateStr) return 0;
@@ -318,6 +328,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
   const [showImportOptions, setShowImportOptions] = useState(false);
   const isMyPost = post.author === currentUser;
   const authorInfo = accountsInfo && accountsInfo[post.author];
+  const hideMetrics = !isMyPost && authorInfo?.hideBodyMetrics;
   
   // 動的なカラー生成
   const generateColor = (str) => {
@@ -480,9 +491,13 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
         {(post.bodyWeight || post.bodyFat) && (
           <div className="flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 text-xs font-bold px-2.5 py-1 rounded-md border border-indigo-100 dark:border-indigo-900">
             <Scale size={14} />
-            {post.bodyWeight && `${post.bodyWeight}kg`}
-            {post.bodyWeight && post.bodyFat && ' / '}
-            {post.bodyFat && `${post.bodyFat}%`}
+            {hideMetrics ? 'ないしょ♡' : (
+              <>
+                {post.bodyWeight && `${post.bodyWeight}kg`}
+                {post.bodyWeight && post.bodyFat && ' / '}
+                {post.bodyFat && `${post.bodyFat}%`}
+              </>
+            )}
           </div>
         )}
         {displaySets > 0 && (
@@ -1325,6 +1340,7 @@ export default function App() {
   const [editingPost, setEditingPost] = useState(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [selectedFriendUser, setSelectedFriendUser] = useState(null);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
     if (currentUser && db) {
@@ -1612,6 +1628,39 @@ export default function App() {
   const myInfo = accountsInfo[currentUser] || {};
   const allGyms = useMemo(() => [{ id: 'common', name: 'フリーウェイト', createdAt: 0 }, ...gyms], [gyms]);
 
+  const notifications = useMemo(() => {
+     if (!currentUser) return [];
+     const notifs = [];
+     const myFriends = myInfo.friends || [];
+     
+     (myInfo.friendRequests || []).forEach(req => {
+        notifs.push({
+           id: `req_${req}`, type: 'friend_request', user: req,
+           message: 'さんからフレンド申請が届きました',
+           time: Date.now()
+        });
+     });
+
+     const yesterday = Date.now() - 24 * 60 * 60 * 1000;
+     posts.forEach(post => {
+        if (myFriends.includes(post.author) && post.timestamp > yesterday) {
+           notifs.push({
+              id: `post_${post.id}`, type: 'workout_complete', user: post.author,
+              message: 'さんがトレーニングを完了しました',
+              time: post.timestamp
+           });
+        }
+        if (post.author === currentUser && post.likes > 0) {
+           notifs.push({
+              id: `like_${post.id}`, type: 'like', user: '誰か',
+              message: 'さんがいいねしました',
+              time: post.timestamp
+           });
+        }
+     });
+     return notifs.sort((a, b) => b.time - a.time).slice(0, 10);
+  }, [currentUser, myInfo.friendRequests, myInfo.friends, posts]);
+
   const handleImportWorkout = async (post, isManual) => {
     const gym = allGyms.find(g => g.name === post.gymName);
     const gymId = gym ? gym.id : '';
@@ -1817,15 +1866,18 @@ export default function App() {
         `}</style>
       )}
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20 shadow-sm flex flex-col transition-colors">
-        <div className="p-4 flex justify-between items-center">
+        <div className="p-4 flex justify-between items-center relative">
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <WithFitLogo className="text-indigo-500" /> With<span className="text-indigo-500">Fit</span>
           </h1>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 px-2 py-1.5 rounded-full border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-center w-8 h-8 bg-slate-50 dark:bg-slate-950 rounded-full border border-slate-200 dark:border-slate-800" title={isOnline ? 'オンライン' : 'オフライン'}>
               <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`}></div>
-              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">{isOnline ? 'オンライン' : 'オフライン'}</span>
             </div>
+            <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-1.5 text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors">
+              <Bell size={20} />
+              {notifications.length > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border border-white dark:border-slate-900"></span>}
+            </button>
             <button onClick={() => setShowProfileModal(true)} className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
               <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-xs overflow-hidden border border-emerald-200 dark:border-emerald-800">
                 {myInfo.photoUrl ? <img src={myInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : currentUser.charAt(0).toUpperCase()}
@@ -1838,6 +1890,31 @@ export default function App() {
         {activeFriends.length > 0 && (
           <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-4 py-2 flex flex-col items-center justify-center text-xs font-bold animate-in slide-in-from-top duration-300">
             <div className="flex items-center gap-2 mb-0.5"><Flame size={14} className="animate-pulse text-amber-300" /> {activeFriends.join(', ')}さんがトレーニング中です！</div>
+          </div>
+        )}
+        {showNotifications && (
+          <div className="absolute top-16 right-4 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold text-sm text-slate-700 dark:text-slate-300">通知</div>
+            <div className="max-h-64 overflow-y-auto p-2 space-y-1">
+               {notifications.length === 0 ? (
+                  <div className="text-center text-xs text-slate-400 p-4">通知はありません</div>
+               ) : (
+                  notifications.map(notif => (
+                     <div key={notif.id} className="flex gap-3 items-center p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-xs shrink-0 overflow-hidden">
+                           {accountsInfo[notif.user]?.photoUrl ? <img src={accountsInfo[notif.user].photoUrl} alt="" className="w-full h-full object-cover"/> : notif.user.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                           <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+                              <span className="text-emerald-600 dark:text-emerald-400 mr-1">{accountsInfo[notif.user]?.displayName || notif.user}</span>
+                              {notif.message}
+                           </p>
+                           <p className="text-[10px] text-slate-400 mt-0.5">{getRelativeTime(notif.time)}</p>
+                        </div>
+                     </div>
+                  ))
+               )}
+            </div>
           </div>
         )}
       </header>
@@ -1880,6 +1957,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
   const [height, setHeight] = useState(userInfo?.height || '');
   const [weight, setWeight] = useState(userInfo?.weight || '');
   const [displayName, setDisplayName] = useState(userInfo?.displayName || currentUser);
+  const [hideBodyMetrics, setHideBodyMetrics] = useState(userInfo?.hideBodyMetrics || false);
 
   useEffect(() => {
     if (isOpen) {
@@ -1891,6 +1969,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
       setHeight(userInfo?.height || '');
       setWeight(userInfo?.weight || '');
       setDisplayName(userInfo?.displayName || currentUser);
+      setHideBodyMetrics(userInfo?.hideBodyMetrics || false);
     }
   }, [isOpen, userInfo, currentUser]);
 
@@ -1919,7 +1998,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
   };
 
   const handleSave = () => {
-    onSave({ displayName: displayName.trim() || currentUser, photoUrl, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null });
+    onSave({ displayName: displayName.trim() || currentUser, photoUrl, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null, hideBodyMetrics });
   };
 
   return (
@@ -1987,6 +2066,11 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
                 <input type="number" inputMode="decimal" step="0.1" value={weight} onChange={e => setWeight(e.target.value)} className="w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-2 py-2 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" placeholder="記録時の初期値" style={{ fontSize: '16px' }} />
              </div>
           </div>
+          
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+             <input type="checkbox" id="hideBodyMetrics" checked={hideBodyMetrics} onChange={e => setHideBodyMetrics(e.target.checked)} className="w-4 h-4 text-emerald-500 rounded focus:ring-emerald-500" />
+             <label htmlFor="hideBodyMetrics" className="text-sm font-bold text-slate-700 dark:text-slate-300">フレンドに体組成を非公開にする</label>
+          </div>
 
           <div>
             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">目標 (100文字以内)</label>
@@ -2049,7 +2133,7 @@ function LoginScreen({ onLogin, onGoogleLogin, isOnline }) {
           <p className="text-sm text-slate-500 font-bold mt-1">みんなで鍛える、記録アプリ</p>
         </div>
         <div className="w-full bg-white p-6 rounded-3xl border border-slate-200 shadow-xl flex flex-col items-center">
-           <button onClick={() => { const provider = new GoogleAuthProvider(); signInWithPopup(getAuth(), provider).then((result) => { onGoogleLogin(result.user); }).catch(console.error); }} className="w-full bg-white border border-slate-300 text-slate-700 font-bold py-3 rounded-xl mb-6 shadow-sm flex items-center justify-center gap-2 hover:bg-slate-50">
+           <button onClick={() => { const provider = new GoogleAuthProvider(); provider.setCustomParameters({ prompt: 'select_account' }); signInWithPopup(getAuth(), provider).then((result) => { onGoogleLogin(result.user); }).catch(console.error); }} className="w-full bg-white border border-slate-300 text-slate-700 font-bold py-3 rounded-xl mb-6 shadow-sm flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors">
              Googleでログイン / 登録
            </button>
            <div className="w-full border-t border-slate-200 my-4 relative">
@@ -2263,6 +2347,8 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState(formatDateFromTimestamp(Date.now()));
   const displayUser = targetUser || currentUser;
+  const isMyData = displayUser === currentUser;
+  const hideMetrics = !isMyData && accountsInfo[displayUser]?.hideBodyMetrics;
 
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
@@ -2348,14 +2434,20 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
 
       <div className="pt-4">
         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">体組成データ</h3>
-        <BodyCompositionInfo info={myCompositionInfo} dailyCalories={myDailyCalories} dateLabel={dateLabel} />
+        {hideMetrics ? (
+          <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-xl text-center text-slate-500 font-bold border border-slate-200 dark:border-slate-700">ないしょ♡</div>
+        ) : (
+          <BodyCompositionInfo info={myCompositionInfo} dailyCalories={myDailyCalories} dateLabel={dateLabel} />
+        )}
       </div>
 
+      {!hideMetrics && (
       <div className="space-y-6 pt-4">
          <h3 className="text-lg font-bold text-slate-900 dark:text-white">体重・体脂肪率の推移</h3>
          <SimpleChart data={weightData} color="#10b981" title={`${displayUser}の体重推移 (kg)`} />
          <SimpleChart data={fatData} color="#6366f1" title={`${displayUser}の体脂肪率推移 (%)`} />
       </div>
+      )}
     </div>
   );
 }
@@ -3223,7 +3315,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
 
                     {editingGymId === gym.id && (
                        <form onSubmit={(e) => handleUpdateGym(e, gym.id)} className="flex gap-2 border-t border-slate-100 dark:border-slate-800 pt-3">
-                          <input type="text" value={editGymName} onChange={(e) => setEditGymName(e.target.value)} className="flex-1 bg-slate-50 dark:bg-slate-950 border border-emerald-200 dark:border-emerald-800 rounded-lg px-2 py-1.5 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-sm" autoFocus />
+                          <input type="text" value={editGymName} onChange={(e) => setEditGymName(e.target.value)} className="flex-1 bg-slate-50 dark:bg-slate-950 border border-emerald-200 dark:border-emerald-800 rounded-lg px-2 py-1.5 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }} autoFocus />
                           <button type="submit" className="text-xs bg-emerald-500 text-white px-3 rounded-lg font-bold shadow-sm">保存</button>
                           <button type="button" onClick={() => setEditingGymId(null)} className="text-xs bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 rounded-lg font-bold shadow-sm">キャンセル</button>
                        </form>
@@ -3610,7 +3702,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 21:18, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 21:46, updated)</p>
       </div>
     </div>
   );
