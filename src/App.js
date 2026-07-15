@@ -1871,8 +1871,9 @@ export default function App() {
             <WithFitLogo className="text-indigo-500" /> With<span className="text-indigo-500">Fit</span>
           </h1>
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-8 h-8 bg-slate-50 dark:bg-slate-950 rounded-full border border-slate-200 dark:border-slate-800" title={isOnline ? 'オンライン' : 'オフライン'}>
+            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 px-2 py-1.5 rounded-full border border-slate-200 dark:border-slate-800">
               <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`}></div>
+              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">{isOnline ? 'オンライン' : 'オフライン'}</span>
             </div>
             <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-1.5 text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors">
               <Bell size={20} />
@@ -3702,7 +3703,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 21:46, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 21:52, updated)</p>
       </div>
     </div>
   );
