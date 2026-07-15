@@ -1518,6 +1518,11 @@ export default function App() {
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
+      const existingUser = Object.entries(accountsInfo).find(([uname, data]) => data.googleUid === result.user.uid);
+      if (existingUser && existingUser[0] !== currentUser) {
+        alert('このGoogleアカウントは既に別のアカウントに紐づけられています。');
+        return;
+      }
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { googleUid: result.user.uid }, { merge: true });
       alert('Googleアカウントと連携しました。');
     } catch (e) {
@@ -1961,7 +1966,7 @@ export default function App() {
           </div>
         )}
         {currentTab === 'timeline' && <TimelineView posts={visiblePosts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} />}
-        {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} currentUser={currentUser} myInfo={myInfo} />}
+        {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} currentUser={currentUser} myInfo={myInfo} setCurrentTab={setCurrentTab} />}
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
         {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} />}
@@ -3101,12 +3106,13 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
 }
 
 // --- 種目・ジム管理画面 ---
-function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myInfo }) {
+function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myInfo, setCurrentTab }) {
   const isAdmin = accountsInfo[currentUser]?.googleUid === 'TApwsmyv0TNyeQezlA16FntSZ4B3';
   const joinedGyms = myInfo?.joinedGyms || ['common'];
   const mutedExercises = myInfo?.mutedExercises || [];
 
   const [activeTab, setActiveTab] = useState('exercises'); 
+  const [gymSearchQuery, setGymSearchQuery] = useState('');
   const [newGymName, setNewGymName] = useState('');
   const [selectedGymId, setSelectedGymId] = useState(isAdmin ? 'common' : (joinedGyms.find(id => id !== 'common') || ''));
   const [filterGymId, setFilterGymId] = useState('all');
@@ -3307,11 +3313,12 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
     try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', id)); } catch (e) {}
   };
 
-  const myFriends = myInfo.friends || [];
+  const myFriends = myInfo?.friends || [];
   const discoverableGyms = gyms.filter(gym => {
     if (gym.id === 'common') return false;
     if (joinedGyms.includes(gym.id)) return false;
-    return myFriends.some(f => (gym.members || []).includes(f) || gym.owner === f);
+    if (gymSearchQuery && !gym.name.toLowerCase().includes(gymSearchQuery.toLowerCase())) return false;
+    return true;
   });
 
   return (
@@ -3321,7 +3328,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
       <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl mb-6">
         <button onClick={() => setActiveTab('exercises')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'exercises' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>種目リスト</button>
         <button onClick={() => setActiveTab('gyms')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'gyms' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>参加中のジム</button>
-        <button onClick={() => setActiveTab('discover')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'discover' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>フレンドのジム</button>
+        <button onClick={() => setActiveTab('discover')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'discover' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>ジムを探す</button>
       </div>
 
       {activeTab === 'gyms' && (
@@ -3403,24 +3410,37 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
 
       {activeTab === 'discover' && (
         <div className="space-y-4 animate-in fade-in">
-          <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-2 ml-1">フレンドが参加しているジムグループ</h3>
+          {myFriends.length === 0 && (
+             <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900 rounded-2xl p-5 flex flex-col items-center text-center shadow-sm mb-6">
+                <Users className="text-indigo-400 mb-2" size={28} />
+                <p className="text-sm font-bold text-indigo-700 dark:text-indigo-300 mb-3">まずはフレンドを追加して、<br/>一緒にトレーニングを共有しましょう！</p>
+                <button onClick={() => setCurrentTab('friends')} className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-sm transition-colors flex items-center gap-2"><UserPlus size={16}/>フレンドを追加する</button>
+             </div>
+          )}
+          
+          <div className="mb-4">
+             <input type="text" value={gymSearchQuery} onChange={e => setGymSearchQuery(e.target.value)} placeholder="ジムの名前で検索..." className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 shadow-sm" style={{ fontSize: '16px' }} />
+          </div>
+          <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-2 ml-1">世界のジムグループ</h3>
           {discoverableGyms.length === 0 ? (
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center shadow-sm">
               <MapPin className="mx-auto text-slate-300 dark:text-slate-600 w-12 h-12 mb-3" />
-              <p className="text-slate-500 dark:text-slate-400 font-bold text-sm">現在フレンドから共有された未所属のジムはありません。</p>
+              <p className="text-slate-500 dark:text-slate-400 font-bold text-sm">該当するジムが見つかりません。</p>
             </div>
           ) : (
             discoverableGyms.map(gym => {
               const membersList = gym.members || [];
               const creatorName = accountsInfo[gym.owner]?.displayName || gym.owner || 'システム';
+              const hasFriend = myFriends.some(f => membersList.includes(f) || gym.owner === f);
               return (
-                <div key={gym.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex justify-between items-center">
-                  <div>
-                    <h4 className="font-bold text-slate-800 dark:text-slate-100 text-base">{gym.name}</h4>
-                    <div className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1">作成者: {creatorName} ｜ メンバー: {membersList.length}名</div>
+                <div key={gym.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex justify-between items-center relative overflow-hidden">
+                  {hasFriend && <div className="absolute top-0 right-0 bg-amber-400 text-amber-900 text-[9px] font-bold px-2 py-0.5 rounded-bl-lg">フレンド参加中</div>}
+                  <div className="flex-1 min-w-0 pr-2">
+                    <h4 className="font-bold text-slate-800 dark:text-slate-100 text-base truncate">{gym.name}</h4>
+                    <div className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1 truncate">作成者: {creatorName} ｜ メンバー: {membersList.length}名</div>
                   </div>
-                  <button onClick={() => handleJoinGym(gym.id)} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-sm transition-colors flex items-center gap-1">
-                    <Plus size={14}/> 参加して共有
+                  <button onClick={() => handleJoinGym(gym.id)} className="shrink-0 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-sm transition-colors flex items-center gap-1">
+                    <Plus size={14}/> 参加
                   </button>
                 </div>
               );
@@ -3756,7 +3776,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 22:22, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 22:29, updated)</p>
       </div>
     </div>
   );
