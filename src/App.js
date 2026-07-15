@@ -2956,9 +2956,13 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
 
 // --- 種目・ジム管理画面 ---
 function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myInfo }) {
+  const isAdmin = accountsInfo[currentUser]?.googleUid === 'TApwsmyv0TNyeQezlA16FntSZ4B3';
+  const joinedGyms = myInfo?.joinedGyms || ['common'];
+  const mutedExercises = myInfo?.mutedExercises || [];
+
   const [activeTab, setActiveTab] = useState('exercises'); 
   const [newGymName, setNewGymName] = useState('');
-  const [selectedGymId, setSelectedGymId] = useState('common');
+  const [selectedGymId, setSelectedGymId] = useState(isAdmin ? 'common' : (joinedGyms.find(id => id !== 'common') || ''));
   const [filterGymId, setFilterGymId] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [editingGymId, setEditingGymId] = useState(null);
@@ -2979,9 +2983,6 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
   const [editExCategory, setEditExCategory] = useState('胸');
   const [editingExGymId, setEditingExGymId] = useState('');
   const [editExFreeWeightType, setEditExFreeWeightType] = useState('barbell');
-
-  const joinedGyms = myInfo.joinedGyms || ['common'];
-  const mutedExercises = myInfo.mutedExercises || [];
 
   const handleAddGym = async (e) => {
     e.preventDefault();
@@ -3297,7 +3298,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                       <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">対象のジムグループ <span className="text-rose-500">*</span></label>
                       <div className="relative">
                         <select value={editingExGymId} onChange={e => setEditingExGymId(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
-                          {gyms.filter(g => joinedGyms.includes(g.id)).map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
+                          {gyms.filter(g => joinedGyms.includes(g.id) && (g.id !== 'common' || isAdmin)).map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
                         </select>
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
                       </div>
@@ -3348,7 +3349,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                       <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">登録先のジムグループ <span className="text-rose-500">*</span></label>
                       <div className="relative">
                         <select value={selectedGymId} onChange={e => setSelectedGymId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
-                          {gyms.filter(g => joinedGyms.includes(g.id)).map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
+                          {gyms.filter(g => joinedGyms.includes(g.id) && (g.id !== 'common' || isAdmin)).map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
                         </select>
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
                       </div>
@@ -3452,7 +3453,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                                   <button onClick={() => handleMuteExercise(ex.name)} className={`p-2 rounded-lg transition-colors border ${isMuted ? 'text-indigo-400 bg-indigo-50 border-indigo-100 hover:bg-indigo-100 dark:bg-indigo-950/30 dark:border-indigo-900' : 'text-slate-400 bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-800 hover:bg-slate-100'}`} title={isMuted ? '表示する' : '非表示にする'}>
                                     <EyeOff size={16}/>
                                   </button>
-                                  {gym.id !== 'common' && gym.owner === currentUser && (
+                                  {((gym.id !== 'common' && gym.owner === currentUser) || (gym.id === 'common' && isAdmin)) && (
                                     <>
                                       <button onClick={() => startEdit(ex)} className="p-2 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 bg-slate-50 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-100 dark:border-slate-800"><Edit2 size={16} /></button>
                                       <button onClick={() => { if(window.confirm(`${ex.name}を削除しますか？`)) handleDeleteExercise(ex.id); }} className="p-2 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 bg-slate-50 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-100 dark:border-slate-800"><Trash2 size={16} /></button>
@@ -3611,7 +3612,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 10:11, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 10:17, updated)</p>
       </div>
     </div>
   );
