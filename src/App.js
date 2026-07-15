@@ -3314,15 +3314,12 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
   };
 
   const myFriends = myInfo?.friends || [];
-  const displayGyms = gyms.filter(gym => {
+  const discoverableGyms = gyms.filter(gym => {
+    if (gym.id === 'common') return false;
+    if (joinedGyms.includes(gym.id)) return false;
     if (gymSearchQuery && !gym.name.toLowerCase().includes(gymSearchQuery.toLowerCase())) return false;
     return true;
   }).sort((a, b) => {
-    const aJoined = joinedGyms.includes(a.id);
-    const bJoined = joinedGyms.includes(b.id);
-    if (aJoined && !bJoined) return -1;
-    if (!aJoined && bJoined) return 1;
-
     const aHasFriend = myFriends.some(f => (a.members || []).includes(f) || a.owner === f);
     const bHasFriend = myFriends.some(f => (b.members || []).includes(f) || b.owner === f);
     if (aHasFriend && !bHasFriend) return -1;
@@ -3336,7 +3333,8 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
       
       <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl mb-6">
         <button onClick={() => setActiveTab('exercises')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'exercises' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>種目リスト</button>
-        <button onClick={() => setActiveTab('gyms')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'gyms' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>ジム一覧</button>
+        <button onClick={() => setActiveTab('gyms')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'gyms' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>参加中のジム</button>
+        <button onClick={() => setActiveTab('discover')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'discover' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>ジムを探す</button>
       </div>
 
       {activeTab === 'gyms' && (
@@ -3416,7 +3414,46 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
         </div>
       )}
 
-
+      {activeTab === 'discover' && (
+        <div className="space-y-4 animate-in fade-in">
+          {myFriends.length === 0 && (
+             <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900 rounded-2xl p-5 flex flex-col items-center text-center shadow-sm mb-6">
+                <Users className="text-indigo-400 mb-2" size={28} />
+                <p className="text-sm font-bold text-indigo-700 dark:text-indigo-300 mb-3">まずはフレンドを追加して、<br/>一緒にトレーニングを共有しましょう！</p>
+                <button onClick={() => setCurrentTab('friends')} className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-sm transition-colors flex items-center gap-2"><UserPlus size={16}/>フレンドを追加する</button>
+             </div>
+          )}
+          
+          <div className="mb-4">
+             <input type="text" value={gymSearchQuery} onChange={e => setGymSearchQuery(e.target.value)} placeholder="ジムの名前で検索..." className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 shadow-sm" style={{ fontSize: '16px' }} />
+          </div>
+          <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-2 ml-1">世界のジムグループ</h3>
+          {discoverableGyms.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center shadow-sm">
+              <MapPin className="mx-auto text-slate-300 dark:text-slate-600 w-12 h-12 mb-3" />
+              <p className="text-slate-500 dark:text-slate-400 font-bold text-sm">該当するジムが見つかりません。</p>
+            </div>
+          ) : (
+            discoverableGyms.map(gym => {
+              const membersList = gym.members || [];
+              const creatorName = accountsInfo[gym.owner]?.displayName || gym.owner || 'システム';
+              const hasFriend = myFriends.some(f => membersList.includes(f) || gym.owner === f);
+              return (
+                <div key={gym.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex justify-between items-center relative overflow-hidden">
+                  {hasFriend && <div className="absolute top-0 right-0 bg-amber-400 text-amber-900 text-[9px] font-bold px-2 py-0.5 rounded-bl-lg">フレンド参加中</div>}
+                  <div className="flex-1 min-w-0 pr-2">
+                    <h4 className="font-bold text-slate-800 dark:text-slate-100 text-base truncate">{gym.name}</h4>
+                    <div className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1 truncate">作成者: {creatorName} ｜ メンバー: {membersList.length}名</div>
+                  </div>
+                  <button onClick={() => handleJoinGym(gym.id)} className="shrink-0 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-sm transition-colors flex items-center gap-1">
+                    <Plus size={14}/> 参加
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
 
       {activeTab === 'exercises' && (
         <div className="space-y-6 animate-in fade-in">
@@ -3745,7 +3782,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 22:49, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 22:32, updated)</p>
       </div>
     </div>
   );
