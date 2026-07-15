@@ -1894,6 +1894,8 @@ export default function App() {
           </div>
         )}
         {showNotifications && (
+          <>
+          <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)}></div>
           <div className="absolute top-16 right-4 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold text-sm text-slate-700 dark:text-slate-300">通知</div>
             <div className="max-h-64 overflow-y-auto p-2 space-y-1">
@@ -1917,6 +1919,7 @@ export default function App() {
                )}
             </div>
           </div>
+          </>
         )}
       </header>
 
@@ -3703,7 +3706,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 21:54, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 21:58, updated)</p>
       </div>
     </div>
   );
