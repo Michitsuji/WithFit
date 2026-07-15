@@ -3319,6 +3319,12 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
     if (joinedGyms.includes(gym.id)) return false;
     if (gymSearchQuery && !gym.name.toLowerCase().includes(gymSearchQuery.toLowerCase())) return false;
     return true;
+  }).sort((a, b) => {
+    const aHasFriend = myFriends.some(f => (a.members || []).includes(f) || a.owner === f);
+    const bHasFriend = myFriends.some(f => (b.members || []).includes(f) || b.owner === f);
+    if (aHasFriend && !bHasFriend) return -1;
+    if (!aHasFriend && bHasFriend) return 1;
+    return 0;
   });
 
   return (
@@ -3776,7 +3782,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 22:29, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 22:32, updated)</p>
       </div>
     </div>
   );
