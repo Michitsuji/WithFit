@@ -3314,12 +3314,15 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
   };
 
   const myFriends = myInfo?.friends || [];
-  const discoverableGyms = gyms.filter(gym => {
-    if (gym.id === 'common') return false;
-    if (joinedGyms.includes(gym.id)) return false;
+  const displayGyms = gyms.filter(gym => {
     if (gymSearchQuery && !gym.name.toLowerCase().includes(gymSearchQuery.toLowerCase())) return false;
     return true;
   }).sort((a, b) => {
+    const aJoined = joinedGyms.includes(a.id);
+    const bJoined = joinedGyms.includes(b.id);
+    if (aJoined && !bJoined) return -1;
+    if (!aJoined && bJoined) return 1;
+
     const aHasFriend = myFriends.some(f => (a.members || []).includes(f) || a.owner === f);
     const bHasFriend = myFriends.some(f => (b.members || []).includes(f) || b.owner === f);
     if (aHasFriend && !bHasFriend) return -1;
@@ -3333,8 +3336,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
       
       <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl mb-6">
         <button onClick={() => setActiveTab('exercises')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'exercises' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>種目リスト</button>
-        <button onClick={() => setActiveTab('gyms')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'gyms' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>参加中のジム</button>
-        <button onClick={() => setActiveTab('discover')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'discover' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>ジムを探す</button>
+        <button onClick={() => setActiveTab('gyms')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'gyms' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>ジム一覧</button>
       </div>
 
       {activeTab === 'gyms' && (
@@ -3782,7 +3784,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 22:32, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 22:39, updated)</p>
       </div>
     </div>
   );
