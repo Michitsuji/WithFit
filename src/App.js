@@ -463,7 +463,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
       <div className="flex justify-between items-start mb-4 pl-3">
         <div className="flex items-center gap-3 w-full overflow-hidden">
           <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm overflow-hidden shrink-0 ${userColorBg}`} style={customBgStyle}>
-            {authorInfo?.photoUrl ? <img src={authorInfo.photoUrl} alt={post.author} className="w-full h-full object-cover" /> : post.author ? post.author.charAt(0).toUpperCase() : '?'}
+            {authorInfo?.photoUrl ? <img src={authorInfo.photoUrl} alt={post.author} className="w-full h-full object-cover" /> : authorInfo?.displayName ? authorInfo.displayName.charAt(0).toUpperCase() : (post.author ? post.author.charAt(0).toUpperCase() : '?')}
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-bold text-slate-800 dark:text-slate-100 truncate">{post.author || '不明'}</p>
@@ -1479,7 +1479,7 @@ export default function App() {
       }
     } else {
       if (!accountData || !accountData.pin) {
-        try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { pin: pin, displayName: username, friendCode: generateFriendCode(), isTraining: false, lastActive: Date.now(), isAppOnline: true, theme: 'light', friends: [], joinedGyms: ['common'] }, { merge: true }); setCurrentUser(username); } catch (e) { return false; }
+        return false;
       } else if (accountData.pin === pin) {
         setCurrentUser(username);
         try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { lastActive: Date.now(), isAppOnline: true, joinedGyms }, { merge: true }); } catch (e) {}
@@ -1901,7 +1901,7 @@ export default function App() {
             </div>
             <button onClick={() => setShowProfileModal(true)} className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
               <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-xs overflow-hidden border border-emerald-200 dark:border-emerald-800">
-                {myInfo.photoUrl ? <img src={myInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : currentUser.charAt(0).toUpperCase()}
+                {myInfo.photoUrl ? <img src={myInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : myInfo.displayName ? myInfo.displayName.charAt(0).toUpperCase() : currentUser.charAt(0).toUpperCase()}
               </div>
               <span className="text-sm font-bold text-slate-700 dark:text-slate-200 hidden sm:inline">{myInfo.displayName || currentUser}</span>
             </button>
@@ -1930,7 +1930,7 @@ export default function App() {
                      return (
                        <div key={notif.id} onClick={() => handleNotificationClick(notif)} className={`flex gap-3 items-center p-2 rounded-xl cursor-pointer transition-colors ${isUnread ? 'bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-100/50 dark:hover:bg-emerald-950/40' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                           <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-xs shrink-0 overflow-hidden">
-                             {accountsInfo[notif.user]?.photoUrl ? <img src={accountsInfo[notif.user].photoUrl} alt="" className="w-full h-full object-cover"/> : notif.user.charAt(0).toUpperCase()}
+                             {accountsInfo[notif.user]?.photoUrl ? <img src={accountsInfo[notif.user].photoUrl} alt="" className="w-full h-full object-cover"/> : accountsInfo[notif.user]?.displayName ? accountsInfo[notif.user].displayName.charAt(0).toUpperCase() : notif.user.charAt(0).toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">
                              <p className="text-xs font-bold text-slate-800 dark:text-slate-200 break-words whitespace-pre-wrap">
@@ -1951,6 +1951,15 @@ export default function App() {
       </header>
 
       <main className="p-4 max-w-md mx-auto w-full pb-40">
+        {!myInfo?.googleUid && (
+          <div className="bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 px-4 py-3 rounded-2xl border border-rose-200 dark:border-rose-900/60 font-bold text-xs mb-6 flex justify-between items-center shadow-sm">
+             <div className="flex items-center gap-1.5 min-w-0">
+                <Lock size={14} className="shrink-0" />
+                <span className="truncate">Google連携をしてアカウントを保護しましょう！</span>
+             </div>
+             <button onClick={handleLinkGoogle} className="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg shrink-0 transition-colors">連携</button>
+          </div>
+        )}
         {currentTab === 'timeline' && <TimelineView posts={visiblePosts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} />}
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} currentUser={currentUser} myInfo={myInfo} />}
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} />}
@@ -2016,7 +2025,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
       setDisplayName(userInfo?.displayName || currentUser);
       setHideBodyMetrics(userInfo?.hideBodyMetrics || false);
     }
-  }, [isOpen, userInfo, currentUser]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -2068,8 +2077,8 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
           )}
         </div>
         <div className="flex flex-col items-center space-y-6">
-          <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800 border-4 border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center relative">
-            {photoUrl ? <img src={photoUrl} alt="profile" className="w-full h-full object-cover" /> : <Users size={40} className="text-slate-300 dark:text-slate-500" />}
+          <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800 border-4 border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center relative font-bold text-2xl text-slate-500">
+            {photoUrl ? <img src={photoUrl} alt="profile" className="w-full h-full object-cover" /> : displayName ? displayName.charAt(0).toUpperCase() : currentUser.charAt(0).toUpperCase()}
             {isUploading && <div className="absolute inset-0 bg-white/60 dark:bg-slate-900/60 flex items-center justify-center"><Activity className="animate-spin text-emerald-500" size={24} /></div>}
           </div>
           
@@ -2269,7 +2278,7 @@ function MonthlyReport({ monthDate, posts, userName, accountsInfo }) {
     <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm animate-in fade-in">
       <div className="flex items-center gap-3 mb-5">
          <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center font-bold text-white text-xs bg-slate-600">
-            {accountsInfo[userName]?.photoUrl ? <img src={accountsInfo[userName].photoUrl} alt={userName} className="w-full h-full object-cover" /> : userName.charAt(0).toUpperCase()}
+            {accountsInfo[userName]?.photoUrl ? <img src={accountsInfo[userName].photoUrl} alt={userName} className="w-full h-full object-cover" /> : accountsInfo[userName]?.displayName ? accountsInfo[userName].displayName.charAt(0).toUpperCase() : userName.charAt(0).toUpperCase()}
          </div>
          <h3 className="font-bold text-slate-800 dark:text-slate-100">{userName} のレポート</h3>
       </div>
@@ -3687,7 +3696,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
                    <div key={reqUser} className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900 rounded-xl p-3 flex items-center justify-between shadow-sm">
                       <div className="flex items-center gap-3">
                          <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 dark:text-slate-400 overflow-hidden">
-                            {accountsInfo[reqUser]?.photoUrl ? <img src={accountsInfo[reqUser].photoUrl} alt={reqUser} className="w-full h-full object-cover" /> : reqUser.charAt(0).toUpperCase()}
+                            {accountsInfo[reqUser]?.photoUrl ? <img src={accountsInfo[reqUser].photoUrl} alt={reqUser} className="w-full h-full object-cover" /> : accountsInfo[reqUser]?.displayName ? accountsInfo[reqUser].displayName.charAt(0).toUpperCase() : reqUser.charAt(0).toUpperCase()}
                          </div>
                          <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">{accountsInfo[reqUser]?.displayName || reqUser}</span>
                       </div>
@@ -3721,7 +3730,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
                   <div className="flex items-center gap-4">
                     <div className="relative">
                       <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xl font-bold text-slate-600 dark:text-slate-300 overflow-hidden">
-                        {friendInfo.photoUrl ? <img src={friendInfo.photoUrl} alt={friendUsername} className="w-full h-full object-cover" /> : friendUsername.charAt(0).toUpperCase()}
+                        {friendInfo.photoUrl ? <img src={friendInfo.photoUrl} alt={friendUsername} className="w-full h-full object-cover" /> : friendInfo.displayName ? friendInfo.displayName.charAt(0).toUpperCase() : friendUsername.charAt(0).toUpperCase()}
                       </div>
                       <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 border-2 border-white dark:border-slate-900 rounded-full z-10 ${isTraining ? 'bg-amber-400' : isOnline ? 'bg-emerald-400' : 'bg-slate-400'}`}></div>
                     </div>
@@ -3747,7 +3756,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 22:07, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 22:22, updated)</p>
       </div>
     </div>
   );
@@ -3763,7 +3772,7 @@ function FriendDetailModal({ friendUsername, posts, accountsInfo, onClose, onTog
         <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-10 pt-safe">
           <div className="flex items-center gap-2">
              <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center font-bold text-white text-xs bg-slate-600 border border-slate-200 dark:border-slate-700">
-                {friendInfo.photoUrl ? <img src={friendInfo.photoUrl} alt={friendUsername} className="w-full h-full object-cover" /> : friendUsername.charAt(0).toUpperCase()}
+                {friendInfo.photoUrl ? <img src={friendInfo.photoUrl} alt={friendUsername} className="w-full h-full object-cover" /> : friendInfo.displayName ? friendInfo.displayName.charAt(0).toUpperCase() : friendUsername.charAt(0).toUpperCase()}
              </div>
              <h2 className="text-lg font-bold text-slate-800 dark:text-white">{friendInfo.displayName || friendUsername}</h2>
           </div>
