@@ -1844,7 +1844,7 @@ export default function App() {
         {currentTab === 'timeline' && <TimelineView posts={visiblePosts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} />}
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} />}
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} />}
-        {currentTab === 'data' && <DataView posts={posts.filter(p => p.author === currentUser)} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
+        {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
         {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} />}
       </main>
 
@@ -2257,9 +2257,10 @@ function BodyCompositionInfo({ info, dailyCalories = 0, dateLabel = '' }) {
 }
 
 // --- データ画面 (カレンダー・グラフ・レポート) ---
-function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport }) {
+function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport, targetUser, onToggleLike }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState(formatDateFromTimestamp(Date.now()));
+  const displayUser = targetUser || currentUser;
 
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
@@ -2267,7 +2268,7 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const todayStr = formatDateFromTimestamp(Date.now());
   
-  const myPosts = posts.filter(p => p.author === currentUser);
+  const myPosts = posts.filter(p => p.author === displayUser);
 
   const blanks = Array.from({ length: firstDay || 0 }).map((_, i) => <div key={`blank-${i}`} className="p-2"></div>);
   const days = Array.from({ length: daysInMonth || 0 }).map((_, i) => {
@@ -2298,7 +2299,7 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
 
   const selectedPosts = myPosts.filter(p => formatDateFromTimestamp(p.timestamp) === selectedDateStr);
 
-  const myUserInfo = accountsInfo[currentUser] || {};
+  const myUserInfo = accountsInfo[displayUser] || {};
   const lastMyFatPost = myPosts.find(p => p.bodyFat);
   const myCompositionInfo = { ...myUserInfo, lastFat: lastMyFatPost ? lastMyFatPost.bodyFat : null };
 
@@ -2312,7 +2313,7 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
 
       <div>
         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">月間レポート ({month + 1}月)</h3>
-        <MonthlyReport monthDate={currentMonth} posts={posts} userName={currentUser} accountsInfo={accountsInfo} />
+        <MonthlyReport monthDate={currentMonth} posts={posts} userName={displayUser} accountsInfo={accountsInfo} />
       </div>
 
       <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
@@ -2336,7 +2337,7 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
           <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-3">{selectedDateStr.replace(/-/g, '/')} の記録</h3>
 
           {selectedPosts.length > 0 ? (
-            selectedPosts.map(post => <WorkoutCard key={post.id} post={post} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={onEdit} onDelete={onDelete} onImport={onImport} />)
+            selectedPosts.map(post => <WorkoutCard key={post.id} post={post} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={onEdit} onDelete={onDelete} onImport={onImport} onToggleLike={onToggleLike} />)
           ) : (
              <div className="bg-slate-100 dark:bg-slate-900 p-4 rounded-xl text-center text-slate-400 dark:text-slate-500 text-sm font-bold border border-slate-200 dark:border-slate-800">記録はありません</div>
           )}
@@ -2350,8 +2351,8 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
 
       <div className="space-y-6 pt-4">
          <h3 className="text-lg font-bold text-slate-900 dark:text-white">体重・体脂肪率の推移</h3>
-         <SimpleChart data={weightData} color="#10b981" title={`${currentUser}の体重推移 (kg)`} />
-         <SimpleChart data={fatData} color="#6366f1" title={`${currentUser}の体脂肪率推移 (%)`} />
+         <SimpleChart data={weightData} color="#10b981" title={`${displayUser}の体重推移 (kg)`} />
+         <SimpleChart data={fatData} color="#6366f1" title={`${displayUser}の体脂肪率推移 (%)`} />
       </div>
     </div>
   );
@@ -3441,7 +3442,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 09:30, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 09:35, updated)</p>
       </div>
     </div>
   );
@@ -3450,8 +3451,6 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
 // --- フレンド詳細モーダル ---
 function FriendDetailModal({ friendUsername, posts, accountsInfo, onClose, onToggleLike, onImport, currentUser }) {
   const friendInfo = accountsInfo[friendUsername] || {};
-  const friendPosts = posts.filter(p => p.author === friendUsername);
-  const now = new Date();
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-50 flex flex-col justify-end sm:justify-center sm:items-center animate-in fade-in duration-200">
@@ -3474,21 +3473,7 @@ function FriendDetailModal({ friendUsername, posts, accountsInfo, onClose, onTog
               </div>
            )}
 
-           <div>
-             <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">月間レポート ({now.getMonth() + 1}月)</h3>
-             <MonthlyReport monthDate={now} posts={posts} userName={friendUsername} accountsInfo={accountsInfo} />
-           </div>
-
-           <div>
-             <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">最近のアクティビティ</h3>
-             {friendPosts.length === 0 ? (
-                <div className="text-center py-8 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-500 font-bold text-sm">記録がありません</div>
-             ) : (
-                <div className="space-y-4">
-                  {friendPosts.slice(0, 5).map(post => <WorkoutCard key={post.id} post={post} currentUser={currentUser} accountsInfo={accountsInfo} onToggleLike={onToggleLike} onImport={onImport} />)}
-                </div>
-             )}
-           </div>
+           <DataView posts={posts} currentUser={currentUser} targetUser={friendUsername} accountsInfo={accountsInfo} onImport={onImport} onToggleLike={onToggleLike} />
         </div>
       </div>
     </div>
