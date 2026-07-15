@@ -3314,18 +3314,42 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
   };
 
   const myFriends = myInfo?.friends || [];
-  const discoverableGyms = gyms.filter(gym => {
+  const filteredGyms = gyms.filter(gym => {
     if (gym.id === 'common') return false;
-    if (joinedGyms.includes(gym.id)) return false;
     if (gymSearchQuery && !gym.name.toLowerCase().includes(gymSearchQuery.toLowerCase())) return false;
     return true;
-  }).sort((a, b) => {
-    const aHasFriend = myFriends.some(f => (a.members || []).includes(f) || a.owner === f);
-    const bHasFriend = myFriends.some(f => (b.members || []).includes(f) || b.owner === f);
-    if (aHasFriend && !bHasFriend) return -1;
-    if (!aHasFriend && bHasFriend) return 1;
-    return 0;
   });
+
+  const joinedGymsList = filteredGyms.filter(gym => joinedGyms.includes(gym.id));
+  
+  const friendGymsList = filteredGyms.filter(gym => {
+    if (joinedGyms.includes(gym.id)) return false;
+    return myFriends.some(f => (gym.members || []).includes(f) || gym.owner === f);
+  });
+  
+  const otherGymsList = filteredGyms.filter(gym => {
+    if (joinedGyms.includes(gym.id)) return false;
+    if (myFriends.some(f => (gym.members || []).includes(f) || gym.owner === f)) return false;
+    return true;
+  });
+
+  const renderDiscoverGymCard = (gym) => {
+    const membersList = gym.members || [];
+    const creatorName = accountsInfo[gym.owner]?.displayName || gym.owner || 'システム';
+    const hasFriend = myFriends.some(f => membersList.includes(f) || gym.owner === f);
+    return (
+      <div key={gym.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex justify-between items-center relative overflow-hidden mb-3">
+        {hasFriend && <div className="absolute top-0 right-0 bg-amber-400 text-amber-900 text-[9px] font-bold px-2 py-0.5 rounded-bl-lg">フレンド参加中</div>}
+        <div className="flex-1 min-w-0 pr-2">
+          <h4 className="font-bold text-slate-800 dark:text-slate-100 text-base truncate">{gym.name}</h4>
+          <div className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1 truncate">作成者: {creatorName} ｜ メンバー: {membersList.length}名</div>
+        </div>
+        <button onClick={() => handleJoinGym(gym.id)} className="shrink-0 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-sm transition-colors flex items-center gap-1">
+          <Plus size={14}/> 参加
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -3333,8 +3357,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
       
       <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl mb-6">
         <button onClick={() => setActiveTab('exercises')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'exercises' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>種目リスト</button>
-        <button onClick={() => setActiveTab('gyms')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'gyms' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>参加中のジム</button>
-        <button onClick={() => setActiveTab('discover')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'discover' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>ジムを探す</button>
+        <button onClick={() => setActiveTab('gyms')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'gyms' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>ジムグループ</button>
       </div>
 
       {activeTab === 'gyms' && (
@@ -3782,7 +3805,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 22:32, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 22:55, updated)</p>
       </div>
     </div>
   );
