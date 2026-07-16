@@ -2086,7 +2086,7 @@ export default function App() {
           </div>
         )}
         {currentTab === 'timeline' && <TimelineView posts={visiblePosts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} />}
-        {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} currentUser={currentUser} myInfo={myInfo} setCurrentTab={setCurrentTab} />}
+        {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} currentUser={currentUser} myInfo={myInfo} setCurrentTab={setCurrentTab} onSendRequest={handleSendFriendRequest} />}
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
         {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} onImportFromDuoFit={handleImportFromDuoFit} posts={posts} />}
@@ -3193,7 +3193,7 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
 }
 
 // --- 種目・ジム管理画面 ---
-function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myInfo, setCurrentTab }) {
+function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myInfo, setCurrentTab, onSendRequest }) {
   const isAdmin = accountsInfo[currentUser]?.googleUid === 'TApwsmyv0TNyeQezlA16FntSZ4B3';
   const joinedGyms = myInfo?.joinedGyms || ['common'];
   const mutedExercises = myInfo?.mutedExercises || [];
@@ -3517,12 +3517,24 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                           <div className="flex flex-wrap gap-3">
                             {membersList.map(mId => {
                               const mInfo = accountsInfo[mId];
+                              const isMe = mId === currentUser;
+                              const isFriend = (myInfo?.friends || []).includes(mId);
+                              const hasRequested = (accountsInfo[mId]?.friendRequests || []).includes(currentUser);
+                              
                               return (
-                                <div key={mId} className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 px-2 py-1.5 rounded-full border border-slate-100 dark:border-slate-800">
-                                  <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[9px] font-bold overflow-hidden">
+                                <div key={mId} className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 pl-2 pr-1.5 py-1.5 rounded-full border border-slate-100 dark:border-slate-800">
+                                  <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[9px] font-bold overflow-hidden shrink-0">
                                     {mInfo?.photoUrl ? <img src={mInfo.photoUrl} alt="member" className="w-full h-full object-cover"/> : mId.charAt(0).toUpperCase()}
                                   </div>
                                   <span className="text-xs font-bold text-slate-600 dark:text-slate-300 truncate max-w-[80px]">{mInfo?.displayName || mId}</span>
+                                  {!isMe && !isFriend && !hasRequested && (
+                                    <button onClick={() => onSendRequest(mId)} className="ml-1 p-1 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 rounded-full hover:bg-emerald-200 dark:hover:bg-emerald-800 transition-colors shrink-0" title="フレンド申請">
+                                      <UserPlus size={12} />
+                                    </button>
+                                  )}
+                                  {!isMe && !isFriend && hasRequested && (
+                                     <span className="ml-1 text-[8px] font-bold text-slate-400 shrink-0 pr-1">申請済</span>
+                                  )}
                                 </div>
                               );
                             })}
@@ -3988,7 +4000,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       </div>
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 09:52, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 09:57, updated)</p>
       </div>
     </div>
   );
