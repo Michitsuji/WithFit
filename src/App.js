@@ -3871,8 +3871,25 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
         </div>
       )}
 
+      <div className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900 rounded-2xl p-5 mt-8 shadow-sm">
+        <h3 className="text-indigo-700 dark:text-indigo-300 font-bold mb-3 text-sm flex items-center gap-2">
+           <Download size={16}/> DuoFitからデータ引継ぎ
+        </h3>
+        <p className="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold mb-4">
+           DuoFitで記録した過去のトレーニングや種目をWithFitにコピーします。<br/>(2回目以降は重複せずデータが上書き更新されます)
+        </p>
+        <div className="space-y-3">
+           <input type="text" value={duofitUsername} onChange={e => setDuofitUsername(e.target.value)} placeholder="DuoFitのユーザー名 (例: 勇太)" className="w-full bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-indigo-500 text-sm" />
+           <input type="password" value={duofitPin} onChange={e => setDuofitPin(e.target.value)} placeholder="DuoFitのPINコード (4桁)" maxLength={4} className="w-full bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-indigo-500 text-sm" />
+           <button onClick={handleExecuteImport} disabled={isImporting || !duofitUsername || duofitPin.length !== 4} className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+              {isImporting ? <Activity size={16} className="animate-spin" /> : <Download size={16} />}
+              {isImporting ? '引継ぎ処理中...' : 'データを引き継ぐ'}
+           </button>
+        </div>
+      </div>
+
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 09:16, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 09:21, updated)</p>
       </div>
     </div>
   );
