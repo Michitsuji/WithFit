@@ -1435,15 +1435,22 @@ export default function App() {
 
   useEffect(() => {
     if (!currentUser) return;
+    
+    let isActiveSession = true;
+    
     const updatePresence = async (isVisible) => { 
-      if (accountsInfo && !accountsInfo[currentUser]) return;
+      if (!isActiveSession) return;
       const now = Date.now();
       if (isVisible) {
          localStorage.setItem('withfit_login_session', JSON.stringify({ userId: currentUser, lastActive: now }));
       }
       if (!db || !isOnline) return;
       try { 
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { lastActive: now, isAppOnline: isVisible }, { merge: true }); 
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser);
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) return;
+        
+        await setDoc(docRef, { lastActive: now, isAppOnline: isVisible }, { merge: true }); 
       } catch (e) {} 
     };
     
@@ -1461,9 +1468,9 @@ export default function App() {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
     return () => {
+      isActiveSession = false;
       clearInterval(intervalId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      updatePresence(false);
     };
   }, [currentUser, isOnline]);
 
@@ -1937,9 +1944,14 @@ export default function App() {
         }
       }
 
-      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser));
+      const userIdToDelete = currentUser;
+      setCurrentUser(null);
+      localStorage.removeItem('withfit_login_session');
+      setCurrentTab('timeline');
+      setEditingPost(null);
+
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', userIdToDelete));
       alert("アカウントが削除されました。");
-      handleLogout();
     } catch (e) {
       console.error("Account deletion error:", e);
       alert("削除中にエラーが発生しました。");
@@ -4017,7 +4029,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 10:23, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 10:26, updated)</p>
       </div>
     </div>
   );
