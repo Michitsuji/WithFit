@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus, EyeOff, Bell } from 'lucide-react';
+import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus, EyeOff, Bell, Download } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy } from 'firebase/firestore';
+import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy, getDocs, where } from 'firebase/firestore';
 
 // --- カスタムアイコン ---
 const WithFitLogo = ({ className = "", size = 24 }) => (
@@ -1717,6 +1717,57 @@ export default function App() {
     }
   };
 
+  const handleImportFromDuoFit = async (duofitUsername, duofitPin) => {
+    if (!db || !duofitUsername || !duofitPin) return { success: false, message: '入力が不完全です' };
+    
+    try {
+      const accRef = doc(db, 'artifacts', 'duofit-app', 'public', 'data', 'accounts', duofitUsername);
+      const accSnap = await getDoc(accRef);
+      if (!accSnap.exists() || accSnap.data().pin !== duofitPin) {
+          return { success: false, message: 'ユーザー名またはPINコードが間違っています' };
+      }
+
+      const gymsRef = collection(db, 'artifacts', 'duofit-app', 'public', 'data', 'gyms');
+      const gymsSnap = await getDocs(gymsRef);
+      const myJoinedGyms = [];
+      const gymPromises = gymsSnap.docs.map(async d => {
+          const data = d.data();
+          if (d.id !== 'common') {
+              myJoinedGyms.push(d.id);
+              const members = data.members || [];
+              if (!members.includes(currentUser)) members.push(currentUser);
+              return setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gyms', d.id), { ...data, members }, { merge: true });
+          }
+      });
+      await Promise.all(gymPromises);
+
+      const currentJoined = accountsInfo[currentUser]?.joinedGyms || ['common'];
+      const newJoined = [...new Set([...currentJoined, ...myJoinedGyms])];
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { joinedGyms: newJoined }, { merge: true });
+
+      const exRef = collection(db, 'artifacts', 'duofit-app', 'public', 'data', 'exercises');
+      const exSnap = await getDocs(exRef);
+      const exPromises = exSnap.docs.map(d => {
+          return setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', d.id), d.data(), { merge: true });
+      });
+      await Promise.all(exPromises);
+
+      const workoutsRef = collection(db, 'artifacts', 'duofit-app', 'public', 'data', 'workouts');
+      const q = query(workoutsRef, where('author', '==', duofitUsername));
+      const workoutsSnap = await getDocs(q);
+      const workoutPromises = workoutsSnap.docs.map(d => {
+          const data = d.data();
+          return setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', d.id), { ...data, author: currentUser }, { merge: true });
+      });
+      await Promise.all(workoutPromises);
+
+      return { success: true };
+    } catch (error) {
+      console.error(error);
+      return { success: false, message: '通信エラーが発生しました' };
+    }
+  };
+
   const unreadNotificationCount = notifications.filter(n => n.time > (myInfo.lastNotificationCheck || 0)).length;
 
   const handleOpenNotifications = () => {
@@ -1969,7 +2020,7 @@ export default function App() {
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} currentUser={currentUser} myInfo={myInfo} setCurrentTab={setCurrentTab} />}
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
-        {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} />}
+        {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} onImportFromDuoFit={handleImportFromDuoFit} />}
       </main>
 
       {editingPost && <EditWorkoutModal post={editingPost} gyms={allGyms} exercises={exercises} onClose={() => setEditingPost(null)} onSave={handleUpdateWorkout} myPastPosts={posts.filter(p => p.author === currentUser)} />}
@@ -3669,10 +3720,28 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
 }
 
 // --- フレンド画面 ---
-function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccept, onReject, onRemoveFriend, onFriendClick, onGenerateFriendCode }) {
+function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccept, onReject, onRemoveFriend, onFriendClick, onGenerateFriendCode, onImportFromDuoFit }) {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [searchUsername, setSearchUsername] = useState('');
   const [activeTab, setActiveTab] = useState('friends');
+  
+  const [duofitUsername, setDuofitUsername] = useState('');
+  const [duofitPin, setDuofitPin] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+
+  const handleExecuteImport = async () => {
+    if (!duofitUsername || !duofitPin) return;
+    setIsImporting(true);
+    const result = await onImportFromDuoFit(duofitUsername, duofitPin);
+    setIsImporting(false);
+    if (result.success) {
+      alert('DuoFitからの引継ぎが完了しました！');
+      setDuofitUsername('');
+      setDuofitPin('');
+    } else {
+      alert(result.message);
+    }
+  };
 
   useEffect(() => {
     const timerId = setInterval(() => setCurrentTime(Date.now()), 5000);
@@ -3803,7 +3872,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.15, 22:57, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 09:16, updated)</p>
       </div>
     </div>
   );
