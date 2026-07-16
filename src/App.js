@@ -47,11 +47,12 @@ const renderUsernameWithBadge = (username, displayName, accountsInfo, className 
   const isUserMaster = username === MASTER_USER;
   return (
     <span className={`inline-flex items-center gap-1 ${className}`}>
-      <span>{displayName || username || '不明'}</span>
+      <span className="truncate">{displayName || username || '不明'}</span>
       {isUserMaster && (
-        <span className="inline-flex items-center bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400 text-[9px] font-black px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-900 shrink-0">
-          👑マスター
-        </span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" style={{ color: '#3b82f6', fill: '#3b82f6' }} title="マスター">
+          <path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z" stroke="#3b82f6"/>
+          <path d="m9 12 2 2 4-4" stroke="white" />
+        </svg>
       )}
     </span>
   );
@@ -2223,7 +2224,7 @@ export default function App() {
                           </div>
                           <div className="flex-1 min-w-0">
                              <p className="text-xs font-bold text-slate-800 dark:text-slate-200 break-words whitespace-pre-wrap">
-                                <span className="text-emerald-600 dark:text-emerald-400 mr-1">{accountsInfo[notif.user]?.displayName || notif.user}</span>
+                                <span className="mr-1 inline-flex">{renderUsernameWithBadge(notif.user, accountsInfo[notif.user]?.displayName, accountsInfo, "text-emerald-600 dark:text-emerald-400")}</span>
                                 {notif.message}
                              </p>
                              <p className="text-[10px] text-slate-400 mt-0.5">{getRelativeTime(notif.time)}</p>
@@ -2675,7 +2676,7 @@ function MonthlyReport({ monthDate, posts, userName, accountsInfo }) {
          <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center font-bold text-white text-xs bg-slate-600">
             {accountsInfo[userName]?.photoUrl ? <img src={accountsInfo[userName].photoUrl} alt={userName} className="w-full h-full object-cover" /> : accountsInfo[userName]?.displayName ? accountsInfo[userName].displayName.charAt(0).toUpperCase() : userName.charAt(0).toUpperCase()}
          </div>
-         <h3 className="font-bold text-slate-800 dark:text-slate-100">{accountsInfo[userName]?.displayName || userName} のレポート</h3>
+         <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1">{renderUsernameWithBadge(userName, accountsInfo[userName]?.displayName, accountsInfo, "font-bold text-slate-800 dark:text-slate-100")} のレポート</h3>
       </div>
       
       {!hasData ? (
@@ -3830,7 +3831,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                                   <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[9px] font-bold overflow-hidden shrink-0">
                                     {mInfo?.photoUrl ? <img src={mInfo.photoUrl} alt="member" className="w-full h-full object-cover"/> : mId.charAt(0).toUpperCase()}
                                   </div>
-                                  <span className="text-xs font-bold text-slate-600 dark:text-slate-300 truncate max-w-[80px]">{mInfo?.displayName || mId}</span>
+                                  {renderUsernameWithBadge(mId, mInfo?.displayName, accountsInfo, "text-xs font-bold text-slate-600 dark:text-slate-300 truncate max-w-[80px]")}
                                   {!isMe && !isFriend && !hasRequested && (
                                     <button onClick={() => onSendRequest(mId)} className="ml-1 p-1 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 rounded-full hover:bg-emerald-200 dark:hover:bg-emerald-800 transition-colors shrink-0" title="フレンド申請">
                                       <UserPlus size={12} />
@@ -4049,10 +4050,12 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                                   <button onClick={() => handleMuteExercise(ex.name)} className={`p-2 rounded-lg transition-colors border ${isMuted ? 'text-indigo-400 bg-indigo-50 border-indigo-100 hover:bg-indigo-100 dark:bg-indigo-950/30 dark:border-indigo-900' : 'text-slate-400 bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-800 hover:bg-slate-100'}`} title={isMuted ? '表示する' : '非表示にする'}>
                                     <EyeOff size={16}/>
                                   </button>
-                                  <>
-                                    <button onClick={() => startEdit(ex)} className="p-2 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 bg-slate-50 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-100 dark:border-slate-800"><Edit2 size={16} /></button>
-                                    <button onClick={() => { if(window.confirm(`${ex.name}を削除しますか？`)) handleDeleteExercise(ex.id); }} className="p-2 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 bg-slate-50 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-100 dark:border-slate-800"><Trash2 size={16} /></button>
-                                  </>
+                                  {(ex.gymId !== 'common' || isAdmin) && (
+                                    <>
+                                      <button onClick={() => startEdit(ex)} className="p-2 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 bg-slate-50 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-100 dark:border-slate-800"><Edit2 size={16} /></button>
+                                      <button onClick={() => { if(window.confirm(`${ex.name}を削除しますか？`)) handleDeleteExercise(ex.id); }} className="p-2 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 bg-slate-50 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-100 dark:border-slate-800"><Trash2 size={16} /></button>
+                                    </>
+                                  )}
                                 </div>
                               </div>
                             );
@@ -4231,7 +4234,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
                       <div className="w-7 h-7 rounded-full bg-white/20 border border-white/20 overflow-hidden flex items-center justify-center font-bold text-xs shrink-0">
                         {user.photoUrl ? <img src={user.photoUrl} alt="" className="w-full h-full object-cover" /> : user.displayName.charAt(0).toUpperCase()}
                       </div>
-                      <span className={`text-xs font-bold truncate ${isMe ? 'text-amber-200' : ''}`}>{user.displayName}</span>
+                      {renderUsernameWithBadge(user.username, user.displayName, accountsInfo, `text-xs font-bold truncate ${isMe ? 'text-amber-200' : ''}`)}
                     </div>
                     <span className="font-mono font-bold text-xs bg-black/20 px-2.5 py-1 rounded-full shrink-0">
                       {user.volume.toLocaleString()}<span className="text-[9px] font-normal ml-0.5">kg</span>
@@ -4251,7 +4254,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
                          <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 dark:text-slate-400 overflow-hidden">
                             {accountsInfo[reqUser]?.photoUrl ? <img src={accountsInfo[reqUser].photoUrl} alt={reqUser} className="w-full h-full object-cover" /> : accountsInfo[reqUser]?.displayName ? accountsInfo[reqUser].displayName.charAt(0).toUpperCase() : reqUser.charAt(0).toUpperCase()}
                          </div>
-                         <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">{accountsInfo[reqUser]?.displayName || reqUser}</span>
+                         {renderUsernameWithBadge(reqUser, accountsInfo[reqUser]?.displayName, accountsInfo, "font-bold text-slate-800 dark:text-slate-100 text-sm")}
                       </div>
                       <div className="flex gap-2">
                          <button onClick={() => onAccept(reqUser)} className="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold rounded-lg transition-colors">承認</button>
@@ -4308,8 +4311,57 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
         </div>
       )}
 
+      {currentUser === MASTER_USER && (
+        <button onClick={() => setShowReportsModal(true)} className="w-full py-3 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900 text-indigo-600 dark:text-indigo-400 font-bold rounded-xl shadow-sm hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors mt-6 mb-2 flex items-center justify-center gap-2">
+          <AlignLeft size={18} /> 【マスター限定】不具合報告一覧を見る
+        </button>
+      )}
+
+      <form onSubmit={async (e) => {
+        e.preventDefault();
+        if (!reportText.trim()) return;
+        setIsSendingReport(true);
+        const reportId = `report_${Date.now()}`;
+        try {
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reports', reportId), {
+            author: currentUser,
+            text: reportText.trim(),
+            timestamp: Date.now()
+          });
+          alert('不具合・ご要望を報告しました。ご協力ありがとうございます！');
+          setReportText('');
+        } catch (error) {
+          console.error(error);
+          alert('送信に失敗しました。');
+        } finally {
+          setIsSendingReport(false);
+        }
+      }} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm mt-6">
+        <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+          <Sparkles size={16} className="text-indigo-500" /> 不具合・ご要望の報告
+        </h3>
+        <textarea 
+          value={reportText} 
+          onChange={e => setReportText(e.target.value)} 
+          placeholder="不具合の動作や、追加してほしい機能などがあれば自由に入力してください。" 
+          required 
+          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm text-slate-700 dark:text-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none resize-none" 
+          rows={3} 
+          style={{ fontSize: '14px' }}
+        />
+        <button 
+          type="submit" 
+          disabled={isSendingReport || !reportText.trim()} 
+          className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2.5 rounded-xl text-sm shadow-md transition-colors disabled:opacity-50 mt-3 flex items-center justify-center gap-2"
+        >
+          {isSendingReport ? <Activity size={16} className="animate-spin" /> : '報告を送信する'}
+        </button>
+      </form>
+
+      <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
+
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 16:32, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 16:38, updated)</p>
       </div>
     </div>
   );
