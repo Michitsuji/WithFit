@@ -1295,6 +1295,7 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState('timeline');
   const [isRecordManual, setIsRecordManual] = useState(false);
   const [importGymId, setImportGymId] = useState('');
+  const [isSessionChecked, setIsSessionChecked] = useState(false);
 
   useEffect(() => {
     const sessionStr = localStorage.getItem('withfit_login_session');
@@ -1308,6 +1309,7 @@ export default function App() {
           }
        } catch(e) {}
     }
+    setIsSessionChecked(true);
   }, []);
   
   const scrollPositions = useRef({});
@@ -1332,7 +1334,6 @@ export default function App() {
 
   const [dataLoaded, setDataLoaded] = useState({ accounts: false, gyms: false, exercises: false, workouts: false });
   const [loadTimeout, setLoadTimeout] = useState(false);
-  const isFullyLoaded = Object.values(dataLoaded).every(Boolean) || loadTimeout;
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [draftWorkoutItems, setDraftWorkoutItems] = useState([]);
   const [isDraftLoaded, setIsDraftLoaded] = useState(false);
@@ -1343,6 +1344,9 @@ export default function App() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [focusedPost, setFocusedPost] = useState(null);
   const [redirectUser, setRedirectUser] = useState(null);
+
+  // セッション、基本データ、下書きの全ての読み込みが完了するまでローディングとする
+  const isFullyLoaded = isSessionChecked && (Object.values(dataLoaded).every(Boolean) || loadTimeout) && (!currentUser || isDraftLoaded);
 
   useEffect(() => {
     if (redirectUser && dataLoaded.accounts) {
@@ -4087,7 +4091,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 15:52, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 15:56, updated)</p>
       </div>
     </div>
   );
