@@ -4190,6 +4190,55 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
             <p className="text-xs text-slate-400 dark:text-slate-500 mt-3 font-bold">※追加したフレンドの記録はタイムラインやデータ画面に表示されます。</p>
           </form>
 
+          {currentUser === MASTER_USER && (
+            <button onClick={() => setShowReportsModal(true)} className="w-full py-3 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900 text-indigo-600 dark:text-indigo-400 font-bold rounded-xl shadow-sm hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors flex items-center justify-center gap-2">
+              <AlignLeft size={18} /> 【マスター限定】不具合報告一覧を見る
+            </button>
+          )}
+
+          {currentUser !== MASTER_USER && (
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!reportText.trim()) return;
+              setIsSendingReport(true);
+              const reportId = `report_${Date.now()}`;
+              try {
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reports', reportId), {
+                  author: currentUser,
+                  text: reportText.trim(),
+                  timestamp: Date.now()
+                });
+                alert('不具合・ご要望を報告しました。ご協力ありがとうございます！');
+                setReportText('');
+              } catch (error) {
+                console.error(error);
+                alert('送信に失敗しました。');
+              } finally {
+                setIsSendingReport(false);
+              }
+            }} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+              <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                <Sparkles size={16} className="text-indigo-500" /> 不具合・ご要望の報告
+              </h3>
+              <textarea 
+                value={reportText} 
+                onChange={e => setReportText(e.target.value)} 
+                placeholder="不具合の動作や、追加してほしい機能などがあれば自由に入力してください。" 
+                required 
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm text-slate-700 dark:text-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none resize-none" 
+                rows={3} 
+                style={{ fontSize: '14px' }}
+              />
+              <button 
+                type="submit" 
+                disabled={isSendingReport || !reportText.trim()} 
+                className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2.5 rounded-xl text-sm shadow-md transition-colors disabled:opacity-50 mt-3 flex items-center justify-center gap-2"
+              >
+                {isSendingReport ? <Activity size={16} className="animate-spin" /> : '報告を送信する'}
+              </button>
+            </form>
+          )}
+
           <div className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900 rounded-2xl p-5 shadow-sm">
             <h3 className="text-indigo-700 dark:text-indigo-300 font-bold mb-3 text-sm flex items-center gap-2">
                <Download size={16}/> DuoFitからデータ引継ぎ
@@ -4237,7 +4286,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
                       {renderUsernameWithBadge(user.username, user.displayName, accountsInfo, `text-xs font-bold truncate ${isMe ? 'text-amber-200' : ''}`)}
                     </div>
                     <span className="font-mono font-bold text-xs bg-black/20 px-2.5 py-1 rounded-full shrink-0">
-                      {user.volume.toLocaleString()}<span className="text-[9px] font-normal ml-0.5">kg</span>
+                      {Math.round(user.volume).toLocaleString()}<span className="text-[9px] font-normal ml-0.5">kg</span>
                     </span>
                   </div>
                 );
@@ -4311,57 +4360,10 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
         </div>
       )}
 
-      {currentUser === MASTER_USER && (
-        <button onClick={() => setShowReportsModal(true)} className="w-full py-3 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900 text-indigo-600 dark:text-indigo-400 font-bold rounded-xl shadow-sm hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors mt-6 mb-2 flex items-center justify-center gap-2">
-          <AlignLeft size={18} /> 【マスター限定】不具合報告一覧を見る
-        </button>
-      )}
-
-      <form onSubmit={async (e) => {
-        e.preventDefault();
-        if (!reportText.trim()) return;
-        setIsSendingReport(true);
-        const reportId = `report_${Date.now()}`;
-        try {
-          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reports', reportId), {
-            author: currentUser,
-            text: reportText.trim(),
-            timestamp: Date.now()
-          });
-          alert('不具合・ご要望を報告しました。ご協力ありがとうございます！');
-          setReportText('');
-        } catch (error) {
-          console.error(error);
-          alert('送信に失敗しました。');
-        } finally {
-          setIsSendingReport(false);
-        }
-      }} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm mt-6">
-        <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
-          <Sparkles size={16} className="text-indigo-500" /> 不具合・ご要望の報告
-        </h3>
-        <textarea 
-          value={reportText} 
-          onChange={e => setReportText(e.target.value)} 
-          placeholder="不具合の動作や、追加してほしい機能などがあれば自由に入力してください。" 
-          required 
-          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm text-slate-700 dark:text-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none resize-none" 
-          rows={3} 
-          style={{ fontSize: '14px' }}
-        />
-        <button 
-          type="submit" 
-          disabled={isSendingReport || !reportText.trim()} 
-          className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2.5 rounded-xl text-sm shadow-md transition-colors disabled:opacity-50 mt-3 flex items-center justify-center gap-2"
-        >
-          {isSendingReport ? <Activity size={16} className="animate-spin" /> : '報告を送信する'}
-        </button>
-      </form>
-
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 16:40, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 16:51, updated)</p>
       </div>
     </div>
   );
