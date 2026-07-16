@@ -2232,6 +2232,12 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
   const [displayName, setDisplayName] = useState(userInfo?.displayName || currentUser);
   const [hideBodyMetrics, setHideBodyMetrics] = useState(userInfo?.hideBodyMetrics || false);
 
+  const [cropImageSrc, setCropImageSrc] = useState(null);
+  const [cropScale, setCropScale] = useState(1);
+  const [cropPosition, setCropPosition] = useState({ x: 0, y: 0 });
+  const [imageObj, setImageObj] = useState(null);
+  const touchRef = useRef({ startDist: 0, startScale: 1, startX: 0, startY: 0, lastX: 0, lastY: 0 });
+
   useEffect(() => {
     if (isOpen) {
       setGoal(userInfo?.goal || '');
@@ -2243,6 +2249,8 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
       setWeight(userInfo?.weight || '');
       setDisplayName(userInfo?.displayName || currentUser);
       setHideBodyMetrics(userInfo?.hideBodyMetrics || false);
+      setCropImageSrc(null);
+      setImageObj(null);
     }
   }, [isOpen]);
 
@@ -2251,28 +2259,112 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    setIsUploading(true);
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_SIZE = 400;
-        let width = img.width; let height = img.height;
-        if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } } else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
-        canvas.width = width; canvas.height = height;
-        const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height);
-        setPhotoUrl(canvas.toDataURL('image/jpeg', 0.8));
-        setIsUploading(false);
+        setImageObj(img);
+        const CROP_SIZE = 300;
+        const initialScale = Math.max(CROP_SIZE / img.width, CROP_SIZE / img.height);
+        setCropScale(initialScale);
+        setCropPosition({ x: 0, y: 0 });
+        setCropImageSrc(event.target.result);
       };
       img.src = event.target.result;
     };
     reader.readAsDataURL(file);
+    e.target.value = null;
+  };
+
+  const handleTouchStart = (e) => {
+    if (e.touches.length === 2) {
+      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      touchRef.current.startDist = dist;
+      touchRef.current.startScale = cropScale;
+    } else if (e.touches.length === 1) {
+      touchRef.current.startX = e.touches[0].clientX;
+      touchRef.current.startY = e.touches[0].clientY;
+      touchRef.current.lastX = cropPosition.x;
+      touchRef.current.lastY = cropPosition.y;
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (e.touches.length === 2) {
+      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      const newScale = Math.max(0.1, touchRef.current.startScale * (dist / touchRef.current.startDist));
+      setCropScale(newScale);
+    } else if (e.touches.length === 1) {
+      const dx = e.touches[0].clientX - touchRef.current.startX;
+      const dy = e.touches[0].clientY - touchRef.current.startY;
+      setCropPosition({ x: touchRef.current.lastX + dx, y: touchRef.current.lastY + dy });
+    }
+  };
+
+  const handleCropConfirm = () => {
+    if (!imageObj) return;
+    setIsUploading(true);
+    setTimeout(() => {
+      const FINAL_SIZE = 400;
+      const ratio = FINAL_SIZE / 300; 
+      const canvas = document.createElement('canvas');
+      canvas.width = FINAL_SIZE;
+      canvas.height = FINAL_SIZE;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, FINAL_SIZE, FINAL_SIZE);
+      ctx.translate(FINAL_SIZE / 2, FINAL_SIZE / 2);
+      ctx.translate(cropPosition.x * ratio, cropPosition.y * ratio);
+      ctx.scale(cropScale * ratio, cropScale * ratio);
+      ctx.drawImage(imageObj, -imageObj.width / 2, -imageObj.height / 2);
+      setPhotoUrl(canvas.toDataURL('image/jpeg', 0.8));
+      setCropImageSrc(null);
+      setImageObj(null);
+      setIsUploading(false);
+    }, 50);
+  };
+
+  const handleCropCancel = () => {
+    setCropImageSrc(null);
+    setImageObj(null);
   };
 
   const handleSave = () => {
     onSave({ displayName: displayName.trim() || currentUser, photoUrl, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null, hideBodyMetrics });
   };
+
+  if (cropImageSrc) {
+    return (
+      <div 
+        className="fixed inset-0 bg-black z-[60] flex flex-col items-center justify-center touch-none overscroll-none"
+        style={{ touchAction: 'none' }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+      >
+        <div className="absolute inset-x-0 top-0 p-4 flex justify-between items-center z-10 pt-safe">
+          <button onClick={handleCropCancel} className="text-white font-bold px-4 py-2 bg-black/50 rounded-full">キャンセル</button>
+          <button onClick={handleCropConfirm} className="text-emerald-400 font-bold px-4 py-2 bg-black/50 rounded-full">完了</button>
+        </div>
+        <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+           <img 
+             src={cropImageSrc}
+             alt="crop"
+             style={{
+               position: 'absolute',
+               left: '50%',
+               top: '50%',
+               transform: `translate(calc(-50% + ${cropPosition.x}px), calc(-50% + ${cropPosition.y}px)) scale(${cropScale})`,
+               transformOrigin: 'center',
+               pointerEvents: 'none',
+               maxWidth: 'none'
+             }}
+           />
+           <div className="absolute w-[300px] h-[300px] border-2 border-white/80 rounded-full pointer-events-none" style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,0.6)' }}></div>
+        </div>
+        <p className="absolute bottom-12 text-white/70 text-sm font-bold pb-safe pointer-events-none">スワイプで移動・ピンチで拡大縮小</p>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-50 flex flex-col items-center justify-center animate-in fade-in duration-200 p-4">
@@ -4108,7 +4200,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 15:59, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 16:07, updated)</p>
       </div>
     </div>
   );
