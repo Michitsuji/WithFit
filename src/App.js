@@ -41,6 +41,22 @@ try {
   console.error("Firebase initialization error:", error);
 }
 
+const MASTER_USER = 'ゆうた';
+
+const renderUsernameWithBadge = (username, displayName, accountsInfo, className = "font-bold text-slate-800 dark:text-slate-100 truncate") => {
+  const isUserMaster = username === MASTER_USER;
+  return (
+    <span className={`inline-flex items-center gap-1 ${className}`}>
+      <span>{displayName || username || '不明'}</span>
+      {isUserMaster && (
+        <span className="inline-flex items-center bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400 text-[9px] font-black px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-900 shrink-0">
+          👑マスター
+        </span>
+      )}
+    </span>
+  );
+};
+
 const MUSCLE_CATEGORIES = ['胸', '背中', '肩', '腕', '脚', '腹筋', 'その他', '有酸素'];
 
 // --- カラーユーティリティ ---
@@ -471,7 +487,9 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
             {authorInfo?.photoUrl ? <img src={authorInfo.photoUrl} alt={post.author} className="w-full h-full object-cover" /> : authorInfo?.displayName ? authorInfo.displayName.charAt(0).toUpperCase() : (post.author ? post.author.charAt(0).toUpperCase() : '?')}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-slate-800 dark:text-slate-100 truncate">{authorInfo?.displayName || post.author || '不明'}</p>
+            <div className="flex items-center gap-1.5 min-w-0">
+              {renderUsernameWithBadge(post.author, authorInfo?.displayName, accountsInfo)}
+            </div>
             <div className="flex flex-col gap-1.5 mt-1">
               <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 dark:text-slate-400 font-bold">
                 <span>{formatShortDateTime(post.timestamp)}</span>
@@ -2172,7 +2190,9 @@ export default function App() {
               <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-xs overflow-hidden border border-emerald-200 dark:border-emerald-800">
                 {myInfo.photoUrl ? <img src={myInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : myInfo.displayName ? myInfo.displayName.charAt(0).toUpperCase() : currentUser.charAt(0).toUpperCase()}
               </div>
-              <span className="text-sm font-bold text-slate-700 dark:text-slate-200 hidden sm:inline">{myInfo.displayName || currentUser}</span>
+              <span className="text-sm font-bold text-slate-700 dark:text-slate-200 hidden sm:inline">
+                {renderUsernameWithBadge(currentUser, myInfo.displayName, accountsInfo, "font-bold text-slate-700 dark:text-slate-200")}
+              </span>
             </button>
             <button onClick={handleLogout} className="text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 p-1.5 rounded-full transition-colors"><LogOut size={20} /></button>
           </div>
@@ -2520,6 +2540,24 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
 
 // --- ログイン・登録画面 ---
 function LoginScreen({ onLogin, onGoogleLogin, isOnline }) {
+  const [agreed, setAgreed] = useState(false);
+
+  const termsText = `【WithFit 利用規約】
+本アプリは「ゆうた」とその友人達でトレーニング記録を共有し、モチベーションを高め合うクローズドな個人開発アプリです。友達同士で安心して使えるよう、以下の内容をご確認ください。
+
+1. Googleアカウント情報の取得と使用目的
+・本アプリへの簡単ログイン、およびアカウント識別（UID、メールアドレス）に利用します。
+・初回登録時に、Googleに登録されている「表示名」と「アイコン画像」を取得し、本アプリのプロフィール初期値として使用します（表示名や画像はログイン後、プロフィール設定からいつでも自由に変更・削除可能です）。
+・取得した情報およびデータを外部に漏洩・提供することは一切ありません。
+
+2. トレーニング・体重・体脂肪率データ
+・登録された筋トレメニューや体重、体脂肪率などの数値は、フレンド間のタイムラインや月間ランキングに表示されます。
+・体重・体脂肪率の体組成データは、プロフィール設定からいつでもフレンドに「非公開（ないしょ♡）」に設定可能です。
+
+3. 免責事項
+・本アプリは個人開発のサービスです。予期せぬシステムの不具合やデータの消失等が発生した場合、一切の責任を負いかねますので、あらかじめご了承ください。
+・友達同士でマナーを守り、楽しくアプリを活用しましょう！`;
+
   return (
     <div className="h-screen w-screen overflow-hidden bg-slate-50 flex flex-col items-center justify-center p-6 relative overscroll-none touch-none">
       <div className="absolute top-6 left-6 z-10 flex items-center gap-1.5 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
@@ -2533,18 +2571,36 @@ function LoginScreen({ onLogin, onGoogleLogin, isOnline }) {
           <p className="text-sm text-slate-500 font-bold mt-1">みんなで鍛える、記録アプリ</p>
         </div>
         <div className="w-full bg-white p-6 rounded-3xl border border-slate-200 shadow-xl flex flex-col items-center">
-           <button onClick={() => { 
-             const provider = new GoogleAuthProvider(); 
-             provider.setCustomParameters({ prompt: 'select_account' }); 
-             signInWithPopup(getAuth(), provider).then((result) => { 
-               onGoogleLogin(result.user); 
-             }).catch((err) => {
-               console.error(err);
-               if (err.code !== 'auth/popup-closed-by-user') {
-                 signInWithRedirect(getAuth(), provider);
-               }
-             }); 
-           }} className="w-full bg-white border border-slate-300 text-slate-700 font-bold py-3 rounded-xl shadow-sm flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors">
+           <div className="w-full mb-4">
+             <div className="text-[10px] text-slate-500 bg-slate-50 border border-slate-100 rounded-xl p-3 h-28 overflow-y-auto whitespace-pre-wrap leading-relaxed select-text font-bold">
+               {termsText}
+             </div>
+             <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
+               <input 
+                 type="checkbox" 
+                 checked={agreed} 
+                 onChange={(e) => setAgreed(e.target.checked)} 
+                 className="w-4 h-4 text-emerald-500 rounded border-slate-300 focus:ring-emerald-500" 
+               />
+               <span className="text-xs font-bold text-slate-600">利用規約に同意する</span>
+             </label>
+           </div>
+           <button 
+             disabled={!agreed}
+             onClick={() => { 
+               const provider = new GoogleAuthProvider(); 
+               provider.setCustomParameters({ prompt: 'select_account' }); 
+               signInWithPopup(getAuth(), provider).then((result) => { 
+                 onGoogleLogin(result.user); 
+               }).catch((err) => {
+                 console.error(err);
+                 if (err.code !== 'auth/popup-closed-by-user') {
+                   signInWithRedirect(getAuth(), provider);
+                 }
+               }); 
+             }} 
+             className={`w-full font-bold py-3 rounded-xl shadow-sm flex items-center justify-center gap-2 transition-colors border ${agreed ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'}`}
+           > 
              Googleでログイン / 登録
            </button>
         </div>
@@ -3442,7 +3498,7 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
 
 // --- 種目・ジム管理画面 ---
 function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myInfo, setCurrentTab, onSendRequest }) {
-  const isAdmin = accountsInfo[currentUser]?.googleUid === 'TApwsmyv0TNyeQezlA16FntSZ4B3';
+  const isAdmin = currentUser === MASTER_USER;
   const joinedGyms = myInfo?.joinedGyms || ['common'];
   const mutedExercises = myInfo?.mutedExercises || [];
 
@@ -4020,6 +4076,9 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [searchUsername, setSearchUsername] = useState('');
   const [activeTab, setActiveTab] = useState('friends');
+  const [reportText, setReportText] = useState('');
+  const [isSendingReport, setIsSendingReport] = useState(false);
+  const [showReportsModal, setShowReportsModal] = useState(false);
 
   const rankingData = useMemo(() => {
     const now = new Date();
@@ -4229,7 +4288,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
                       <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 border-2 border-white dark:border-slate-900 rounded-full z-10 ${isTraining ? 'bg-amber-400' : isOnline ? 'bg-emerald-400' : 'bg-slate-400'}`}></div>
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800 dark:text-slate-100">{friendInfo.displayName || friendUsername}</h3>
+                      <h3>{renderUsernameWithBadge(friendUsername, friendInfo.displayName, accountsInfo, "font-bold text-slate-800 dark:text-slate-100")}</h3>
                       {isTraining ? (
                         <p className="text-xs text-amber-500 font-bold flex items-center gap-1"><Flame size={12}/>トレーニング中 {friendInfo.currentExerciseName ? `- ${friendInfo.currentExerciseName}` : ''}</p>
                       ) : isOnline ? (
@@ -4250,7 +4309,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 16:19, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 16:32, updated)</p>
       </div>
     </div>
   );
@@ -4268,7 +4327,7 @@ function FriendDetailModal({ friendUsername, posts, accountsInfo, onClose, onTog
              <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center font-bold text-white text-xs bg-slate-600 border border-slate-200 dark:border-slate-700">
                 {friendInfo.photoUrl ? <img src={friendInfo.photoUrl} alt={friendUsername} className="w-full h-full object-cover" /> : friendInfo.displayName ? friendInfo.displayName.charAt(0).toUpperCase() : friendUsername.charAt(0).toUpperCase()}
              </div>
-             <h2 className="text-lg font-bold text-slate-800 dark:text-white">{friendInfo.displayName || friendUsername}</h2>
+             <h2>{renderUsernameWithBadge(friendUsername, friendInfo.displayName, accountsInfo, "text-lg font-bold text-slate-800 dark:text-white")}</h2>
           </div>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={20} /></button>
         </div>
