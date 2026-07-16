@@ -1727,31 +1727,6 @@ export default function App() {
           return { success: false, message: 'ユーザー名またはPINコードが間違っています' };
       }
 
-      const gymsRef = collection(db, 'artifacts', 'duofit-app', 'public', 'data', 'gyms');
-      const gymsSnap = await getDocs(gymsRef);
-      const myJoinedGyms = [];
-      const gymPromises = gymsSnap.docs.map(async d => {
-          const data = d.data();
-          if (d.id !== 'common') {
-              myJoinedGyms.push(d.id);
-              const members = data.members || [];
-              if (!members.includes(currentUser)) members.push(currentUser);
-              return setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gyms', d.id), { ...data, members }, { merge: true });
-          }
-      });
-      await Promise.all(gymPromises);
-
-      const currentJoined = accountsInfo[currentUser]?.joinedGyms || ['common'];
-      const newJoined = [...new Set([...currentJoined, ...myJoinedGyms])];
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { joinedGyms: newJoined }, { merge: true });
-
-      const exRef = collection(db, 'artifacts', 'duofit-app', 'public', 'data', 'exercises');
-      const exSnap = await getDocs(exRef);
-      const exPromises = exSnap.docs.map(d => {
-          return setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', d.id), d.data(), { merge: true });
-      });
-      await Promise.all(exPromises);
-
       const workoutsRef = collection(db, 'artifacts', 'duofit-app', 'public', 'data', 'workouts');
       const q = query(workoutsRef, where('author', '==', duofitUsername));
       const workoutsSnap = await getDocs(q);
@@ -3889,7 +3864,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       </div>
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 09:21, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 09:27, updated)</p>
       </div>
     </div>
   );
