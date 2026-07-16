@@ -326,7 +326,12 @@ function SimpleChart({ data, color, title }) {
 // --- 共通コンポーネント：ワークアウトカード ---
 function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onToggleLike, onImport }) {
   const [showImportOptions, setShowImportOptions] = useState(false);
+  const [showLikesModal, setShowLikesModal] = useState(false);
   const isMyPost = post.author === currentUser;
+  
+  const likedUsers = post.likedUsers || [];
+  const isCurrentlyLiked = likedUsers.includes(currentUser);
+  const displayLikesCount = Math.max(post.likes || 0, likedUsers.length);
   const authorInfo = accountsInfo && accountsInfo[post.author];
   const hideMetrics = !isMyPost && authorInfo?.hideBodyMetrics;
   
@@ -617,17 +622,59 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 
       <div className="flex items-center justify-between pl-3 mt-4">
         {isMyPost ? (
-          <div className="flex items-center gap-2 px-3 py-2 text-sm font-bold text-slate-400 dark:text-slate-500">
-            <Heart size={16} className={post.likes > 0 ? "text-rose-400" : ""} fill={post.likes > 0 ? "currentColor" : "none"} />
-            {post.likes > 0 ? 'ナイス！' : 'ナイス待ち'}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 px-3 py-2 text-sm font-bold text-slate-400 dark:text-slate-500">
+              <Heart size={16} className={displayLikesCount > 0 ? "text-rose-400" : ""} fill={displayLikesCount > 0 ? "currentColor" : "none"} />
+              {displayLikesCount > 0 ? 'ナイス！' : 'ナイス待ち'}
+            </div>
+            {displayLikesCount > 0 && (
+              <button onClick={() => setShowLikesModal(true)} className="text-sm font-bold text-emerald-500 hover:underline px-2 py-1">
+                {displayLikesCount}
+              </button>
+            )}
           </div>
         ) : (
-          <button onClick={() => onToggleLike(post.id, post.likes || 0, post.likedByMe)} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all text-sm font-bold ${post.likedByMe ? 'bg-rose-50 dark:bg-rose-950 text-rose-500 border border-rose-200 dark:border-rose-900' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'}`}>
-            <Heart size={16} fill={post.likedByMe ? "currentColor" : "none"} className={post.likedByMe ? "animate-pulse" : ""} />
-            ナイス！
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={() => onToggleLike(post.id, displayLikesCount, isCurrentlyLiked, likedUsers)} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all text-sm font-bold ${isCurrentlyLiked ? 'bg-rose-50 dark:bg-rose-950 text-rose-500 border border-rose-200 dark:border-rose-900' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'}`}>
+              <Heart size={16} fill={isCurrentlyLiked ? "currentColor" : "none"} className={isCurrentlyLiked ? "animate-pulse" : ""} />
+              ナイス！
+            </button>
+            {displayLikesCount > 0 && (
+              <button onClick={() => setShowLikesModal(true)} className="text-sm font-bold text-emerald-500 hover:underline px-2 py-1">
+                {displayLikesCount}
+              </button>
+            )}
+          </div>
         )}
       </div>
+
+      {showLikesModal && (
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowLikesModal(false)}>
+          <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[70vh]" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+              <h3 className="font-bold text-slate-800 dark:text-slate-100">ナイスしたユーザー</h3>
+              <button onClick={() => setShowLikesModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={20}/></button>
+            </div>
+            <div className="p-2 overflow-y-auto space-y-1">
+              {likedUsers.length > 0 ? (
+                likedUsers.map(u => {
+                  const uInfo = accountsInfo && accountsInfo[u];
+                  return (
+                    <div key={u} className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-xl transition-colors">
+                      <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 dark:text-slate-400 overflow-hidden border border-slate-200 dark:border-slate-700">
+                        {uInfo?.photoUrl ? <img src={uInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : uInfo?.displayName ? uInfo.displayName.charAt(0).toUpperCase() : u.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="font-bold text-slate-800 dark:text-slate-200 text-sm">{uInfo?.displayName || u}</span>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="p-4 text-center text-slate-500 text-sm font-bold">誰かがナイスしています</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1688,9 +1735,12 @@ export default function App() {
     try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), data, { merge: true }); setShowProfileModal(false); } catch (e) {}
   };
 
-  const toggleLike = async (postId, currentLikes, isCurrentlyLiked) => {
-    if (!db) return;
-    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', postId), { likes: isCurrentlyLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1, likedByMe: !isCurrentlyLiked }, { merge: true }); } catch (e) {}
+  const toggleLike = async (postId, currentLikes, isCurrentlyLiked, likedUsers = []) => {
+    if (!db || !currentUser) return;
+    const newLikedUsers = isCurrentlyLiked 
+      ? likedUsers.filter(u => u !== currentUser) 
+      : [...new Set([...likedUsers, currentUser])];
+    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', postId), { likes: newLikedUsers.length, likedUsers: newLikedUsers }, { merge: true }); } catch (e) {}
   };
 
   const myInfo = accountsInfo[currentUser] || {};
@@ -2205,11 +2255,11 @@ export default function App() {
 
       <nav className="fixed bottom-0 w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pt-1 pb-safe z-30 transition-colors" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
         <div className="flex justify-around items-center p-2 max-w-md mx-auto">
-          <NavButton icon={<Home size={22} />} label="ホーム" isActive={currentTab === 'timeline'} onClick={() => { setCurrentTab('timeline'); }} />
-          <NavButton icon={<Dumbbell size={22} />} label="種目" isActive={currentTab === 'exercises'} onClick={() => setCurrentTab('exercises')} />
-          <NavButton icon={myInfo.isTraining ? <Clock className="animate-pulse" size={28}/> : <PlusCircle size={28} />} label={myInfo.isTraining ? "記録中" : "記録"} isActive={currentTab === 'record'} onClick={() => setCurrentTab('record')} isPrimary isTraining={myInfo.isTraining} />
-          <NavButton icon={<CalendarIcon size={22} />} label="データ" isActive={currentTab === 'data'} onClick={() => { setCurrentTab('data'); }} />
-          <NavButton icon={<Users size={22} />} label="フレンド" isActive={currentTab === 'friends'} onClick={() => setCurrentTab('friends')} />
+          <NavButton icon={<Home size={22} />} label="ホーム" isActive={currentTab === 'timeline'} onClick={() => { if(currentTab === 'timeline') window.scrollTo({top:0, behavior:'smooth'}); else setCurrentTab('timeline'); }} />
+          <NavButton icon={<Dumbbell size={22} />} label="種目" isActive={currentTab === 'exercises'} onClick={() => { if(currentTab === 'exercises') window.scrollTo({top:0, behavior:'smooth'}); else setCurrentTab('exercises'); }} />
+          <NavButton icon={myInfo.isTraining ? <Clock className="animate-pulse" size={28}/> : <PlusCircle size={28} />} label={myInfo.isTraining ? "記録中" : "記録"} isActive={currentTab === 'record'} onClick={() => { if(currentTab === 'record') window.scrollTo({top:0, behavior:'smooth'}); else setCurrentTab('record'); }} isPrimary isTraining={myInfo.isTraining} />
+          <NavButton icon={<CalendarIcon size={22} />} label="データ" isActive={currentTab === 'data'} onClick={() => { if(currentTab === 'data') window.scrollTo({top:0, behavior:'smooth'}); else setCurrentTab('data'); }} />
+          <NavButton icon={<Users size={22} />} label="フレンド" isActive={currentTab === 'friends'} onClick={() => { if(currentTab === 'friends') window.scrollTo({top:0, behavior:'smooth'}); else setCurrentTab('friends'); }} />
         </div>
       </nav>
 
@@ -4200,7 +4250,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 16:07, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 16:19, updated)</p>
       </div>
     </div>
   );
