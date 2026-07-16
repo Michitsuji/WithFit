@@ -46,6 +46,7 @@ const ACQUAINTANCE_USER = 'matsukichi';
 
 const renderUsernameWithBadge = (username, displayName, accountsInfo, className = "font-bold text-slate-800 dark:text-slate-100 truncate") => {
   const isUserMaster = username === MASTER_USER;
+  const isUserAcquaintance = username === ACQUAINTANCE_USER;
   return (
     <span className={`inline-flex items-center gap-1 ${className}`}>
       <span className="truncate">{displayName || username || '不明'}</span>
@@ -54,6 +55,9 @@ const renderUsernameWithBadge = (username, displayName, accountsInfo, className 
           <path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z" stroke="#3b82f6"/>
           <path d="m9 12 2 2 4-4" stroke="white" />
         </svg>
+      )}
+      {isUserAcquaintance && (
+        <Handshake size={15} className="shrink-0 text-cyan-500" title="知り合い" />
       )}
     </span>
   );
@@ -4400,7 +4404,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.17, 08:26, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.17, 08:27, updated)</p>
       </div>
     </div>
   );
