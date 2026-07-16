@@ -702,7 +702,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 
 // --- 共通コンポーネント：ワークアウト入力フォーム ---
 function WorkoutItemForm({ item, index, availableExercises, updateItem, removeItem, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet, reorderSet, myPastPosts, onActive, isDragging, isAnyDragging, dragHandleProps }) {
-  const [localFilter, setLocalFilter] = useState('barbell');
+  const [localFilters, setLocalFilters] = useState([]);
   const [draggedSetIndex, setDraggedSetIndex] = useState(null);
   const [dragOverSetIndex, setDragOverSetIndex] = useState(null);
   const [draggableSetId, setDraggableSetId] = useState(null);
@@ -822,14 +822,16 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
     return history;
   }, [myPastPosts]);
 
+  const toggleFilter = (type) => {
+    setLocalFilters(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]);
+  };
+
   const filteredExercises = availableExercises.filter(ex => {
+    if (localFilters.length === 0) return true;
     const isCommon = ex.gymId === 'common';
     const fwType = ex.freeWeightType || (ex.name.includes('ダンベル') ? 'dumbbell' : ex.name.includes('スミス') ? 'smith' : 'barbell');
-    if (localFilter === 'barbell' && (!isCommon || fwType !== 'barbell')) return false;
-    if (localFilter === 'dumbbell' && (!isCommon || fwType !== 'dumbbell')) return false;
-    if (localFilter === 'smith' && (!isCommon || fwType !== 'smith')) return false;
-    if (localFilter === 'gym' && isCommon) return false;
-    return true;
+    const exFilterType = !isCommon ? 'gym' : fwType;
+    return localFilters.includes(exFilterType);
   });
 
   const updateExerciseName = (newName, superIndex = 0) => {
@@ -1007,10 +1009,10 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
           <div className="flex flex-col flex-1 min-w-0 ml-1 gap-2">
             {!isAnyDragging && (
               <div className="flex flex-wrap bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg gap-1">
-                <button onClick={() => setLocalFilter('barbell')} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'barbell' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>バーベル</button>
-                <button onClick={() => setLocalFilter('dumbbell')} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'dumbbell' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>ダンベル</button>
-                <button onClick={() => setLocalFilter('smith')} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'smith' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>スミス</button>
-                <button onClick={() => setLocalFilter('gym')} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilter === 'gym' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>マシン等</button>
+                <button onClick={() => toggleFilter('gym')} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilters.includes('gym') ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>マシン等</button>
+                <button onClick={() => toggleFilter('barbell')} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilters.includes('barbell') ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>バーベル</button>
+                <button onClick={() => toggleFilter('dumbbell')} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilters.includes('dumbbell') ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>ダンベル</button>
+                <button onClick={() => toggleFilter('smith')} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilters.includes('smith') ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>スミス</button>
               </div>
             )}
             <div className="relative w-full">
@@ -4395,7 +4397,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 22:29, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 22:30, updated)</p>
       </div>
     </div>
   );
