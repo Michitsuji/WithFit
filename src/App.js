@@ -1887,6 +1887,50 @@ export default function App() {
     } catch (e) {}
   };
 
+  const handleDeleteAccount = async () => {
+    if (!currentUser || !db) return;
+    if (!window.confirm("アカウントを完全に削除しますか？この操作は取り消せません。")) return;
+    if (!window.confirm("本当に削除しますか？すべてのトレーニング記録やフレンド関係が消失します。")) return;
+
+    try {
+      const myPosts = posts.filter(p => p.author === currentUser);
+      for (const p of myPosts) {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', p.id));
+      }
+
+      for (const [uname, acc] of Object.entries(accountsInfo)) {
+        if (uname === currentUser) continue;
+        let needUpdate = false;
+        const updatedFields = {};
+        if (acc.friends && acc.friends.includes(currentUser)) {
+          updatedFields.friends = acc.friends.filter(f => f !== currentUser);
+          needUpdate = true;
+        }
+        if (acc.friendRequests && acc.friendRequests.includes(currentUser)) {
+          updatedFields.friendRequests = acc.friendRequests.filter(r => r !== currentUser);
+          needUpdate = true;
+        }
+        if (needUpdate) {
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', uname), updatedFields, { merge: true });
+        }
+      }
+
+      for (const gym of gyms) {
+        if (gym.members && gym.members.includes(currentUser)) {
+          const updatedMembers = gym.members.filter(m => m !== currentUser);
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gyms', gym.id), { members: updatedMembers }, { merge: true });
+        }
+      }
+
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser));
+      alert("アカウントが削除されました。");
+      handleLogout();
+    } catch (e) {
+      console.error("Account deletion error:", e);
+      alert("削除中にエラーが発生しました。");
+    }
+  };
+
   if (!isFullyLoaded) {
     return (
       <div className="h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6">
@@ -2045,7 +2089,7 @@ export default function App() {
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} currentUser={currentUser} myInfo={myInfo} setCurrentTab={setCurrentTab} />}
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
-        {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} onImportFromDuoFit={handleImportFromDuoFit} />}
+        {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} onImportFromDuoFit={handleImportFromDuoFit} posts={posts} />}
       </main>
 
       {editingPost && <EditWorkoutModal post={editingPost} gyms={allGyms} exercises={exercises} onClose={() => setEditingPost(null)} onSave={handleUpdateWorkout} myPastPosts={posts.filter(p => p.author === currentUser)} />}
@@ -2075,13 +2119,13 @@ export default function App() {
         </div>
       </nav>
 
-      <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} userInfo={myInfo} onSave={handleSaveProfile} currentUser={currentUser} onLinkGoogle={handleLinkGoogle} />
+      <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} userInfo={myInfo} onSave={handleSaveProfile} currentUser={currentUser} onLinkGoogle={handleLinkGoogle} onDeleteAccount={handleDeleteAccount} />
     </div>
   );
 }
 
 // --- プロフィール設定モーダル ---
-function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGoogle }) {
+function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGoogle, onDeleteAccount }) {
   const [isUploading, setIsUploading] = useState(false);
   const [goal, setGoal] = useState(userInfo?.goal || '');
   const [theme, setTheme] = useState(userInfo?.theme || 'light');
@@ -2227,6 +2271,12 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
         <button onClick={handleSave} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-md transition-all mt-6">
           設定を保存
         </button>
+        
+        <div className="mt-8 pt-4 border-t border-slate-200 dark:border-slate-800">
+           <button onClick={onDeleteAccount} className="w-full bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-900 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 py-3 rounded-xl font-bold text-sm transition-colors">
+              アカウントを削除する
+           </button>
+        </div>
       </div>
     </div>
   );
@@ -3706,10 +3756,39 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
 }
 
 // --- フレンド画面 ---
-function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccept, onReject, onRemoveFriend, onFriendClick, onGenerateFriendCode, onImportFromDuoFit }) {
+function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccept, onReject, onRemoveFriend, onFriendClick, onGenerateFriendCode, onImportFromDuoFit, posts }) {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [searchUsername, setSearchUsername] = useState('');
   const [activeTab, setActiveTab] = useState('friends');
+
+  const rankingData = useMemo(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const userVolumes = {};
+    
+    userVolumes[currentUser] = 0;
+    const myFriends = myInfo.friends || [];
+    myFriends.forEach(f => { userVolumes[f] = 0; });
+
+    (posts || []).forEach(p => {
+      if (userVolumes[p.author] !== undefined) {
+        const d = new Date(p.timestamp);
+        if (d.getFullYear() === year && d.getMonth() === month) {
+          userVolumes[p.author] += Number(p.volume) || 0;
+        }
+      }
+    });
+
+    return Object.entries(userVolumes)
+      .map(([username, volume]) => ({
+        username,
+        volume,
+        displayName: accountsInfo[username]?.displayName || username,
+        photoUrl: accountsInfo[username]?.photoUrl || null
+      }))
+      .sort((a, b) => b.volume - a.volume);
+  }, [posts, currentUser, myInfo.friends, accountsInfo]);
   
   const [duofitUsername, setDuofitUsername] = useState('');
   const [duofitPin, setDuofitPin] = useState('');
@@ -3779,6 +3858,40 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
 
       {activeTab === 'friends' && (
         <div className="space-y-4">
+          <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 rounded-3xl p-5 text-white shadow-xl mb-6 overflow-hidden relative">
+            <div className="absolute -right-6 -bottom-6 text-white/10 transform rotate-12 pointer-events-none">
+              <Trophy size={140} />
+            </div>
+            <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
+              <Trophy className="text-amber-300 animate-bounce" size={18} />
+              今月の総負荷量ランキング
+            </h3>
+            <div className="space-y-2.5 relative z-10">
+              {rankingData.slice(0, 5).map((user, idx) => {
+                const isMe = user.username === currentUser;
+                let rankBadge = <span className="text-xs font-bold w-6 text-center text-white/70">{idx + 1}</span>;
+                if (idx === 0) rankBadge = <Award className="text-amber-300 shrink-0" size={20} />;
+                if (idx === 1) rankBadge = <Award className="text-slate-300 shrink-0" size={20} />;
+                if (idx === 2) rankBadge = <Award className="text-amber-600 shrink-0" size={20} />;
+
+                return (
+                  <div key={user.username} className={`flex items-center justify-between p-2.5 rounded-2xl border backdrop-blur-md transition-all ${isMe ? 'bg-white/20 border-white/40 shadow-md' : 'bg-black/10 border-white/10 hover:bg-black/20'}`}>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-6 flex justify-center items-center shrink-0">{rankBadge}</div>
+                      <div className="w-7 h-7 rounded-full bg-white/20 border border-white/20 overflow-hidden flex items-center justify-center font-bold text-xs shrink-0">
+                        {user.photoUrl ? <img src={user.photoUrl} alt="" className="w-full h-full object-cover" /> : user.displayName.charAt(0).toUpperCase()}
+                      </div>
+                      <span className={`text-xs font-bold truncate ${isMe ? 'text-amber-200' : ''}`}>{user.displayName}</span>
+                    </div>
+                    <span className="font-mono font-bold text-xs bg-black/20 px-2.5 py-1 rounded-full shrink-0">
+                      {user.volume.toLocaleString()}<span className="text-[9px] font-normal ml-0.5">kg</span>
+                    </span>
+                  </div>
+                );
+              })} 
+            </div>
+          </div>
+
           <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 rounded-xl p-4 flex items-center justify-between shadow-sm mb-6">
             <div>
               <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 mb-1">あなたのフレンドコード</p>
@@ -3875,7 +3988,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       </div>
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 09:44, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 09:52, updated)</p>
       </div>
     </div>
   );
