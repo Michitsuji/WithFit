@@ -1836,6 +1836,8 @@ export default function App() {
       return;
     }
 
+    if (!window.confirm(`${accountsInfo[friendUsername]?.displayName || friendUsername}さんにフレンド申請を送りますか？`)) return;
+
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', friendUsername), { friendRequests: [...targetRequests, currentUser] }, { merge: true });
       alert(`${accountsInfo[friendUsername]?.displayName || friendUsername}さんにフレンド申請を送信しました！`);
@@ -1885,6 +1887,50 @@ export default function App() {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { friends: currentFriends.filter(f => f !== friendUsername) }, { merge: true });
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', friendUsername), { friends: targetFriends.filter(f => f !== currentUser) }, { merge: true });
     } catch (e) {}
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!currentUser || !db) return;
+    if (!window.confirm("アカウントを完全に削除しますか？この操作は取り消せません。")) return;
+    if (!window.confirm("本当に削除しますか？すべてのトレーニング記録やフレンド関係が消失します。")) return;
+
+    try {
+      const myPosts = posts.filter(p => p.author === currentUser);
+      for (const p of myPosts) {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', p.id));
+      }
+
+      for (const [uname, acc] of Object.entries(accountsInfo)) {
+        if (uname === currentUser) continue;
+        let needUpdate = false;
+        const updatedFields = {};
+        if (acc.friends && acc.friends.includes(currentUser)) {
+          updatedFields.friends = acc.friends.filter(f => f !== currentUser);
+          needUpdate = true;
+        }
+        if (acc.friendRequests && acc.friendRequests.includes(currentUser)) {
+          updatedFields.friendRequests = acc.friendRequests.filter(r => r !== currentUser);
+          needUpdate = true;
+        }
+        if (needUpdate) {
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', uname), updatedFields, { merge: true });
+        }
+      }
+
+      for (const gym of gyms) {
+        if (gym.members && gym.members.includes(currentUser)) {
+          const updatedMembers = gym.members.filter(m => m !== currentUser);
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gyms', gym.id), { members: updatedMembers }, { merge: true });
+        }
+      }
+
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser));
+      alert("アカウントが削除されました。");
+      handleLogout();
+    } catch (e) {
+      console.error("Account deletion error:", e);
+      alert("削除中にエラーが発生しました。");
+    }
   };
 
   const handleDeleteAccount = async () => {
@@ -4000,7 +4046,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       </div>
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 09:57, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 10:07, updated)</p>
       </div>
     </div>
   );
