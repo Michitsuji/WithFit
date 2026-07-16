@@ -1357,13 +1357,19 @@ export default function App() {
         try {
           const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser);
           const docSnap = await getDoc(docRef);
-          if (docSnap.exists() && docSnap.data().currentWorkoutItems) {
+          const savedDraft = localStorage.getItem(`withfit_draft_${currentUser}`);
+          const savedCats = localStorage.getItem(`withfit_cats_${currentUser}`);
+          const lsTimestamp = Number(localStorage.getItem(`withfit_draft_time_${currentUser}`)) || 0;
+          const fsTimestamp = docSnap.exists() ? (docSnap.data().draftUpdatedAt || 0) : 0;
+
+          if (savedDraft && (lsTimestamp >= fsTimestamp || !fsTimestamp)) {
+             setDraftWorkoutItems(JSON.parse(savedDraft));
+             if (savedCats) setSelectedCategories(JSON.parse(savedCats));
+          } else if (docSnap.exists() && docSnap.data().currentWorkoutItems) {
              setDraftWorkoutItems(docSnap.data().currentWorkoutItems);
              setSelectedCategories(docSnap.data().currentSelectedCategories || []);
-          } else {
-             const savedDraft = localStorage.getItem(`withfit_draft_${currentUser}`);
-             if (savedDraft) setDraftWorkoutItems(JSON.parse(savedDraft));
-             const savedCats = localStorage.getItem(`withfit_cats_${currentUser}`);
+          } else if (savedDraft) {
+             setDraftWorkoutItems(JSON.parse(savedDraft));
              if (savedCats) setSelectedCategories(JSON.parse(savedCats));
           }
         } catch (e) {
@@ -1382,18 +1388,23 @@ export default function App() {
     if (currentUser && db && isDraftLoaded) {
       try {
         if (draftWorkoutItems.length > 0 || selectedCategories.length > 0) {
+          const now = Date.now();
           localStorage.setItem(`withfit_draft_${currentUser}`, JSON.stringify(draftWorkoutItems));
           localStorage.setItem(`withfit_cats_${currentUser}`, JSON.stringify(selectedCategories));
+          localStorage.setItem(`withfit_draft_time_${currentUser}`, now.toString());
           setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { 
             currentWorkoutItems: draftWorkoutItems,
-            currentSelectedCategories: selectedCategories
+            currentSelectedCategories: selectedCategories,
+            draftUpdatedAt: now
           }, { merge: true }).catch(()=>{});
         } else {
           localStorage.removeItem(`withfit_draft_${currentUser}`);
           localStorage.removeItem(`withfit_cats_${currentUser}`);
+          localStorage.removeItem(`withfit_draft_time_${currentUser}`);
           setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { 
             currentWorkoutItems: deleteField(),
-            currentSelectedCategories: deleteField()
+            currentSelectedCategories: deleteField(),
+            draftUpdatedAt: deleteField()
           }, { merge: true }).catch(()=>{});
         }
       } catch (e) {
@@ -4076,7 +4087,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 15:47, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 15:52, updated)</p>
       </div>
     </div>
   );
