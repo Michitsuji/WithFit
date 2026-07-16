@@ -2234,29 +2234,8 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
 
 // --- ログイン・登録画面 ---
 function LoginScreen({ onLogin, onGoogleLogin, isOnline }) {
-  const [username, setUsername] = useState('');
-  const [pin, setPin] = useState('');
-  const [error, setError] = useState('');
-  
-  const handlePinInput = (num) => { 
-    if (pin.length < 4) { setPin(prev => prev + num); setError(''); } 
-  };
-  const handleBackspace = () => { setPin(prev => prev.slice(0, -1)); setError(''); };
-  
-  const handleSubmit = async () => {
-    if (pin.length !== 4 || !username.trim()) return;
-    const success = await onLogin(username.trim(), pin);
-    if (!success) { setError('パスワードが間違っています。新規登録の場合は異なるユーザー名をお試しください。'); setPin(''); }
-  };
-
-  useEffect(() => { 
-    if (pin.length === 4) {
-      handleSubmit();
-    }
-  }, [pin]);
-
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 relative">
+    <div className="h-screen w-screen overflow-hidden bg-slate-50 flex flex-col items-center justify-center p-6 relative overscroll-none touch-none">
       <div className="absolute top-6 left-6 z-10 flex items-center gap-1.5 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
         <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`}></div>
         <span className="text-[10px] font-bold text-slate-500">{isOnline ? 'オンライン' : 'オフライン'}</span>
@@ -2268,27 +2247,9 @@ function LoginScreen({ onLogin, onGoogleLogin, isOnline }) {
           <p className="text-sm text-slate-500 font-bold mt-1">みんなで鍛える、記録アプリ</p>
         </div>
         <div className="w-full bg-white p-6 rounded-3xl border border-slate-200 shadow-xl flex flex-col items-center">
-           <button onClick={() => { const provider = new GoogleAuthProvider(); provider.setCustomParameters({ prompt: 'select_account' }); signInWithPopup(getAuth(), provider).then((result) => { onGoogleLogin(result.user); }).catch(console.error); }} className="w-full bg-white border border-slate-300 text-slate-700 font-bold py-3 rounded-xl mb-6 shadow-sm flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors">
+           <button onClick={() => { const provider = new GoogleAuthProvider(); provider.setCustomParameters({ prompt: 'select_account' }); signInWithPopup(getAuth(), provider).then((result) => { onGoogleLogin(result.user); }).catch(console.error); }} className="w-full bg-white border border-slate-300 text-slate-700 font-bold py-3 rounded-xl shadow-sm flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors">
              Googleでログイン / 登録
            </button>
-           <div className="w-full border-t border-slate-200 my-4 relative">
-             <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-2 text-xs text-slate-400 font-bold">または既存アカウントでログイン</span>
-           </div>
-           <div className="w-full mb-6 mt-4">
-              <label className="block text-sm font-bold text-slate-700 mb-2">ユーザー名</label>
-              <input type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder="例: yuta123" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-bold focus:outline-none focus:border-emerald-500" />
-           </div>
-           <p className="text-slate-500 text-sm mb-4 flex items-center gap-2 font-bold"><Lock size={14} />PINコード (4桁)</p>
-           <div className="flex gap-4 mb-6">
-             {[0, 1, 2, 3].map(i => <div key={i} className={`w-4 h-4 rounded-full transition-colors duration-200 ${i < pin.length ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-slate-200'}`} />)}
-           </div>
-           {error && <p className="text-rose-500 text-xs mb-4 font-bold text-center">{error}</p>}
-           <div className="grid grid-cols-3 gap-4 w-full max-w-[280px]">
-             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => <button key={num} onClick={() => handlePinInput(num.toString())} disabled={!username.trim()} className="h-16 rounded-full bg-white border border-slate-200 text-slate-800 text-2xl font-bold hover:bg-slate-50 active:bg-slate-100 transition-colors shadow-sm disabled:opacity-50">{num}</button>)}
-             <div />
-             <button onClick={() => handlePinInput('0')} disabled={!username.trim()} className="h-16 rounded-full bg-white border border-slate-200 text-slate-800 text-2xl font-bold hover:bg-slate-50 active:bg-slate-100 transition-colors shadow-sm disabled:opacity-50">0</button>
-             <button onClick={handleBackspace} className="h-16 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-800 active:bg-slate-100 transition-colors">⌫</button>
-           </div>
         </div>
       </div>
     </div>
@@ -3914,7 +3875,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       </div>
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 09:39, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 09:44, updated)</p>
       </div>
     </div>
   );
