@@ -3336,7 +3336,7 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
     if (!isGymMatch) return false;
     if (selectedCategories.length === 0) return false;
     if (ex.gymId === 'common') {
-       if (ex.author && ex.author !== currentUser && ex.author !== MASTER_USER) return false;
+       if (ex.author && ex.author !== post.author && ex.author !== MASTER_USER) return false;
     }
     return selectedCategories.includes(ex.category || 'その他');
   });
@@ -4374,7 +4374,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 17:00, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 17:01, updated)</p>
       </div>
     </div>
   );
