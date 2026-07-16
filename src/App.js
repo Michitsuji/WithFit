@@ -466,7 +466,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
             {authorInfo?.photoUrl ? <img src={authorInfo.photoUrl} alt={post.author} className="w-full h-full object-cover" /> : authorInfo?.displayName ? authorInfo.displayName.charAt(0).toUpperCase() : (post.author ? post.author.charAt(0).toUpperCase() : '?')}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-slate-800 dark:text-slate-100 truncate">{post.author || '不明'}</p>
+            <p className="font-bold text-slate-800 dark:text-slate-100 truncate">{authorInfo?.displayName || post.author || '不明'}</p>
             <div className="flex flex-col gap-1.5 mt-1">
               <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 dark:text-slate-400 font-bold">
                 <span>{formatShortDateTime(post.timestamp)}</span>
@@ -1736,6 +1736,56 @@ export default function App() {
       });
       await Promise.all(workoutPromises);
 
+      const duofitGymsRef = collection(db, 'artifacts', 'duofit-app', 'public', 'data', 'gyms');
+      const duofitGymsSnap = await getDocs(duofitGymsRef);
+      const newJoinedGyms = [...(myInfo?.joinedGyms || ['common'])];
+      const gymIdMap = {};
+
+      const gymPromises = duofitGymsSnap.docs.map(async (d) => {
+          const gymData = d.data();
+          const existingGym = gyms.find(g => g.name === gymData.name);
+          let targetGymId = d.id;
+          
+          if (existingGym) {
+              targetGymId = existingGym.id;
+              if (!newJoinedGyms.includes(targetGymId)) newJoinedGyms.push(targetGymId);
+              const members = existingGym.members || [];
+              if (!members.includes(currentUser)) {
+                  await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gyms', targetGymId), {
+                      members: [...members, currentUser]
+                  }, { merge: true });
+              }
+          } else {
+              targetGymId = `gym_${generateId()}`;
+              if (!newJoinedGyms.includes(targetGymId)) newJoinedGyms.push(targetGymId);
+              await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gyms', targetGymId), {
+                  ...gymData,
+                  owner: 'ゆうた',
+                  members: [currentUser]
+              });
+          }
+          gymIdMap[d.id] = targetGymId;
+      });
+      await Promise.all(gymPromises);
+
+      const duofitExRef = collection(db, 'artifacts', 'duofit-app', 'public', 'data', 'exercises');
+      const duofitExSnap = await getDocs(duofitExRef);
+      
+      const exPromises = duofitExSnap.docs.map(async (d) => {
+          const exData = d.data();
+          const targetGymId = exData.gymId === 'common' ? 'common' : (gymIdMap[exData.gymId] || exData.gymId);
+          const existingEx = exercises.find(ex => ex.name === exData.name && ex.gymId === targetGymId);
+          if (!existingEx) {
+              await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', `ex_${generateId()}`), {
+                  ...exData,
+                  gymId: targetGymId
+              });
+          }
+      });
+      await Promise.all(exPromises);
+
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { joinedGyms: [...new Set(newJoinedGyms)] }, { merge: true });
+
       return { success: true };
     } catch (error) {
       console.error(error);
@@ -2311,7 +2361,7 @@ function MonthlyReport({ monthDate, posts, userName, accountsInfo }) {
          <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center font-bold text-white text-xs bg-slate-600">
             {accountsInfo[userName]?.photoUrl ? <img src={accountsInfo[userName].photoUrl} alt={userName} className="w-full h-full object-cover" /> : accountsInfo[userName]?.displayName ? accountsInfo[userName].displayName.charAt(0).toUpperCase() : userName.charAt(0).toUpperCase()}
          </div>
-         <h3 className="font-bold text-slate-800 dark:text-slate-100">{userName} のレポート</h3>
+         <h3 className="font-bold text-slate-800 dark:text-slate-100">{accountsInfo[userName]?.displayName || userName} のレポート</h3>
       </div>
       
       {!hasData ? (
@@ -2529,8 +2579,8 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
       {!hideMetrics && (
       <div className="space-y-6 pt-4">
          <h3 className="text-lg font-bold text-slate-900 dark:text-white">体重・体脂肪率の推移</h3>
-         <SimpleChart data={weightData} color="#10b981" title={`${displayUser}の体重推移 (kg)`} />
-         <SimpleChart data={fatData} color="#6366f1" title={`${displayUser}の体脂肪率推移 (%)`} />
+         <SimpleChart data={weightData} color="#10b981" title={`${accountsInfo[displayUser]?.displayName || displayUser}の体重推移 (kg)`} />
+         <SimpleChart data={fatData} color="#6366f1" title={`${accountsInfo[displayUser]?.displayName || displayUser}の体脂肪率推移 (%)`} />
       </div>
       )}
     </div>
@@ -3864,7 +3914,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       </div>
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 09:27, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 09:39, updated)</p>
       </div>
     </div>
   );
