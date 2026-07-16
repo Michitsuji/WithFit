@@ -49,13 +49,6 @@ const getUserGlowClass = (username, defaultBorder = '') => {
   if (username === ACQUAINTANCE_USER) return 'glow-cool';
   return defaultBorder;
 };
-const ACQUAINTANCE_USER = 'matsukichi';
-
-const getUserGlowClass = (username, defaultBorder = '') => {
-  if (username === MASTER_USER) return 'glow-warm';
-  if (username === ACQUAINTANCE_USER) return 'glow-cool';
-  return defaultBorder;
-};
 
 const renderUsernameWithBadge = (username, displayName, accountsInfo, className = "font-bold text-slate-800 dark:text-slate-100 truncate") => {
   const isUserMaster = username === MASTER_USER;
@@ -697,8 +690,6 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                   return (
                     <div key={u} className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-xl transition-colors">
                       <div className={`w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 dark:text-slate-400 overflow-hidden ${getUserGlowClass(u, 'border border-slate-200 dark:border-slate-700')}`}>
-                        {uInfo?.photoUrl ? <img src={uInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : uInfo?.displayName ? uInfo.displayName.charAt(0).toUpperCase() : u.charAt(0).toUpperCase()}
-                      </div>
                         {uInfo?.photoUrl ? <img src={uInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : uInfo?.displayName ? uInfo.displayName.charAt(0).toUpperCase() : u.charAt(0).toUpperCase()}
                       </div>
                       <span className="font-bold text-slate-800 dark:text-slate-200 text-sm">{uInfo?.displayName || u}</span>
@@ -2254,8 +2245,6 @@ export default function App() {
               <div className={`w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-xs overflow-hidden ${getUserGlowClass(currentUser, 'border border-emerald-200 dark:border-emerald-800')}`}>
                 {myInfo.photoUrl ? <img src={myInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : myInfo.displayName ? myInfo.displayName.charAt(0).toUpperCase() : currentUser.charAt(0).toUpperCase()}
               </div>
-                {myInfo.photoUrl ? <img src={myInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : myInfo.displayName ? myInfo.displayName.charAt(0).toUpperCase() : currentUser.charAt(0).toUpperCase()}
-              </div>
               <span className="text-sm font-bold text-slate-700 dark:text-slate-200 hidden sm:inline">
                 {renderUsernameWithBadge(currentUser, myInfo.displayName, accountsInfo, "font-bold text-slate-700 dark:text-slate-200")}
               </span>
@@ -2525,8 +2514,6 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
         </div>
         <div className="flex flex-col items-center space-y-6">
           <div className={`w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex items-center justify-center relative font-bold text-2xl text-slate-500 ${getUserGlowClass(currentUser, 'border-4 border-slate-200 dark:border-slate-700')}`}>
-            {photoUrl ? <img src={photoUrl} alt="profile" className="w-full h-full object-cover" /> : displayName ? displayName.charAt(0).toUpperCase() : currentUser.charAt(0).toUpperCase()}
-          </div>
             {photoUrl ? <img src={photoUrl} alt="profile" className="w-full h-full object-cover" /> : displayName ? displayName.charAt(0).toUpperCase() : currentUser.charAt(0).toUpperCase()}
             {isUploading && <div className="absolute inset-0 bg-white/60 dark:bg-slate-900/60 flex items-center justify-center"><Activity className="animate-spin text-emerald-500" size={24} /></div>}
           </div>
@@ -4439,7 +4426,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 23:14, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 23:18, updated)</p>
       </div>
     </div>
   );
