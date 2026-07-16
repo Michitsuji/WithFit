@@ -1975,6 +1975,14 @@ export default function App() {
   const myFriends = myInfo.friends || [];
   const activeFriends = myFriends.filter(f => accountsInfo[f]?.isTraining);
   
+  const activeFriendsText = activeFriends.map(f => {
+    const friendInfo = accountsInfo[f];
+    const friendName = friendInfo?.displayName || f;
+    const gymId = friendInfo?.currentGymId;
+    const gymName = gymId ? allGyms.find(g => g.id === gymId)?.name : null;
+    return gymName ? `${friendName}(${gymName})` : friendName;
+  }).join('、');
+
   const isDarkMode = ['dark', 'ocean', 'mono'].includes(myInfo.theme);
   const themeContainerClass = myInfo.theme === 'ocean' ? 'theme-ocean' : myInfo.theme === 'pop' ? 'theme-pop' : '';
   
@@ -2039,8 +2047,8 @@ export default function App() {
       )}
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20 shadow-sm flex flex-col transition-colors">
         <div className="p-4 flex justify-between items-center relative">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <WithFitLogo className="text-indigo-500" /> With<span className="text-indigo-500">Fit</span>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-1">
+            <WithFitLogo className="text-indigo-500" /><span>With<span className="text-indigo-500">Fit</span></span>
           </h1>
           <div className="flex items-center gap-3">
             <button onClick={handleOpenNotifications} className="relative p-1.5 text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors">
@@ -2062,7 +2070,7 @@ export default function App() {
         </div>
         {activeFriends.length > 0 && (
           <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-4 py-2 flex flex-col items-center justify-center text-xs font-bold animate-in slide-in-from-top duration-300">
-            <div className="flex items-center gap-2 mb-0.5"><Flame size={14} className="animate-pulse text-amber-300" /> {activeFriends.join(', ')}さんがトレーニング中です！</div>
+            <div className="flex items-center gap-2 mb-0.5"><Flame size={14} className="animate-pulse text-amber-300 shrink-0" /> <span className="truncate">{activeFriendsText}さんがトレーニング中です！</span></div>
           </div>
         )}
         {showNotifications && (
@@ -2628,7 +2636,7 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
 // --- 記録入力画面 ---
 function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workoutItems, setWorkoutItems, selectedCategories, setSelectedCategories, posts, currentUser, isManual, setIsManual, onActiveExerciseChange, accountsInfo }) {
   const joinedGyms = myInfo.joinedGyms || ['common'];
-  const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (gyms.filter(g => joinedGyms.includes(g.id))[0]?.id || 'common'));
+  const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (gyms.filter(g => joinedGyms.includes(g.id) && g.id !== 'common')[0]?.id || ''));
   const itemDnd = useDragAndDrop(workoutItems, setWorkoutItems);
   const [restTimerStart, setRestTimerStart] = useState(null);
   const [restTimeElapsed, setRestTimeElapsed] = useState(0);
@@ -2669,7 +2677,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
 
   const mutedExercises = myInfo.mutedExercises || [];
   const availableExercises = exercises.filter(ex => {
-    if (ex.gymId !== selectedGymId) return false; 
+    if (ex.gymId !== selectedGymId && ex.gymId !== 'common') return false; 
     if (mutedExercises.includes(ex.name)) return false;
     if (selectedCategories.length === 0) return false;
     return selectedCategories.includes(ex.category || 'その他');
@@ -2877,7 +2885,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
           <div className="w-full relative mb-6">
             <select value={selectedGymId} onChange={(e) => setSelectedGymId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
               <option value="" disabled>ジムを選択</option>
-              {gyms.filter(g => joinedGyms.includes(g.id)).map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
+              {gyms.filter(g => joinedGyms.includes(g.id) && g.id !== 'common').map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
             </select>
             <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">▼</div>
           </div>
@@ -2926,7 +2934,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
              <div className="w-full relative">
                <select value={selectedGymId} onChange={(e) => setSelectedGymId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
                  <option value="" disabled>ジムを選択</option>
-                 {gyms.filter(g => joinedGyms.includes(g.id)).map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
+                 {gyms.filter(g => joinedGyms.includes(g.id) && g.id !== 'common').map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
                </select>
                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">▼</div>
              </div>
@@ -4029,7 +4037,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 10:26, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 15:42, updated)</p>
       </div>
     </div>
   );
