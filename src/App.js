@@ -42,6 +42,13 @@ try {
 }
 
 const MASTER_USER = 'ゆうた';
+const ACQUAINTANCE_USER = 'matsukichi';
+
+const getUserGlowClass = (username, defaultBorder = '') => {
+  if (username === MASTER_USER) return 'glow-warm';
+  if (username === ACQUAINTANCE_USER) return 'glow-cool';
+  return defaultBorder;
+};
 
 const renderUsernameWithBadge = (username, displayName, accountsInfo, className = "font-bold text-slate-800 dark:text-slate-100 truncate") => {
   const isUserMaster = username === MASTER_USER;
@@ -484,7 +491,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
       <div className={`absolute top-0 left-0 w-1.5 h-full ${isMyPost ? 'bg-slate-300 dark:bg-slate-600' : ''}`} style={!isMyPost ? { backgroundColor: customBgStyle.backgroundColor } : {}}></div>
       <div className="flex justify-between items-start mb-4 pl-3">
         <div className="flex items-center gap-3 w-full overflow-hidden">
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm overflow-hidden shrink-0 ${userColorBg}`} style={customBgStyle}>
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm overflow-hidden shrink-0 ${userColorBg} ${getUserGlowClass(post.author)}`} style={customBgStyle}>
             {authorInfo?.photoUrl ? <img src={authorInfo.photoUrl} alt={post.author} className="w-full h-full object-cover" /> : authorInfo?.displayName ? authorInfo.displayName.charAt(0).toUpperCase() : (post.author ? post.author.charAt(0).toUpperCase() : '?')}
           </div>
           <div className="flex-1 min-w-0">
@@ -682,7 +689,9 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                   const uInfo = accountsInfo && accountsInfo[u];
                   return (
                     <div key={u} className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-xl transition-colors">
-                      <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 dark:text-slate-400 overflow-hidden border border-slate-200 dark:border-slate-700">
+                      <div className={`w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 dark:text-slate-400 overflow-hidden ${getUserGlowClass(u, 'border border-slate-200 dark:border-slate-700')}`}>
+                        {uInfo?.photoUrl ? <img src={uInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : uInfo?.displayName ? uInfo.displayName.charAt(0).toUpperCase() : u.charAt(0).toUpperCase()}
+                      </div>
                         {uInfo?.photoUrl ? <img src={uInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : uInfo?.displayName ? uInfo.displayName.charAt(0).toUpperCase() : u.charAt(0).toUpperCase()}
                       </div>
                       <span className="font-bold text-slate-800 dark:text-slate-200 text-sm">{uInfo?.displayName || u}</span>
@@ -2145,6 +2154,26 @@ export default function App() {
 
   return (
     <div className={`min-h-screen font-sans pb-32 overflow-x-hidden select-none transition-colors duration-300 ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'} ${themeContainerClass}`}>
+      <style>{`
+        @keyframes warmGlow {
+          0% { border-color: #ef4444; box-shadow: 0 0 4px #f97316; }
+          50% { border-color: #f97316; box-shadow: 0 0 12px #f59e0b; }
+          100% { border-color: #ef4444; box-shadow: 0 0 4px #f97316; }
+        }
+        @keyframes coolGlow {
+          0% { border-color: #06b6d4; box-shadow: 0 0 4px #3b82f6; }
+          50% { border-color: #3b82f6; box-shadow: 0 0 12px #8b5cf6; }
+          100% { border-color: #06b6d4; box-shadow: 0 0 4px #3b82f6; }
+        }
+        .glow-warm {
+          animation: warmGlow 2s infinite ease-in-out;
+          border: 2px solid #ef4444 !important;
+        }
+        .glow-cool {
+          animation: coolGlow 2s infinite ease-in-out;
+          border: 2px solid #06b6d4 !important;
+        }
+      `}</style>
       {myInfo.theme === 'ocean' && (
         <style>{`
           .theme-ocean.dark, .theme-ocean .bg-slate-950 { background-color: #021526 !important; }
@@ -2215,7 +2244,9 @@ export default function App() {
               <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">{isOnline ? 'オンライン' : 'オフライン'}</span>
             </div>
             <button onClick={() => setShowProfileModal(true)} className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-              <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-xs overflow-hidden border border-emerald-200 dark:border-emerald-800">
+              <div className={`w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-xs overflow-hidden ${getUserGlowClass(currentUser, 'border border-emerald-200 dark:border-emerald-800')}`}>
+                {myInfo.photoUrl ? <img src={myInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : myInfo.displayName ? myInfo.displayName.charAt(0).toUpperCase() : currentUser.charAt(0).toUpperCase()}
+              </div>
                 {myInfo.photoUrl ? <img src={myInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : myInfo.displayName ? myInfo.displayName.charAt(0).toUpperCase() : currentUser.charAt(0).toUpperCase()}
               </div>
               <span className="text-sm font-bold text-slate-700 dark:text-slate-200 hidden sm:inline">
@@ -2246,7 +2277,7 @@ export default function App() {
                      const isUnread = notif.time > (myInfo.lastNotificationCheck || 0);
                      return (
                        <div key={notif.id} onClick={() => handleNotificationClick(notif)} className={`flex gap-3 items-center p-2 rounded-xl cursor-pointer transition-colors ${isUnread ? 'bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-100/50 dark:hover:bg-emerald-950/40' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                          <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-xs shrink-0 overflow-hidden">
+                          <div className={`w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-xs shrink-0 overflow-hidden ${getUserGlowClass(notif.user)}`}>
                              {accountsInfo[notif.user]?.photoUrl ? <img src={accountsInfo[notif.user].photoUrl} alt="" className="w-full h-full object-cover"/> : accountsInfo[notif.user]?.displayName ? accountsInfo[notif.user].displayName.charAt(0).toUpperCase() : notif.user.charAt(0).toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -2486,7 +2517,9 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
           )}
         </div>
         <div className="flex flex-col items-center space-y-6">
-          <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800 border-4 border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center relative font-bold text-2xl text-slate-500">
+          <div className={`w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex items-center justify-center relative font-bold text-2xl text-slate-500 ${getUserGlowClass(currentUser, 'border-4 border-slate-200 dark:border-slate-700')}`}>
+            {photoUrl ? <img src={photoUrl} alt="profile" className="w-full h-full object-cover" /> : displayName ? displayName.charAt(0).toUpperCase() : currentUser.charAt(0).toUpperCase()}
+          </div>
             {photoUrl ? <img src={photoUrl} alt="profile" className="w-full h-full object-cover" /> : displayName ? displayName.charAt(0).toUpperCase() : currentUser.charAt(0).toUpperCase()}
             {isUploading && <div className="absolute inset-0 bg-white/60 dark:bg-slate-900/60 flex items-center justify-center"><Activity className="animate-spin text-emerald-500" size={24} /></div>}
           </div>
@@ -2700,7 +2733,7 @@ function MonthlyReport({ monthDate, posts, userName, accountsInfo }) {
   return (
     <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm animate-in fade-in">
       <div className="flex items-center gap-3 mb-5">
-         <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center font-bold text-white text-xs bg-slate-600">
+         <div className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center font-bold text-white text-xs bg-slate-600 ${getUserGlowClass(userName)}`}>
             {accountsInfo[userName]?.photoUrl ? <img src={accountsInfo[userName].photoUrl} alt={userName} className="w-full h-full object-cover" /> : accountsInfo[userName]?.displayName ? accountsInfo[userName].displayName.charAt(0).toUpperCase() : userName.charAt(0).toUpperCase()}
          </div>
          <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1">{renderUsernameWithBadge(userName, accountsInfo[userName]?.displayName, accountsInfo, "font-bold text-slate-800 dark:text-slate-100")} のレポート</h3>
@@ -3861,7 +3894,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                               
                               return (
                                 <div key={mId} className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 pl-2 pr-1.5 py-1.5 rounded-full border border-slate-100 dark:border-slate-800">
-                                  <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[9px] font-bold overflow-hidden shrink-0">
+                                  <div className={`w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[9px] font-bold overflow-hidden shrink-0 ${getUserGlowClass(mId)}`}>
                                     {mInfo?.photoUrl ? <img src={mInfo.photoUrl} alt="member" className="w-full h-full object-cover"/> : mId.charAt(0).toUpperCase()}
                                   </div>
                                   {renderUsernameWithBadge(mId, mInfo?.displayName, accountsInfo, "text-xs font-bold text-slate-600 dark:text-slate-300 truncate max-w-[80px]")}
@@ -4316,7 +4349,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
                   <div key={user.username} className={`flex items-center justify-between p-2.5 rounded-2xl border backdrop-blur-md transition-all ${isMe ? 'bg-white/20 border-white/40 shadow-md' : 'bg-black/10 border-white/10 hover:bg-black/20'}`}>
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="w-6 flex justify-center items-center shrink-0">{rankBadge}</div>
-                      <div className="w-7 h-7 rounded-full bg-white/20 border border-white/20 overflow-hidden flex items-center justify-center font-bold text-xs shrink-0">
+                      <div className={`w-7 h-7 rounded-full bg-white/20 overflow-hidden flex items-center justify-center font-bold text-xs shrink-0 ${getUserGlowClass(user.username, 'border border-white/20')}`}>
                         {user.photoUrl ? <img src={user.photoUrl} alt="" className="w-full h-full object-cover" /> : user.displayName.charAt(0).toUpperCase()}
                       </div>
                       {renderUsernameWithBadge(user.username, user.displayName, accountsInfo, `text-xs font-bold truncate ${isMe ? 'text-amber-200' : ''}`)}
@@ -4336,7 +4369,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
                 {myInfo.friendRequests.map(reqUser => (
                    <div key={reqUser} className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900 rounded-xl p-3 flex items-center justify-between shadow-sm">
                       <div className="flex items-center gap-3">
-                         <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 dark:text-slate-400 overflow-hidden">
+                         <div className={`w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 dark:text-slate-400 overflow-hidden ${getUserGlowClass(reqUser)}`}>
                             {accountsInfo[reqUser]?.photoUrl ? <img src={accountsInfo[reqUser].photoUrl} alt={reqUser} className="w-full h-full object-cover" /> : accountsInfo[reqUser]?.displayName ? accountsInfo[reqUser].displayName.charAt(0).toUpperCase() : reqUser.charAt(0).toUpperCase()}
                          </div>
                          {renderUsernameWithBadge(reqUser, accountsInfo[reqUser]?.displayName, accountsInfo, "font-bold text-slate-800 dark:text-slate-100 text-sm")}
@@ -4370,7 +4403,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
                 <div key={friendUsername} onClick={() => onFriendClick && onFriendClick(friendUsername)} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex items-center justify-between group cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                   <div className="flex items-center gap-4">
                     <div className="relative">
-                      <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xl font-bold text-slate-600 dark:text-slate-300 overflow-hidden">
+                      <div className={`w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xl font-bold text-slate-600 dark:text-slate-300 overflow-hidden ${getUserGlowClass(friendUsername, 'border border-slate-200 dark:border-slate-700')}`}>
                         {friendInfo.photoUrl ? <img src={friendInfo.photoUrl} alt={friendUsername} className="w-full h-full object-cover" /> : friendInfo.displayName ? friendInfo.displayName.charAt(0).toUpperCase() : friendUsername.charAt(0).toUpperCase()}
                       </div>
                       <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 border-2 border-white dark:border-slate-900 rounded-full z-10 ${isTraining ? 'bg-amber-400' : isOnline ? 'bg-emerald-400' : 'bg-slate-400'}`}></div>
@@ -4399,7 +4432,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 22:36, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 23:03, updated)</p>
       </div>
     </div>
   );
@@ -4414,7 +4447,7 @@ function FriendDetailModal({ friendUsername, posts, accountsInfo, onClose, onTog
       <div className="bg-slate-50 dark:bg-slate-950 sm:rounded-3xl rounded-t-3xl flex flex-col h-[90vh] sm:h-[85vh] w-full sm:max-w-md overflow-hidden shadow-2xl relative">
         <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-10 pt-safe">
           <div className="flex items-center gap-2">
-             <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center font-bold text-white text-xs bg-slate-600 border border-slate-200 dark:border-slate-700">
+             <div className={`w-8 h-8 rounded-full overflow-hidden flex items-center justify-center font-bold text-white text-xs bg-slate-600 ${getUserGlowClass(friendUsername, 'border border-slate-200 dark:border-slate-700')}`}>
                 {friendInfo.photoUrl ? <img src={friendInfo.photoUrl} alt={friendUsername} className="w-full h-full object-cover" /> : friendInfo.displayName ? friendInfo.displayName.charAt(0).toUpperCase() : friendUsername.charAt(0).toUpperCase()}
              </div>
              <h2>{renderUsernameWithBadge(friendUsername, friendInfo.displayName, accountsInfo, "text-lg font-bold text-slate-800 dark:text-white")}</h2>
@@ -4497,7 +4530,7 @@ function ReportsModal({ isOpen, onClose, db, accountsInfo }) {
                 <div key={report.id} className="bg-slate-50 dark:bg-slate-950/50 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 relative">
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-[9px] overflow-hidden">
+                      <div className={`w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-[9px] overflow-hidden ${getUserGlowClass(report.author)}`}>
                         {uInfo?.photoUrl ? <img src={uInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : report.author.charAt(0).toUpperCase()}
                       </div>
                       <div className="flex flex-col">
