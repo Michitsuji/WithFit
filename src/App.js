@@ -1436,6 +1436,7 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) return;
     const updatePresence = async (isVisible) => { 
+      if (accountsInfo && !accountsInfo[currentUser]) return;
       const now = Date.now();
       if (isVisible) {
          localStorage.setItem('withfit_login_session', JSON.stringify({ userId: currentUser, lastActive: now }));
@@ -1499,9 +1500,21 @@ export default function App() {
       return true;
     } else {
       let baseName = googleUser.displayName || (googleUser.email ? googleUser.email.split('@')[0] : 'user');
+      
+      const legacyUser = Object.entries(accountsInfo).find(([uname, data]) => 
+         !data.googleUid && (uname === baseName || data.displayName === baseName) && data.friendCode
+      );
+      if (legacyUser) {
+         const username = legacyUser[0];
+         setCurrentUser(username);
+         const joinedGyms = legacyUser[1]?.joinedGyms || ['common'];
+         try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { googleUid: googleUser.uid, lastActive: Date.now(), isAppOnline: true, joinedGyms }, { merge: true }); } catch (e) {}
+         return true;
+      }
+
       let username = baseName;
       let counter = 1;
-      while (accountsInfo[username]) {
+      while (accountsInfo[username] && accountsInfo[username].friendCode) {
         username = `${baseName}${counter}`;
         counter++;
       }
@@ -4004,7 +4017,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 10:15, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 10:23, updated)</p>
       </div>
     </div>
   );
