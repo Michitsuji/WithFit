@@ -2001,10 +2001,27 @@ export default function App() {
   };
 
   if (!isFullyLoaded) {
+    let loadingProgress = 0;
+    if (isSessionChecked) loadingProgress += 10;
+    if (dataLoaded.accounts) loadingProgress += 20;
+    if (dataLoaded.gyms) loadingProgress += 20;
+    if (dataLoaded.exercises) loadingProgress += 20;
+    if (dataLoaded.workouts) loadingProgress += 20;
+    if (isDraftLoaded || (!currentUser && isSessionChecked)) loadingProgress += 10;
+    if (loadTimeout) loadingProgress = 100;
+    loadingProgress = Math.min(100, Math.round(loadingProgress));
+
     return (
       <div className="h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6">
-        <Activity className="text-emerald-500 w-12 h-12 animate-pulse mb-4" />
-        <p className="text-slate-500 dark:text-slate-400 font-bold mb-2">データを読み込み中...</p>
+        <Activity className="text-emerald-500 w-12 h-12 animate-pulse mb-6" />
+        <p className="text-slate-500 dark:text-slate-400 font-bold mb-4">データを読み込み中...</p>
+        <div className="w-64 max-w-full bg-slate-200 dark:bg-slate-800 rounded-full h-3 mb-2 overflow-hidden shadow-inner">
+          <div 
+            className="bg-emerald-500 h-3 rounded-full transition-all duration-300 ease-out shadow-[0_0_8px_rgba(16,185,129,0.5)]" 
+            style={{ width: `${loadingProgress}%` }}
+          ></div>
+        </div>
+        <p className="text-emerald-600 dark:text-emerald-400 font-bold text-sm mb-4">{loadingProgress}%</p>
         <p className="text-slate-400 text-xs font-bold text-center">完了するまでしばらくお待ちください</p>
       </div>
     );
@@ -4091,7 +4108,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 15:56, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 15:59, updated)</p>
       </div>
     </div>
   );
