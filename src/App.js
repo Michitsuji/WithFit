@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus, EyeOff, Bell, Download } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy, getDocs, where } from 'firebase/firestore';
 
 // --- カスタムアイコン ---
@@ -1342,6 +1342,14 @@ export default function App() {
   const [selectedFriendUser, setSelectedFriendUser] = useState(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [focusedPost, setFocusedPost] = useState(null);
+  const [redirectUser, setRedirectUser] = useState(null);
+
+  useEffect(() => {
+    if (redirectUser && dataLoaded.accounts) {
+      handleGoogleLogin(redirectUser);
+      setRedirectUser(null);
+    }
+  }, [redirectUser, dataLoaded.accounts]);
 
   useEffect(() => {
     if (currentUser && db) {
@@ -1373,18 +1381,26 @@ export default function App() {
   useEffect(() => {
     if (currentUser && db && isDraftLoaded) {
       try {
-        if (draftWorkoutItems.length > 0) {
+        if (draftWorkoutItems.length > 0 || selectedCategories.length > 0) {
           localStorage.setItem(`withfit_draft_${currentUser}`, JSON.stringify(draftWorkoutItems));
-          setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { currentWorkoutItems: draftWorkoutItems }, { merge: true }).catch(()=>{});
+          localStorage.setItem(`withfit_cats_${currentUser}`, JSON.stringify(selectedCategories));
+          setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { 
+            currentWorkoutItems: draftWorkoutItems,
+            currentSelectedCategories: selectedCategories
+          }, { merge: true }).catch(()=>{});
         } else {
           localStorage.removeItem(`withfit_draft_${currentUser}`);
-          setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { currentWorkoutItems: deleteField() }, { merge: true }).catch(()=>{});
+          localStorage.removeItem(`withfit_cats_${currentUser}`);
+          setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { 
+            currentWorkoutItems: deleteField(),
+            currentSelectedCategories: deleteField()
+          }, { merge: true }).catch(()=>{});
         }
       } catch (e) {
         console.error("Failed to save draft", e);
       }
     }
-  }, [draftWorkoutItems, currentUser, db, isDraftLoaded]);
+  }, [draftWorkoutItems, selectedCategories, currentUser, db, isDraftLoaded]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -1401,6 +1417,13 @@ export default function App() {
 
   useEffect(() => {
     if (!auth) return;
+    
+    getRedirectResult(auth).then((result) => {
+      if (result && result.user) {
+        setRedirectUser(result.user);
+      }
+    }).catch(console.error);
+
     const initAuth = async () => { try { await signInAnonymously(auth); } catch (e) {} };
     initAuth();
     const unsubscribe = onAuthStateChanged(auth, (user) => setFirebaseUser(user));
@@ -1547,7 +1570,11 @@ export default function App() {
       alert('Googleアカウントと連携しました。');
     } catch (e) {
       console.error(e);
-      alert('連携に失敗しました。');
+      if (e.code === 'auth/popup-blocked' || e.code === 'auth/cross-origin-opener-policy-failed') {
+         alert('ポップアップがブロックされました。ブラウザの設定で許可するか、別のブラウザをお試しください。');
+      } else {
+         alert('連携に失敗しました。');
+      }
     }
   };
 
@@ -1617,7 +1644,7 @@ export default function App() {
       if (!manualStart) {
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now() }, { merge: true });
       }
-      setDraftWorkoutItems([]); setCurrentTab('timeline');
+      setDraftWorkoutItems([]); setSelectedCategories([]); setCurrentTab('timeline');
     } catch (e) { console.error("Post error:", e); }
   };
 
@@ -1638,7 +1665,7 @@ export default function App() {
   const handleCancelTraining = async () => {
     if (!window.confirm("現在の記録を破棄して終了しますか？")) return;
     if (!currentUser || !db) return;
-    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now() }, { merge: true }); setDraftWorkoutItems([]); setCurrentTab('timeline'); } catch (e) {}
+    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now() }, { merge: true }); setDraftWorkoutItems([]); setSelectedCategories([]); setCurrentTab('timeline'); } catch (e) {}
   };
 
   const handleSaveProfile = async (data) => {
@@ -2332,7 +2359,18 @@ function LoginScreen({ onLogin, onGoogleLogin, isOnline }) {
           <p className="text-sm text-slate-500 font-bold mt-1">みんなで鍛える、記録アプリ</p>
         </div>
         <div className="w-full bg-white p-6 rounded-3xl border border-slate-200 shadow-xl flex flex-col items-center">
-           <button onClick={() => { const provider = new GoogleAuthProvider(); provider.setCustomParameters({ prompt: 'select_account' }); signInWithPopup(getAuth(), provider).then((result) => { onGoogleLogin(result.user); }).catch(console.error); }} className="w-full bg-white border border-slate-300 text-slate-700 font-bold py-3 rounded-xl shadow-sm flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors">
+           <button onClick={() => { 
+             const provider = new GoogleAuthProvider(); 
+             provider.setCustomParameters({ prompt: 'select_account' }); 
+             signInWithPopup(getAuth(), provider).then((result) => { 
+               onGoogleLogin(result.user); 
+             }).catch((err) => {
+               console.error(err);
+               if (err.code !== 'auth/popup-closed-by-user') {
+                 signInWithRedirect(getAuth(), provider);
+               }
+             }); 
+           }} className="w-full bg-white border border-slate-300 text-slate-700 font-bold py-3 rounded-xl shadow-sm flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors">
              Googleでログイン / 登録
            </button>
         </div>
@@ -2824,6 +2862,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const handleCancel = () => {
       if (isManual) {
           setWorkoutItems([]);
+          setSelectedCategories([]);
           setIsManual(false);
       } else {
           onCancel();
@@ -4037,7 +4076,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       )}
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 15:42, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 15:47, updated)</p>
       </div>
     </div>
   );
