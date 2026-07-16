@@ -642,14 +642,16 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
       <div className="flex items-center justify-between pl-3 mt-4">
         {isMyPost ? (
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-2 text-sm font-bold text-slate-400 dark:text-slate-500">
-              <Heart size={16} className={displayLikesCount > 0 ? "text-rose-400" : ""} fill={displayLikesCount > 0 ? "currentColor" : "none"} />
-              {displayLikesCount > 0 ? 'ナイス！' : 'ナイス待ち'}
-            </div>
-            {displayLikesCount > 0 && (
-              <button onClick={() => setShowLikesModal(true)} className="text-sm font-bold text-emerald-500 hover:underline px-2 py-1">
-                {displayLikesCount}
+            {displayLikesCount > 0 ? (
+              <button onClick={() => setShowLikesModal(true)} className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-rose-500 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/80 rounded-full transition-colors border border-rose-200 dark:border-rose-900/50">
+                <Heart size={16} fill="currentColor" />
+                {displayLikesCount} ナイス！
               </button>
+            ) : (
+              <div className="flex items-center gap-2 px-3 py-2 text-sm font-bold text-slate-400 dark:text-slate-500">
+                <Heart size={16} fill="none" />
+                ナイス待ち
+              </div>
             )}
           </div>
         ) : (
@@ -659,8 +661,8 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
               ナイス！
             </button>
             {displayLikesCount > 0 && (
-              <button onClick={() => setShowLikesModal(true)} className="text-sm font-bold text-emerald-500 hover:underline px-2 py-1">
-                {displayLikesCount}
+              <button onClick={() => setShowLikesModal(true)} className="flex items-center gap-1 text-sm font-bold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 px-3 py-1.5 rounded-full transition-colors">
+                <Heart size={14} fill="currentColor" /> {displayLikesCount} ナイス！
               </button>
             )}
           </div>
@@ -2949,6 +2951,9 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
     if (ex.gymId !== selectedGymId && ex.gymId !== 'common') return false; 
     if (mutedExercises.includes(ex.name)) return false;
     if (selectedCategories.length === 0) return false;
+    if (ex.gymId === 'common') {
+       if (ex.author && ex.author !== currentUser && ex.author !== MASTER_USER) return false;
+    }
     return selectedCategories.includes(ex.category || 'その他');
   });
 
@@ -3330,6 +3335,9 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
     const isGymMatch = gym ? (ex.gymId === gym.id || ex.gymId === 'common') : true;
     if (!isGymMatch) return false;
     if (selectedCategories.length === 0) return false;
+    if (ex.gymId === 'common') {
+       if (ex.author && ex.author !== currentUser && ex.author !== MASTER_USER) return false;
+    }
     return selectedCategories.includes(ex.category || 'その他');
   });
 
@@ -3610,7 +3618,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
     setIsAdding(true);
     const newDocId = `ex_${Date.now()}`;
     try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', newDocId), { name: newExName.trim(), maker: newExMaker.trim(), gymId: selectedGymId, weightType: newExWeightType, category: newExCategory, freeWeightType: selectedGymId === 'common' ? newExFreeWeightType : null, createdAt: Date.now() });
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', newDocId), { name: newExName.trim(), maker: newExMaker.trim(), gymId: selectedGymId, weightType: newExWeightType, category: newExCategory, freeWeightType: selectedGymId === 'common' ? newExFreeWeightType : null, createdAt: Date.now(), author: currentUser });
       setNewExName(''); setNewExMaker(''); setNewExWeightType('total'); setNewExCategory('胸'); setNewExFreeWeightType('barbell');
     } catch (e) {}
     setIsAdding(false);
@@ -4018,6 +4026,9 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                     const gymExercises = exercises.filter(ex => {
                       if (ex.gymId !== gym.id) return false;
                       if (filterCategory !== 'all' && ex.category !== filterCategory) return false;
+                      if (ex.gymId === 'common') {
+                         if (ex.author && ex.author !== currentUser && ex.author !== MASTER_USER) return false;
+                      }
                       return true;
                     }).sort((a, b) => {
                       const idxA = MUSCLE_CATEGORIES.indexOf(a.category);
@@ -4050,7 +4061,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                                   <button onClick={() => handleMuteExercise(ex.name)} className={`p-2 rounded-lg transition-colors border ${isMuted ? 'text-indigo-400 bg-indigo-50 border-indigo-100 hover:bg-indigo-100 dark:bg-indigo-950/30 dark:border-indigo-900' : 'text-slate-400 bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-800 hover:bg-slate-100'}`} title={isMuted ? '表示する' : '非表示にする'}>
                                     <EyeOff size={16}/>
                                   </button>
-                                  {(ex.gymId !== 'common' || isAdmin) && (
+                                  {(ex.gymId !== 'common' || isAdmin || ex.author === currentUser) && (
                                     <>
                                       <button onClick={() => startEdit(ex)} className="p-2 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 bg-slate-50 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-100 dark:border-slate-800"><Edit2 size={16} /></button>
                                       <button onClick={() => { if(window.confirm(`${ex.name}を削除しますか？`)) handleDeleteExercise(ex.id); }} className="p-2 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 bg-slate-50 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-100 dark:border-slate-800"><Trash2 size={16} /></button>
@@ -4363,7 +4374,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 16:51, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.16, 17:00, updated)</p>
       </div>
     </div>
   );
