@@ -57,7 +57,10 @@ const renderUsernameWithBadge = (username, displayName, accountsInfo, className 
         </svg>
       )}
       {isUserAcquaintance && (
-        <Handshake size={15} className="shrink-0 text-cyan-500" title="知り合い" />
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" style={{ color: '#1e293b', fill: '#1e293b' }} title="知り合い">
+          <path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z" stroke="#1e293b"/>
+          <path d="m9 12 2 2 4-4" stroke="white" />
+        </svg>
       )}
     </span>
   );
@@ -2334,6 +2337,8 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
   const [weight, setWeight] = useState(userInfo?.weight || '');
   const [displayName, setDisplayName] = useState(userInfo?.displayName || currentUser);
   const [hideBodyMetrics, setHideBodyMetrics] = useState(userInfo?.hideBodyMetrics || false);
+  const [enablePartner, setEnablePartner] = useState(userInfo?.enablePartner || false);
+  const [partnerId, setPartnerId] = useState(userInfo?.partnerId || '');
 
   const [cropImageSrc, setCropImageSrc] = useState(null);
   const [cropScale, setCropScale] = useState(1);
@@ -2352,10 +2357,12 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
       setWeight(userInfo?.weight || '');
       setDisplayName(userInfo?.displayName || currentUser);
       setHideBodyMetrics(userInfo?.hideBodyMetrics || false);
+      setEnablePartner(userInfo?.enablePartner || false);
+      setPartnerId(userInfo?.partnerId || '');
       setCropImageSrc(null);
       setImageObj(null);
     }
-  }, [isOpen]);
+  }, [isOpen, userInfo, currentUser]);
 
   if (!isOpen) return null;
 
@@ -2433,7 +2440,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
   };
 
   const handleSave = () => {
-    onSave({ displayName: displayName.trim() || currentUser, photoUrl, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null, hideBodyMetrics });
+    onSave({ displayName: displayName.trim() || currentUser, photoUrl, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null, hideBodyMetrics, enablePartner, partnerId: partnerId.trim() });
   };
 
   if (cropImageSrc) {
@@ -2538,6 +2545,16 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
           <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
              <input type="checkbox" id="hideBodyMetrics" checked={hideBodyMetrics} onChange={e => setHideBodyMetrics(e.target.checked)} className="w-4 h-4 text-emerald-500 rounded focus:ring-emerald-500" />
              <label htmlFor="hideBodyMetrics" className="text-sm font-bold text-slate-700 dark:text-slate-300">フレンドに体組成を非公開にする</label>
+          </div>
+
+          <div className="flex flex-col gap-2 bg-slate-50 dark:bg-slate-950/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700 mt-4 mb-4">
+             <div className="flex items-center gap-2">
+               <input type="checkbox" id="enablePartner" checked={enablePartner} onChange={e => setEnablePartner(e.target.checked)} className="w-4 h-4 text-emerald-500 rounded focus:ring-emerald-500" />
+               <label htmlFor="enablePartner" className="text-sm font-bold text-slate-700 dark:text-slate-300">パートナー機能を有効にする</label>
+             </div>
+             {enablePartner && (
+               <input type="text" value={partnerId} onChange={e => setPartnerId(e.target.value)} placeholder="パートナーのユーザー名を入力" className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500" />
+             )}
           </div>
 
           <div>
@@ -4119,7 +4136,10 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
 function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccept, onReject, onRemoveFriend, onFriendClick, onGenerateFriendCode, onImportFromDuoFit, posts }) {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [searchUsername, setSearchUsername] = useState('');
-  const [activeTab, setActiveTab] = useState('friends');
+  const enablePartner = myInfo?.enablePartner;
+  const partnerName = myInfo?.partnerId;
+  const partnerInfo = partnerName ? accountsInfo[partnerName] : null;
+  const [activeTab, setActiveTab] = useState(enablePartner && partnerName ? 'partner' : 'friends');
   const [reportText, setReportText] = useState('');
   const [isSendingReport, setIsSendingReport] = useState(false);
   const [showReportsModal, setShowReportsModal] = useState(false);
@@ -4197,14 +4217,159 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
 
   const myFriends = myInfo.friends || [];
 
+  let partnerPosts = [];
+  let weightData = [];
+  let fatData = [];
+  let totalMonthVolume = 0;
+  let myMonthVolume = 0;
+  let partnerMonthVolume = 0;
+  let myPercent = 0;
+  let partnerPercent = 0;
+  let partnerCompositionInfo = {};
+  let partnerDailyCalories = 0;
+  let dateLabel = '';
+  let cardGradient = 'bg-gradient-to-br from-slate-400 to-slate-500 shadow-slate-500/20'; 
+  let iconBorder = 'border-slate-300';
+  let badgeColor = 'bg-slate-400';
+  let isPartnerTraining = false;
+  let isPartnerOnline = false;
+  let pLastActive = 0;
+
+  if (enablePartner && partnerName && partnerInfo) {
+      isPartnerTraining = partnerInfo.isTraining;
+      pLastActive = partnerInfo.lastActive || 0;
+      const pIsAppOnline = partnerInfo.isAppOnline !== false;
+      isPartnerOnline = pIsAppOnline && pLastActive > 0 && (currentTime - pLastActive < 45000);
+
+      if (isPartnerTraining) { cardGradient = 'bg-gradient-to-br from-amber-500 to-orange-600 shadow-orange-500/20'; iconBorder = 'border-orange-400'; badgeColor = isPartnerOnline ? 'bg-amber-400' : 'bg-slate-400'; } 
+      else if (isPartnerOnline) { cardGradient = 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/20'; iconBorder = 'border-emerald-400'; badgeColor = 'bg-emerald-400'; }
+
+      partnerPosts = posts ? posts.filter(p => p.author === partnerName) : [];
+      weightData = partnerPosts.filter(p => p.bodyWeight && !isNaN(p.bodyWeight)).map(p => ({ date: p.date, value: Number(p.bodyWeight) })).reverse();
+      fatData = partnerPosts.filter(p => p.bodyFat && !isNaN(p.bodyFat)).map(p => ({ date: p.date, value: Number(p.bodyFat) })).reverse();
+
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      const currentMonthPosts = posts.filter(p => {
+        const d = new Date(p.timestamp);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      });
+
+      myMonthVolume = currentMonthPosts.filter(p => p.author === currentUser).reduce((sum, p) => sum + (Number(p.volume) || 0), 0);
+      partnerMonthVolume = currentMonthPosts.filter(p => p.author === partnerName).reduce((sum, p) => sum + (Number(p.volume) || 0), 0);
+      totalMonthVolume = myMonthVolume + partnerMonthVolume;
+      const targetVolume = 500000; 
+      
+      myPercent = Math.min(100, (myMonthVolume / targetVolume) * 100);
+      partnerPercent = Math.min(100 - myPercent, (partnerMonthVolume / targetVolume) * 100);
+
+      const lastPartnerFat = partnerPosts.find(p => p.bodyFat);
+      partnerCompositionInfo = { ...partnerInfo, lastFat: lastPartnerFat ? lastPartnerFat.bodyFat : null };
+
+      const todayStr = formatDateFromTimestamp(Date.now());
+      const todayPartnerPosts = partnerPosts.filter(p => formatDateFromTimestamp(p.timestamp) === todayStr);
+      partnerDailyCalories = todayPartnerPosts.reduce((sum, p) => sum + (Number(p.calories) || 0), 0);
+      dateLabel = todayStr.substring(5).replace('-', '/');
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in">
       <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">フレンド</h2>
       
       <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl mb-6">
+        {enablePartner && (
+           <button onClick={() => setActiveTab('partner')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'partner' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>パートナー</button>
+        )}
         <button onClick={() => setActiveTab('friends')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'friends' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>フレンド一覧</button>
         <button onClick={() => setActiveTab('add')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'add' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>フレンド追加</button>
       </div>
+
+      {activeTab === 'partner' && partnerName && partnerInfo && (
+        <div className="space-y-6 animate-in fade-in">
+          <div className={`rounded-3xl p-6 relative overflow-hidden shadow-lg w-full text-white transition-colors duration-500 ${cardGradient}`}>
+            <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
+            <div className="absolute bottom-0 left-0 w-32 h-32 bg-black/10 rounded-full blur-2xl -ml-10 -mb-10"></div>
+            
+            <div className="flex flex-col items-center justify-center text-center relative z-10 py-4">
+              <div className="relative mb-4">
+                <div className={`w-24 h-24 rounded-full bg-white border-4 ${iconBorder} shadow-xl flex items-center justify-center text-3xl font-bold overflow-hidden`}>
+                  {partnerInfo.photoUrl ? <img src={partnerInfo.photoUrl} alt={partnerName} className="w-full h-full object-cover" /> : <span className="text-slate-800">{partnerName.charAt(0).toUpperCase()}</span>}
+                </div>
+                <div className={`absolute bottom-0 right-0 w-6 h-6 border-4 border-white rounded-full ${badgeColor} z-20`}></div>
+              </div>
+              <p className="font-bold text-2xl mb-1">{partnerInfo.displayName || partnerName}</p>
+              
+              {partnerInfo.goal && (
+                 <div className="mt-2 bg-black/20 px-4 py-2 rounded-xl text-sm font-bold backdrop-blur-sm w-full max-w-[280px]">
+                    <p className="text-white/80 text-xs mb-1">目標</p>
+                    <p className="text-white break-words">{partnerInfo.goal}</p>
+                 </div>
+              )}
+
+              {isPartnerTraining ? (
+                <div className="mt-4 flex flex-col items-center gap-1.5 bg-black/30 px-4 py-2.5 rounded-2xl text-sm font-bold backdrop-blur-sm">
+                    <div className="flex items-center gap-2"><Flame size={16} className={`${isPartnerOnline ? 'text-amber-300 animate-pulse' : 'text-slate-400'}`} /> トレーニング中 {isPartnerOnline ? '(オンライン)' : '(オフライン)'} <TimerDisplay startTime={partnerInfo.trainingStartTime} /></div>
+                    {partnerInfo.currentExerciseName && <div className="text-[10px] text-amber-100 opacity-90 border-t border-white/20 pt-1 mt-1 w-full text-center">現在: {partnerInfo.currentExerciseName}</div>}
+                </div>
+              ) : isPartnerOnline ? (
+                <div className="mt-4 inline-flex items-center gap-2 bg-black/30 px-4 py-1.5 rounded-full text-sm font-bold backdrop-blur-sm"><Circle fill="currentColor" size={10} className="text-emerald-300 animate-pulse" /> オンライン</div>
+              ) : (
+                <div className="mt-4 inline-flex items-center gap-2 bg-black/20 px-4 py-1.5 rounded-full text-sm font-bold backdrop-blur-sm text-slate-200"><Circle fill="currentColor" size={10} className="text-slate-300" /> オフライン</div>
+              )}
+              {!isPartnerOnline && (
+                <div className="mt-2 text-xs font-bold text-white/70">
+                  最終アクセス: {getTimeAgo(pLastActive)}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
+             <div className="absolute top-2 right-2 text-white/20"><Trophy size={80}/></div>
+             <div className="relative z-10">
+               <h3 className="font-bold text-lg flex items-center gap-2 mb-2"><Target size={20}/> 今月のふたりで500トンチャレンジ！</h3>
+               <p className="text-xs text-indigo-100 font-bold mb-4">ふたりの合計総負荷量で500,000kgを目指そう！</p>
+               
+               <div className="flex justify-between items-end mb-2">
+                  <span className="text-2xl font-bold">{totalMonthVolume.toLocaleString()} <span className="text-sm font-normal">kg</span></span>
+                  <span className="text-sm font-bold text-indigo-200">/ 500,000 kg</span>
+               </div>
+               
+               <div className="w-full h-4 bg-black/30 rounded-full overflow-hidden flex">
+                  <div className="h-full bg-emerald-400 transition-all duration-1000" style={{ width: `${myPercent}%` }}></div>
+                  <div className="h-full bg-rose-400 transition-all duration-1000" style={{ width: `${partnerPercent}%` }}></div>
+               </div>
+               
+               <div className="flex justify-between items-center mt-3 text-xs font-bold">
+                  <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-emerald-400"></div>{currentUser}: {myMonthVolume.toLocaleString()}kg</div>
+                  <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-rose-400"></div>{partnerInfo.displayName || partnerName}: {partnerMonthVolume.toLocaleString()}kg</div>
+               </div>
+             </div>
+          </div>
+
+          <div className="mt-8">
+             <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">{partnerInfo.displayName || partnerName}の月間レポート</h3>
+             <MonthlyReport monthDate={new Date(new Date().getFullYear(), new Date().getMonth(), 1)} posts={posts} userName={partnerName} accountsInfo={accountsInfo} />
+          </div>
+
+          <div className="mt-8">
+             <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">基礎代謝・体組成データ</h3>
+             <BodyCompositionInfo info={partnerCompositionInfo} dailyCalories={partnerDailyCalories} dateLabel={dateLabel} />
+          </div>
+
+          <div className="space-y-6 pt-8">
+             <h3 className="text-lg font-bold text-slate-800 dark:text-white">{partnerInfo.displayName || partnerName}のデータ</h3>
+             <SimpleChart data={weightData} color="#10b981" title="体重の推移 (kg)" />
+             <SimpleChart data={fatData} color="#6366f1" title="体脂肪率の推移 (%)" />
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'partner' && enablePartner && (!partnerName || !partnerInfo) && (
+        <div className="text-center py-10 text-slate-500 font-bold bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          パートナー情報が見つかりません。<br/>プロフィール設定で正しいユーザー名を設定してください。
+        </div>
+      )}
 
       {activeTab === 'add' && (
         <div className="space-y-6">
@@ -4404,7 +4569,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.17, 08:27, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.17, 17:44, updated)</p>
       </div>
     </div>
   );
