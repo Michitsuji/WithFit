@@ -4179,7 +4179,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
   const [searchPartnerName, setSearchPartnerName] = useState('');
   const partnerName = myInfo?.partnerId;
   const partnerInfo = partnerName ? accountsInfo[partnerName] : null;
-  const [activeTab, setActiveTab] = useState(partnerName ? 'partner' : 'friends');
+  const [activeTab, setActiveTab] = useState(partnerInfo ? 'partner' : 'friends');
   const [reportText, setReportText] = useState('');
   const [isSendingReport, setIsSendingReport] = useState(false);
   const [showReportsModal, setShowReportsModal] = useState(false);
@@ -4676,7 +4676,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.17, 17:52, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.17, 17:53, updated)</p>
       </div>
     </div>
   );
