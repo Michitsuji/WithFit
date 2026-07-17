@@ -2391,6 +2391,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
   const [weight, setWeight] = useState(userInfo?.weight || '');
   const [displayName, setDisplayName] = useState(userInfo?.displayName || currentUser);
   const [hideBodyMetrics, setHideBodyMetrics] = useState(userInfo?.hideBodyMetrics || false);
+  const [enablePartnerFeature, setEnablePartnerFeature] = useState(userInfo?.enablePartnerFeature || false);
 
   const [cropImageSrc, setCropImageSrc] = useState(null);
   const [cropScale, setCropScale] = useState(1);
@@ -2409,6 +2410,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
       setWeight(userInfo?.weight || '');
       setDisplayName(userInfo?.displayName || currentUser);
       setHideBodyMetrics(userInfo?.hideBodyMetrics || false);
+      setEnablePartnerFeature(userInfo?.enablePartnerFeature || false);
       setCropImageSrc(null);
       setImageObj(null);
     }
@@ -2490,7 +2492,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
   };
 
   const handleSave = () => {
-    onSave({ displayName: displayName.trim() || currentUser, photoUrl, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null, hideBodyMetrics });
+    onSave({ displayName: displayName.trim() || currentUser, photoUrl, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null, hideBodyMetrics, enablePartnerFeature });
   };
 
   if (cropImageSrc) {
@@ -2595,6 +2597,10 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
           <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
              <input type="checkbox" id="hideBodyMetrics" checked={hideBodyMetrics} onChange={e => setHideBodyMetrics(e.target.checked)} className="w-4 h-4 text-emerald-500 rounded focus:ring-emerald-500" />
              <label htmlFor="hideBodyMetrics" className="text-sm font-bold text-slate-700 dark:text-slate-300">フレンドに体組成を非公開にする</label>
+          </div>
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
+             <input type="checkbox" id="enablePartnerFeature" checked={enablePartnerFeature} onChange={e => setEnablePartnerFeature(e.target.checked)} className="w-4 h-4 text-emerald-500 rounded focus:ring-emerald-500" />
+             <label htmlFor="enablePartnerFeature" className="text-sm font-bold text-slate-700 dark:text-slate-300">パートナー機能を利用する</label>
           </div>
 
           <div>
@@ -4179,7 +4185,8 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
   const [searchPartnerName, setSearchPartnerName] = useState('');
   const partnerName = myInfo?.partnerId;
   const partnerInfo = partnerName ? accountsInfo[partnerName] : null;
-  const [activeTab, setActiveTab] = useState(partnerName ? 'partner' : 'friends');
+  const isPartnerEnabled = myInfo?.enablePartnerFeature || false;
+  const [activeTab, setActiveTab] = useState((isPartnerEnabled && partnerName) ? 'partner' : 'friends');
   const [reportText, setReportText] = useState('');
   const [isSendingReport, setIsSendingReport] = useState(false);
   const [showReportsModal, setShowReportsModal] = useState(false);
@@ -4323,12 +4330,14 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">フレンド</h2>
       
       <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl mb-6">
-        <button onClick={() => setActiveTab('partner')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'partner' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>パートナー</button>
+        {isPartnerEnabled && (
+          <button onClick={() => setActiveTab('partner')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'partner' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>パートナー</button>
+        )}
         <button onClick={() => setActiveTab('friends')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'friends' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>フレンド一覧</button>
         <button onClick={() => setActiveTab('add')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'add' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>フレンド追加</button>
       </div>
 
-      {activeTab === 'partner' && (
+      {isPartnerEnabled && activeTab === 'partner' && (
         <div className="space-y-6 animate-in fade-in">
           {myInfo.partnerRequests && myInfo.partnerRequests.length > 0 && (
              <div className="mb-6 space-y-2">
@@ -4676,7 +4685,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.17, 17:53, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 08:56, updated)</p>
       </div>
     </div>
   );
