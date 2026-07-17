@@ -4179,7 +4179,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
   const [searchPartnerName, setSearchPartnerName] = useState('');
   const partnerName = myInfo?.partnerId;
   const partnerInfo = partnerName ? accountsInfo[partnerName] : null;
-  const [activeTab, setActiveTab] = useState(partnerInfo ? 'partner' : 'friends');
+  const [activeTab, setActiveTab] = useState(partnerName ? 'partner' : 'friends');
   const [reportText, setReportText] = useState('');
   const [isSendingReport, setIsSendingReport] = useState(false);
   const [showReportsModal, setShowReportsModal] = useState(false);
