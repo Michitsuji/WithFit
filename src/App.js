@@ -2132,6 +2132,15 @@ export default function App() {
           updatedFields.friendRequests = acc.friendRequests.filter(r => r !== currentUser);
           needUpdate = true;
         }
+        if (acc.partnerRequests && acc.partnerRequests.includes(currentUser)) {
+          updatedFields.partnerRequests = acc.partnerRequests.filter(r => r !== currentUser);
+          needUpdate = true;
+        }
+        if (acc.partnerId === currentUser) {
+          updatedFields.partnerId = null;
+          updatedFields.enablePartner = false;
+          needUpdate = true;
+        }
         if (needUpdate) {
           await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', uname), updatedFields, { merge: true });
         }
@@ -4179,7 +4188,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
   const [searchPartnerName, setSearchPartnerName] = useState('');
   const partnerName = myInfo?.partnerId;
   const partnerInfo = partnerName ? accountsInfo[partnerName] : null;
-  const [activeTab, setActiveTab] = useState(partnerName ? 'partner' : 'friends');
+  const [activeTab, setActiveTab] = useState(enablePartner ? 'partner' : 'friends');
   const [reportText, setReportText] = useState('');
   const [isSendingReport, setIsSendingReport] = useState(false);
   const [showReportsModal, setShowReportsModal] = useState(false);
@@ -4323,12 +4332,14 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">フレンド</h2>
       
       <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl mb-6">
-        <button onClick={() => setActiveTab('partner')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'partner' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>パートナー</button>
+        {enablePartner && (
+           <button onClick={() => setActiveTab('partner')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'partner' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>パートナー</button>
+        )}
         <button onClick={() => setActiveTab('friends')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'friends' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>フレンド一覧</button>
         <button onClick={() => setActiveTab('add')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'add' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>フレンド追加</button>
       </div>
 
-      {activeTab === 'partner' && (
+      {activeTab === 'partner' && enablePartner && (
         <div className="space-y-6 animate-in fade-in">
           {myInfo.partnerRequests && myInfo.partnerRequests.length > 0 && (
              <div className="mb-6 space-y-2">
@@ -4676,7 +4687,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.17, 17:53, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.17, 19:43, updated)</p>
       </div>
     </div>
   );
