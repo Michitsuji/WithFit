@@ -2499,7 +2499,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
   };
 
   const handleSave = () => {
-    onSave({ displayName: displayName.trim() || currentUser, photoUrl, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null, hideBodyMetrics });
+    onSave({ displayName: displayName.trim() || currentUser, photoUrl, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null, hideBodyMetrics, enablePartner });
   };
 
   if (cropImageSrc) {
@@ -4401,6 +4401,13 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
               )}
             </div>
           )}
+
+          {partnerName && !partnerInfo && (
+            <div className="text-center py-10 text-slate-500 font-bold bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center">
+              <p className="mb-4">パートナーのアカウントが見つかりません。<br/>退会したか、削除された可能性があります。</p>
+              <button onClick={onRemovePartner} className="text-xs font-bold text-rose-500 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 px-4 py-2 rounded-xl transition-colors">パートナーを解除する</button>
+            </div>
+          )}
           
           {partnerName && partnerInfo && (
             <>
@@ -4687,7 +4694,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.17, 19:43, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.17, 19:46, updated)</p>
       </div>
     </div>
   );
