@@ -1813,6 +1813,14 @@ export default function App() {
         });
      });
 
+     (myInfo.partnerRequests || []).forEach(req => {
+        notifs.push({
+           id: `preq_${req}`, type: 'partner_request', user: req,
+           message: 'さんからパートナー申請が届きました',
+           time: Date.now()
+        });
+     });
+
      const yesterday = Date.now() - 24 * 60 * 60 * 1000;
      posts.forEach(post => {
         if (myFriends.includes(post.author) && post.timestamp > yesterday) {
@@ -1970,7 +1978,7 @@ export default function App() {
 
   const handleNotificationClick = (notif) => {
     setShowNotifications(false);
-    if (notif.type === 'friend_request') {
+    if (notif.type === 'friend_request' || notif.type === 'partner_request') {
        setCurrentTab('friends');
     } else if (notif.postId) {
        const targetPost = posts.find(p => p.id === notif.postId);
@@ -2007,6 +2015,52 @@ export default function App() {
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', friendUsername), { friendRequests: [...targetRequests, currentUser] }, { merge: true });
       alert(`${accountsInfo[friendUsername]?.displayName || friendUsername}さんにフレンド申請を送信しました！`);
+    } catch (e) {}
+  };
+
+  const handleSendPartnerRequest = async (friendCodeOrName) => {
+    if (!currentUser || !db || !friendCodeOrName) return;
+    const friendEntry = Object.entries(accountsInfo).find(([uname, data]) => data.friendCode === friendCodeOrName || uname === friendCodeOrName);
+    if (!friendEntry) { alert("該当するフレンドコード（またはユーザー名）が見つかりません。"); return; }
+    const partnerUsername = friendEntry[0];
+    if (partnerUsername === currentUser) { alert("自分自身は追加できません。"); return; }
+    if (myInfo.partnerId === partnerUsername) { alert("既にパートナーです。"); return; }
+    if (accountsInfo[partnerUsername]?.partnerId) { alert("相手は既に別のパートナーがいます。"); return; }
+    const targetRequests = accountsInfo[partnerUsername]?.partnerRequests || [];
+    if (targetRequests.includes(currentUser)) { alert("既に申請済みです。"); return; }
+    if (!window.confirm(`${accountsInfo[partnerUsername]?.displayName || partnerUsername}さんにパートナー申請を送りますか？`)) return;
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', partnerUsername), { partnerRequests: [...new Set([...targetRequests, currentUser])] }, { merge: true });
+      alert(`${accountsInfo[partnerUsername]?.displayName || partnerUsername}さんにパートナー申請を送信しました！`);
+    } catch (e) {}
+  };
+
+  const handleAcceptPartnerRequest = async (requesterUsername) => {
+    if (!currentUser || !db) return;
+    const myRequests = myInfo.partnerRequests || [];
+    const currentMyPartner = myInfo.partnerId;
+    const currentRequesterPartner = accountsInfo[requesterUsername]?.partnerId;
+    try {
+      if (currentMyPartner) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentMyPartner), { partnerId: null, enablePartner: false }, { merge: true });
+      if (currentRequesterPartner) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentRequesterPartner), { partnerId: null, enablePartner: false }, { merge: true });
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { partnerId: requesterUsername, enablePartner: true, partnerRequests: myRequests.filter(u => u !== requesterUsername) }, { merge: true });
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', requesterUsername), { partnerId: currentUser, enablePartner: true, partnerRequests: (accountsInfo[requesterUsername]?.partnerRequests || []).filter(u => u !== currentUser) }, { merge: true });
+    } catch(e) {}
+  };
+
+  const handleRejectPartnerRequest = async (requesterUsername) => {
+     if (!currentUser || !db) return;
+     const myRequests = myInfo.partnerRequests || [];
+     try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { partnerRequests: myRequests.filter(u => u !== requesterUsername) }, { merge: true }); } catch(e) {}
+  };
+
+  const handleRemovePartner = async () => {
+    if (!currentUser || !db || !myInfo.partnerId) return;
+    if (!window.confirm(`パートナー (${accountsInfo[myInfo.partnerId]?.displayName || myInfo.partnerId}) を解除しますか？`)) return;
+    const partnerId = myInfo.partnerId;
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { partnerId: null, enablePartner: false }, { merge: true });
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', partnerId), { partnerId: null, enablePartner: false }, { merge: true });
     } catch (e) {}
   };
 
@@ -2289,7 +2343,7 @@ export default function App() {
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} currentUser={currentUser} myInfo={myInfo} setCurrentTab={setCurrentTab} onSendRequest={handleSendFriendRequest} />}
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} />}
-        {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} onImportFromDuoFit={handleImportFromDuoFit} posts={posts} />}
+        {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onSendPartnerRequest={handleSendPartnerRequest} onAcceptPartnerRequest={handleAcceptPartnerRequest} onRejectPartnerRequest={handleRejectPartnerRequest} onRemovePartner={handleRemovePartner} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} onImportFromDuoFit={handleImportFromDuoFit} posts={posts} />}
       </main>
 
       {editingPost && <EditWorkoutModal post={editingPost} gyms={allGyms} exercises={exercises} onClose={() => setEditingPost(null)} onSave={handleUpdateWorkout} myPastPosts={posts.filter(p => p.author === currentUser)} />}
@@ -2337,8 +2391,6 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
   const [weight, setWeight] = useState(userInfo?.weight || '');
   const [displayName, setDisplayName] = useState(userInfo?.displayName || currentUser);
   const [hideBodyMetrics, setHideBodyMetrics] = useState(userInfo?.hideBodyMetrics || false);
-  const [enablePartner, setEnablePartner] = useState(userInfo?.enablePartner || false);
-  const [partnerId, setPartnerId] = useState(userInfo?.partnerId || '');
 
   const [cropImageSrc, setCropImageSrc] = useState(null);
   const [cropScale, setCropScale] = useState(1);
@@ -2357,8 +2409,6 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
       setWeight(userInfo?.weight || '');
       setDisplayName(userInfo?.displayName || currentUser);
       setHideBodyMetrics(userInfo?.hideBodyMetrics || false);
-      setEnablePartner(userInfo?.enablePartner || false);
-      setPartnerId(userInfo?.partnerId || '');
       setCropImageSrc(null);
       setImageObj(null);
     }
@@ -2440,7 +2490,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
   };
 
   const handleSave = () => {
-    onSave({ displayName: displayName.trim() || currentUser, photoUrl, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null, hideBodyMetrics, enablePartner, partnerId: partnerId.trim() });
+    onSave({ displayName: displayName.trim() || currentUser, photoUrl, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null, hideBodyMetrics });
   };
 
   if (cropImageSrc) {
@@ -2545,16 +2595,6 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
           <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-950/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
              <input type="checkbox" id="hideBodyMetrics" checked={hideBodyMetrics} onChange={e => setHideBodyMetrics(e.target.checked)} className="w-4 h-4 text-emerald-500 rounded focus:ring-emerald-500" />
              <label htmlFor="hideBodyMetrics" className="text-sm font-bold text-slate-700 dark:text-slate-300">フレンドに体組成を非公開にする</label>
-          </div>
-
-          <div className="flex flex-col gap-2 bg-slate-50 dark:bg-slate-950/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700 mt-4 mb-4">
-             <div className="flex items-center gap-2">
-               <input type="checkbox" id="enablePartner" checked={enablePartner} onChange={e => setEnablePartner(e.target.checked)} className="w-4 h-4 text-emerald-500 rounded focus:ring-emerald-500" />
-               <label htmlFor="enablePartner" className="text-sm font-bold text-slate-700 dark:text-slate-300">パートナー機能を有効にする</label>
-             </div>
-             {enablePartner && (
-               <input type="text" value={partnerId} onChange={e => setPartnerId(e.target.value)} placeholder="パートナーのユーザー名を入力" className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500" />
-             )}
           </div>
 
           <div>
@@ -4133,16 +4173,22 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
 }
 
 // --- フレンド画面 ---
-function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccept, onReject, onRemoveFriend, onFriendClick, onGenerateFriendCode, onImportFromDuoFit, posts }) {
+function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccept, onReject, onRemoveFriend, onSendPartnerRequest, onAcceptPartnerRequest, onRejectPartnerRequest, onRemovePartner, onFriendClick, onGenerateFriendCode, onImportFromDuoFit, posts }) {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [searchUsername, setSearchUsername] = useState('');
-  const enablePartner = myInfo?.enablePartner;
+  const [searchPartnerName, setSearchPartnerName] = useState('');
   const partnerName = myInfo?.partnerId;
   const partnerInfo = partnerName ? accountsInfo[partnerName] : null;
-  const [activeTab, setActiveTab] = useState(enablePartner && partnerName ? 'partner' : 'friends');
+  const [activeTab, setActiveTab] = useState(partnerName ? 'partner' : 'friends');
   const [reportText, setReportText] = useState('');
   const [isSendingReport, setIsSendingReport] = useState(false);
   const [showReportsModal, setShowReportsModal] = useState(false);
+
+  const handlePartnerSearchSubmit = (e) => {
+    e.preventDefault();
+    onSendPartnerRequest(searchPartnerName.trim());
+    setSearchPartnerName('');
+  };
 
   const rankingData = useMemo(() => {
     const now = new Date();
@@ -4235,7 +4281,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
   let isPartnerOnline = false;
   let pLastActive = 0;
 
-  if (enablePartner && partnerName && partnerInfo) {
+  if (partnerName && partnerInfo) {
       isPartnerTraining = partnerInfo.isTraining;
       pLastActive = partnerInfo.lastActive || 0;
       const pIsAppOnline = partnerInfo.isAppOnline !== false;
@@ -4277,15 +4323,76 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">フレンド</h2>
       
       <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-xl mb-6">
-        {enablePartner && (
-           <button onClick={() => setActiveTab('partner')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'partner' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>パートナー</button>
-        )}
+        <button onClick={() => setActiveTab('partner')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'partner' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>パートナー</button>
         <button onClick={() => setActiveTab('friends')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'friends' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>フレンド一覧</button>
         <button onClick={() => setActiveTab('add')} className={`flex-1 py-2 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'add' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>フレンド追加</button>
       </div>
 
-      {activeTab === 'partner' && partnerName && partnerInfo && (
+      {activeTab === 'partner' && (
         <div className="space-y-6 animate-in fade-in">
+          {myInfo.partnerRequests && myInfo.partnerRequests.length > 0 && (
+             <div className="mb-6 space-y-2">
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">パートナー申請 承認待ち</h3>
+                {myInfo.partnerRequests.map(reqUser => (
+                   <div key={reqUser} className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-xl p-3 flex items-center justify-between shadow-sm">
+                      <div className="flex items-center gap-3">
+                         <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 dark:text-slate-400 overflow-hidden">
+                            {accountsInfo[reqUser]?.photoUrl ? <img src={accountsInfo[reqUser].photoUrl} alt={reqUser} className="w-full h-full object-cover" /> : accountsInfo[reqUser]?.displayName ? accountsInfo[reqUser].displayName.charAt(0).toUpperCase() : reqUser.charAt(0).toUpperCase()}
+                         </div>
+                         {renderUsernameWithBadge(reqUser, accountsInfo[reqUser]?.displayName, accountsInfo, "font-bold text-slate-800 dark:text-slate-100 text-sm")}
+                      </div>
+                      <div className="flex gap-2">
+                         <button onClick={() => onAcceptPartnerRequest(reqUser)} className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-lg transition-colors">承認</button>
+                         <button onClick={() => onRejectPartnerRequest(reqUser)} className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg transition-colors">拒否</button>
+                      </div>
+                   </div>
+                ))}
+             </div>
+          )}
+
+          {!partnerName && (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+              <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2">
+                 <Users size={18} className="text-amber-500" /> パートナーを追加する
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-bold mb-4">フレンドコードで検索するか、既存のフレンドからパートナー申請を送りましょう。パートナーは1人だけ設定できます。</p>
+              
+              <form onSubmit={handlePartnerSearchSubmit} className="flex gap-2 mb-6">
+                <input type="text" value={searchPartnerName} onChange={e => setSearchPartnerName(e.target.value)} required placeholder="フレンドコードまたはユーザー名" className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-100 focus:border-amber-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/>
+                <button type="submit" disabled={!searchPartnerName.trim()} className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 rounded-xl transition-colors disabled:opacity-50 shadow-sm text-sm">申請</button>
+              </form>
+
+              {myFriends.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 mb-3">フレンドから選ぶ</h4>
+                  <div className="space-y-2">
+                    {myFriends.map(f => {
+                       const fInfo = accountsInfo[f];
+                       const hasRequested = (fInfo?.partnerRequests || []).includes(currentUser);
+                       return (
+                         <div key={f} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
+                           <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 dark:text-slate-400 overflow-hidden">
+                                 {fInfo?.photoUrl ? <img src={fInfo.photoUrl} alt={f} className="w-full h-full object-cover" /> : fInfo?.displayName ? fInfo.displayName.charAt(0).toUpperCase() : f.charAt(0).toUpperCase()}
+                              </div>
+                              {renderUsernameWithBadge(f, fInfo?.displayName, accountsInfo, "font-bold text-slate-800 dark:text-slate-200 text-sm")}
+                           </div>
+                           {hasRequested ? (
+                              <span className="text-[10px] font-bold text-slate-400 px-3 py-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg">申請済</span>
+                           ) : (
+                              <button onClick={() => onSendPartnerRequest(f)} className="text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition-colors">申請</button>
+                           )}
+                         </div>
+                       )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {partnerName && partnerInfo && (
+            <>
           <div className={`rounded-3xl p-6 relative overflow-hidden shadow-lg w-full text-white transition-colors duration-500 ${cardGradient}`}>
             <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
             <div className="absolute bottom-0 left-0 w-32 h-32 bg-black/10 rounded-full blur-2xl -ml-10 -mb-10"></div>
@@ -4362,12 +4469,12 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
              <SimpleChart data={weightData} color="#10b981" title="体重の推移 (kg)" />
              <SimpleChart data={fatData} color="#6366f1" title="体脂肪率の推移 (%)" />
           </div>
-        </div>
-      )}
 
-      {activeTab === 'partner' && enablePartner && (!partnerName || !partnerInfo) && (
-        <div className="text-center py-10 text-slate-500 font-bold bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          パートナー情報が見つかりません。<br/>プロフィール設定で正しいユーザー名を設定してください。
+          <div className="mt-8 text-center pt-4 border-t border-slate-200 dark:border-slate-800">
+             <button onClick={onRemovePartner} className="text-xs font-bold text-slate-400 hover:text-rose-500 transition-colors">パートナーを解除する</button>
+          </div>
+            </>
+          )}
         </div>
       )}
 
@@ -4569,7 +4676,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.17, 17:44, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.17, 17:52, updated)</p>
       </div>
     </div>
   );
