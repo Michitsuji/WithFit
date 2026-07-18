@@ -349,12 +349,21 @@ function SimpleChart({ data, color, title }) {
 
 // --- 共通コンポーネント：ワークアウトカード ---
 function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onToggleLike, onImport, onAddComment, onDeleteComment }) {
-  const [showComments, setShowComments] = useState(false);
+  const comments = post.comments || [];
+  const [showComments, setShowComments] = useState(comments.length > 0);
+  const [showAllComments, setShowAllComments] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [mentionQuery, setMentionQuery] = useState(null);
   const textareaRef = useRef(null);
+  const displayComments = showAllComments ? comments : comments.slice(0, 2);
 
-  const comments = post.comments || [];
+  const handleReply = (username) => {
+    setCommentText(prev => prev ? `${prev} @${username} ` : `@${username} `);
+    setShowComments(true);
+    setTimeout(() => {
+      if (textareaRef.current) textareaRef.current.focus();
+    }, 100);
+  };
 
   const handleCommentChange = (e) => {
     const text = e.target.value;
@@ -380,6 +389,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
       onAddComment(post.id, commentText);
       setCommentText('');
       setMentionQuery(null);
+      setShowAllComments(true);
     }
   };
 
@@ -718,46 +728,58 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
           </button>
         </div>
         <div className="flex items-center pr-4">
-          <button onClick={() => setShowComments(!showComments)} className="text-slate-800 dark:text-slate-200 transition-transform active:scale-90 hover:text-slate-500">
+          <button onClick={() => { setShowComments(true); setTimeout(() => textareaRef.current?.focus(), 100); }} className="text-slate-800 dark:text-slate-200 transition-transform active:scale-90 hover:text-slate-500">
             <MessageCircle size={26} />
           </button>
         </div>
       </div>
-      {displayLikesCount > 0 && (
-        <div className="pl-3 mb-2">
-          <button onClick={() => setShowLikesModal(true)} className="text-sm font-bold text-slate-800 dark:text-slate-200 hover:opacity-70">
-            いいね！{displayLikesCount}件
+      <div className="pl-3 mb-2 flex flex-col gap-1">
+        {displayLikesCount > 0 ? (
+          <button onClick={() => setShowLikesModal(true)} className="text-sm font-bold text-slate-800 dark:text-slate-200 hover:opacity-70 text-left">
+            ♡{displayLikesCount}ナイス!
           </button>
-        </div>
-      )}
-      {displayLikesCount === 0 && isMyPost && (
-        <div className="pl-3 mb-2 text-xs font-bold text-slate-400">
-          いいね待ち
-        </div>
-      )}
+        ) : isMyPost ? (
+          <span className="text-xs font-bold text-slate-400">
+            ナイス待ち
+          </span>
+        ) : null}
+        
+        {comments.length > 2 && !showAllComments && (
+          <button onClick={() => setShowAllComments(true)} className="text-sm font-bold text-slate-500 hover:opacity-70 text-left">
+            コメント{comments.length}件をすべて見る
+          </button>
+        )}
+      </div>
 
       {showComments && (
-        <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 animate-in fade-in duration-200">
-          {comments.length > 0 && (
+        <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-800 animate-in fade-in duration-200">
+          {displayComments.length > 0 && (
             <div className="space-y-3 mb-3">
-              {comments.map(comment => {
+              {displayComments.map(comment => {
                 const cInfo = accountsInfo[comment.author];
                 return (
                   <div key={comment.id} className="flex gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 text-xs shrink-0 overflow-hidden">
+                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 text-xs shrink-0 overflow-hidden mt-1">
                        {cInfo?.photoUrl ? <img src={cInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : cInfo?.displayName ? cInfo.displayName.charAt(0).toUpperCase() : comment.author.charAt(0).toUpperCase()}
                     </div>
-                    <div className="flex-1 bg-slate-50 dark:bg-slate-950/50 p-2.5 rounded-2xl rounded-tl-none border border-slate-100 dark:border-slate-800 relative group">
-                      <div className="flex items-baseline gap-2 mb-1">
-                        {renderUsernameWithBadge(comment.author, cInfo?.displayName, accountsInfo, "font-bold text-xs text-slate-800 dark:text-slate-200")}
-                        <span className="text-[10px] text-slate-400">{getRelativeTime(comment.timestamp)}</span>
+                    <div className="flex-1 group">
+                      <div className="bg-slate-50 dark:bg-slate-950/50 p-2.5 rounded-2xl rounded-tl-none border border-slate-100 dark:border-slate-800 relative">
+                        <div className="flex items-baseline gap-2 mb-1">
+                          {renderUsernameWithBadge(comment.author, cInfo?.displayName, accountsInfo, "font-bold text-xs text-slate-800 dark:text-slate-200")}
+                          <span className="text-[10px] text-slate-400">{getRelativeTime(comment.timestamp)}</span>
+                        </div>
+                        <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{renderCommentText(comment.text)}</p>
+                        {(comment.author === currentUser || post.author === currentUser) && onDeleteComment && (
+                          <button onClick={() => onDeleteComment(post.id, comment.id)} className="absolute top-2 right-2 p-1 text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Trash2 size={12} />
+                          </button>
+                        )}
                       </div>
-                      <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{renderCommentText(comment.text)}</p>
-                      {(comment.author === currentUser || post.author === currentUser) && onDeleteComment && (
-                        <button onClick={() => onDeleteComment(post.id, comment.id)} className="absolute top-2 right-2 p-1 text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Trash2 size={12} />
+                      <div className="pl-2 mt-1">
+                        <button onClick={() => handleReply(comment.author)} className="text-[11px] font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+                          返信
                         </button>
-                      )}
+                      </div>
                     </div>
                   </div>
                 )
@@ -4823,7 +4845,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 16:43, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 16:48, updated)</p>
       </div>
     </div>
   );
