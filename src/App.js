@@ -1252,53 +1252,12 @@ function useDragAndDrop(items, setItems) {
   const [dragOverIndex, setDragOverIndex] = useState(null);
   const [draggableId, setDraggableId] = useState(null);
   const refs = useRef([]);
-
-  const adjustPosition = (idx) => {
-    const el = refs.current[idx];
-    if (!el) return;
-    const container = document.getElementById('edit-modal-scroll-container') || window;
-    const isWindow = container === window;
-    const initialTop = el.getBoundingClientRect().top;
-
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        const currentEl = refs.current[idx];
-        if (!currentEl) return;
-        
-        const currentTop = currentEl.getBoundingClientRect().top;
-        container.scrollBy({ top: currentTop - initialTop, behavior: 'instant' });
-
-        setTimeout(() => {
-          const rect = currentEl.getBoundingClientRect();
-          const totalItems = items.length;
-          
-          const ratio = totalItems > 1 ? idx / (totalItems - 1) : 0.5;
-          
-          if (isWindow) {
-            const scrollTop = window.scrollY || document.documentElement.scrollTop;
-            const absoluteTop = rect.top + scrollTop;
-            const windowHeight = window.innerHeight;
-            const targetViewportY = windowHeight * (0.15 + 0.7 * ratio);
-            const targetScrollY = absoluteTop - targetViewportY + (rect.height / 2);
-            window.scrollTo({ top: targetScrollY, behavior: 'smooth' });
-          } else {
-            const containerRect = container.getBoundingClientRect();
-            const scrollTop = container.scrollTop;
-            const absoluteTop = (rect.top - containerRect.top) + scrollTop;
-            const containerHeight = container.clientHeight;
-            const targetViewportY = containerHeight * (0.15 + 0.7 * ratio);
-            const targetScrollY = absoluteTop - targetViewportY + (rect.height / 2);
-            container.scrollTo({ top: targetScrollY, behavior: 'smooth' });
-          }
-        }, 50);
-      }, 50);
-    });
-  };
+  const longPressTimer = useRef(null);
+  const touchState = useRef({ isHolding: false, startX: 0, startY: 0 });
 
   const handleDragStart = (e, idx) => {
     setDraggedIndex(idx);
     e.dataTransfer.effectAllowed = 'move';
-    adjustPosition(idx);
   };
   const handleDragOver = (e, idx) => {
     e.preventDefault();
@@ -1324,13 +1283,31 @@ function useDragAndDrop(items, setItems) {
     setDragOverIndex(null);
     setDraggableId(null);
   };
+
   const handleTouchStart = (e, idx) => {
-    setDraggedIndex(idx);
-    document.body.style.overflow = 'hidden';
-    adjustPosition(idx);
+    if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(e.target.tagName) || e.target.closest('button')) return;
+    touchState.current.startX = e.touches[0].clientX;
+    touchState.current.startY = e.touches[0].clientY;
+    
+    longPressTimer.current = setTimeout(() => {
+      touchState.current.isHolding = true;
+      setDraggedIndex(idx);
+      setDraggableId(items[idx].id);
+      if (navigator.vibrate) navigator.vibrate(50);
+    }, 400);
   };
+
   const handleTouchMove = (e) => {
-    if (draggedIndex === null) return;
+    if (longPressTimer.current && !touchState.current.isHolding) {
+       const dx = e.touches[0].clientX - touchState.current.startX;
+       const dy = e.touches[0].clientY - touchState.current.startY;
+       if (Math.hypot(dx, dy) > 10) {
+          clearTimeout(longPressTimer.current);
+          longPressTimer.current = null;
+       }
+    }
+    if (!touchState.current.isHolding || draggedIndex === null) return;
+    
     const x = e.touches[0].clientX;
     const y = e.touches[0].clientY;
     let hoverIndex = dragOverIndex;
@@ -1341,28 +1318,56 @@ function useDragAndDrop(items, setItems) {
     });
     if (hoverIndex !== null && hoverIndex !== dragOverIndex) setDragOverIndex(hoverIndex);
   };
+
   const handleTouchEnd = () => {
-    if (draggedIndex !== null && dragOverIndex !== null && draggedIndex !== dragOverIndex) {
-      setItems(prev => {
-        const newItems = [...prev];
-        const [dragged] = newItems.splice(draggedIndex, 1);
-        newItems.splice(dragOverIndex, 0, dragged);
-        return newItems;
-      });
+    clearTimeout(longPressTimer.current);
+    longPressTimer.current = null;
+    if (touchState.current.isHolding) {
+      if (draggedIndex !== null && dragOverIndex !== null && draggedIndex !== dragOverIndex) {
+        setItems(prev => {
+          const newItems = [...prev];
+          const [dragged] = newItems.splice(draggedIndex, 1);
+          newItems.splice(dragOverIndex, 0, dragged);
+          return newItems;
+        });
+      }
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      setDraggableId(null);
+      touchState.current.isHolding = false;
     }
-    setDraggedIndex(null);
-    setDragOverIndex(null);
-    setDraggableId(null);
-    document.body.style.overflow = '';
   };
+
+  const handleMouseDown = (e, idx) => {
+    if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'SVG', 'path'].some(tag => e.target.tagName.toUpperCase() === tag) || e.target.closest('button')) return;
+    longPressTimer.current = setTimeout(() => {
+      setDraggableId(items[idx].id);
+    }, 400);
+  };
+
+  const handleMouseUp = () => {
+    clearTimeout(longPressTimer.current);
+    longPressTimer.current = null;
+    if (draggedIndex === null) setDraggableId(null);
+  };
+
+  const dragHandleProps = (idx) => ({
+    onTouchStart: (e) => handleTouchStart(e, idx),
+    onTouchMove: handleTouchMove,
+    onTouchEnd: handleTouchEnd,
+    onTouchCancel: handleTouchEnd,
+    onMouseDown: (e) => handleMouseDown(e, idx),
+    onMouseUp: handleMouseUp,
+    onMouseLeave: handleMouseUp
+  });
 
   return {
     draggedIndex, dragOverIndex, draggableId, setDraggableId, refs,
     handlers: {
       onDragStart: handleDragStart, onDragOver: handleDragOver, onDragLeave: handleDragLeave,
-      onDrop: handleDrop, onDragEnd: handleDragEnd, onTouchStart: handleTouchStart,
-      onTouchMove: handleTouchMove, onTouchEnd: handleTouchEnd, onTouchCancel: handleTouchEnd
-    }
+      onDrop: handleDrop, onDragEnd: handleDragEnd
+    },
+    dragHandleProps
   };
 }
 
@@ -3016,6 +3021,47 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const itemDnd = useDragAndDrop(workoutItems, setWorkoutItems);
   const [restTimerStart, setRestTimerStart] = useState(null);
   const [restTimeElapsed, setRestTimeElapsed] = useState(0);
+  const carouselRef = useRef(null);
+  const [carouselHeight, setCarouselHeight] = useState('auto');
+
+  const updateCarouselHeight = () => {
+    if (!carouselRef.current) return;
+    const container = carouselRef.current;
+    const scrollLeft = container.scrollLeft;
+    const center = scrollLeft + container.clientWidth / 2;
+    
+    let activeIdx = 0;
+    let minDiff = Infinity;
+    
+    itemDnd.refs.current.forEach((el, idx) => {
+      if (!el) return;
+      const centerEl = el.offsetLeft - container.offsetLeft + el.offsetWidth / 2;
+      const diff = Math.abs(center - centerEl);
+      if (diff < minDiff) {
+        minDiff = diff;
+        activeIdx = idx;
+      }
+    });
+
+    const addBtnEl = container.lastElementChild;
+    if (addBtnEl && addBtnEl.tagName === 'DIV') {
+      const centerEl = addBtnEl.offsetLeft - container.offsetLeft + addBtnEl.offsetWidth / 2;
+      const diff = Math.abs(center - centerEl);
+      if (diff < minDiff) {
+         setCarouselHeight(addBtnEl.offsetHeight);
+         return;
+      }
+    }
+    
+    if (itemDnd.refs.current[activeIdx]) {
+      setCarouselHeight(itemDnd.refs.current[activeIdx].offsetHeight);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(updateCarouselHeight, 50);
+    return () => clearTimeout(timer);
+  }, [workoutItems]);
 
   useEffect(() => {
     if (!restTimerStart) return;
@@ -3443,6 +3489,47 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
   const [editBodyWeight, setEditBodyWeight] = useState(post.bodyWeight || '');
   const [editBodyFat, setEditBodyFat] = useState(post.bodyFat || '');
   const [selectedCategories, setSelectedCategories] = useState([]);
+  const carouselRef = useRef(null);
+  const [carouselHeight, setCarouselHeight] = useState('auto');
+
+  const updateCarouselHeight = () => {
+    if (!carouselRef.current) return;
+    const container = carouselRef.current;
+    const scrollLeft = container.scrollLeft;
+    const center = scrollLeft + container.clientWidth / 2;
+    
+    let activeIdx = 0;
+    let minDiff = Infinity;
+    
+    itemDnd.refs.current.forEach((el, idx) => {
+      if (!el) return;
+      const centerEl = el.offsetLeft - container.offsetLeft + el.offsetWidth / 2;
+      const diff = Math.abs(center - centerEl);
+      if (diff < minDiff) {
+        minDiff = diff;
+        activeIdx = idx;
+      }
+    });
+
+    const addBtnEl = container.lastElementChild;
+    if (addBtnEl && addBtnEl.tagName === 'DIV') {
+      const centerEl = addBtnEl.offsetLeft - container.offsetLeft + addBtnEl.offsetWidth / 2;
+      const diff = Math.abs(center - centerEl);
+      if (diff < minDiff) {
+         setCarouselHeight(addBtnEl.offsetHeight);
+         return;
+      }
+    }
+    
+    if (itemDnd.refs.current[activeIdx]) {
+      setCarouselHeight(itemDnd.refs.current[activeIdx].offsetHeight);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(updateCarouselHeight, 50);
+    return () => clearTimeout(timer);
+  }, [workoutItems]);
 
   const toggleCategory = (cat) => setSelectedCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]);
 
@@ -3572,7 +3659,12 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
             .hide-scrollbar::-webkit-scrollbar { display: none; }
             .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
           `}</style>
-          <div className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start">
+          <div 
+            ref={carouselRef}
+            onScroll={updateCarouselHeight}
+            className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start transition-[height] duration-300 ease-in-out"
+            style={{ height: carouselHeight === 'auto' ? 'auto' : `${carouselHeight + 32}px`, overflowY: 'hidden' }}
+          >
             {workoutItems.map((item, index) => (
                <div key={item.id}
                   ref={(el) => (itemDnd.refs.current[index] = el)}
@@ -3582,7 +3674,8 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
                   onDragLeave={itemDnd.handlers.onDragLeave}
                   onDrop={(e) => itemDnd.handlers.onDrop(e, index)}
                   onDragEnd={itemDnd.handlers.onDragEnd}
-                  className={`snap-center shrink-0 w-[88%] sm:w-[320px] relative transition-all duration-200 ${itemDnd.draggedIndex === index ? (itemDnd.dragOverIndex === index ? 'opacity-70 scale-[0.98] ring-2 ring-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] rounded-2xl' : 'opacity-40 scale-[0.98] border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl') : ''}`}
+                  {...itemDnd.dragHandleProps(index)}
+                  className={`snap-center shrink-0 w-[88%] sm:w-[320px] relative transition-all duration-200 cursor-default ${itemDnd.draggedIndex === index ? (itemDnd.dragOverIndex === index ? 'opacity-70 scale-[0.98] ring-2 ring-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] rounded-2xl' : 'opacity-40 scale-[0.98] border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl') : ''}`}
                >
                   {itemDnd.dragOverIndex === index && itemDnd.draggedIndex !== index && <div className={`absolute top-0 h-full w-1.5 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${itemDnd.draggedIndex < itemDnd.dragOverIndex ? '-right-2.5' : '-left-2.5'}`} />}
                   <WorkoutItemForm 
@@ -3601,14 +3694,7 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
                     myPastPosts={myPastPosts}
                     isDragging={itemDnd.draggedIndex === index}
                     isAnyDragging={itemDnd.draggedIndex !== null}
-                    dragHandleProps={{
-                      onMouseEnter: () => itemDnd.setDraggableId(item.id),
-                      onMouseLeave: () => itemDnd.setDraggableId(null),
-                      onTouchStart: (e) => { itemDnd.setDraggableId(item.id); itemDnd.handlers.onTouchStart(e, index); },
-                      onTouchMove: itemDnd.handlers.onTouchMove,
-                      onTouchEnd: itemDnd.handlers.onTouchEnd,
-                      onTouchCancel: itemDnd.handlers.onTouchCancel
-                    }}
+                    dragHandleProps={{}}
                   />
                </div>
             ))}
@@ -4729,7 +4815,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 09:20, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 09:32, updated)</p>
       </div>
     </div>
   );
