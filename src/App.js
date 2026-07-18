@@ -2002,82 +2002,6 @@ export default function App() {
     }
   };
 
-  const handleImportFromDuoFit = async (duofitUsername, duofitPin) => {
-    if (!db || !duofitUsername || !duofitPin) return { success: false, message: '入力が不完全です' };
-    
-    try {
-      const accRef = doc(db, 'artifacts', 'duofit-app', 'public', 'data', 'accounts', duofitUsername);
-      const accSnap = await getDoc(accRef);
-      if (!accSnap.exists() || accSnap.data().pin !== duofitPin) {
-          return { success: false, message: 'ユーザー名またはPINコードが間違っています' };
-      }
-
-      const workoutsRef = collection(db, 'artifacts', 'duofit-app', 'public', 'data', 'workouts');
-      const q = query(workoutsRef, where('author', '==', duofitUsername));
-      const workoutsSnap = await getDocs(q);
-      const workoutPromises = workoutsSnap.docs.map(d => {
-          const data = d.data();
-          return setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', d.id), { ...data, author: currentUser }, { merge: true });
-      });
-      await Promise.all(workoutPromises);
-
-      const duofitGymsRef = collection(db, 'artifacts', 'duofit-app', 'public', 'data', 'gyms');
-      const duofitGymsSnap = await getDocs(duofitGymsRef);
-      const newJoinedGyms = [...(myInfo?.joinedGyms || ['common'])];
-      const gymIdMap = {};
-
-      const gymPromises = duofitGymsSnap.docs.map(async (d) => {
-          const gymData = d.data();
-          const existingGym = gyms.find(g => g.name === gymData.name);
-          let targetGymId = d.id;
-          
-          if (existingGym) {
-              targetGymId = existingGym.id;
-              if (!newJoinedGyms.includes(targetGymId)) newJoinedGyms.push(targetGymId);
-              const members = existingGym.members || [];
-              if (!members.includes(currentUser)) {
-                  await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gyms', targetGymId), {
-                      members: [...members, currentUser]
-                  }, { merge: true });
-              }
-          } else {
-              targetGymId = `gym_${generateId()}`;
-              if (!newJoinedGyms.includes(targetGymId)) newJoinedGyms.push(targetGymId);
-              await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gyms', targetGymId), {
-                  ...gymData,
-                  owner: 'ゆうた',
-                  members: [currentUser]
-              });
-          }
-          gymIdMap[d.id] = targetGymId;
-      });
-      await Promise.all(gymPromises);
-
-      const duofitExRef = collection(db, 'artifacts', 'duofit-app', 'public', 'data', 'exercises');
-      const duofitExSnap = await getDocs(duofitExRef);
-      
-      const exPromises = duofitExSnap.docs.map(async (d) => {
-          const exData = d.data();
-          const targetGymId = exData.gymId === 'common' ? 'common' : (gymIdMap[exData.gymId] || exData.gymId);
-          const existingEx = exercises.find(ex => ex.name === exData.name && ex.gymId === targetGymId);
-          if (!existingEx) {
-              await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', `ex_${generateId()}`), {
-                  ...exData,
-                  gymId: targetGymId
-              });
-          }
-      });
-      await Promise.all(exPromises);
-
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { joinedGyms: [...new Set(newJoinedGyms)] }, { merge: true });
-
-      return { success: true };
-    } catch (error) {
-      console.error(error);
-      return { success: false, message: '通信エラーが発生しました' };
-    }
-  };
-
   const unreadNotificationCount = notifications.filter(n => n.time > (myInfo.lastNotificationCheck || 0)).length;
 
   const handleOpenNotifications = () => {
@@ -2327,6 +2251,9 @@ export default function App() {
 
   return (
     <div className={`min-h-screen font-sans pb-32 overflow-x-hidden select-none transition-colors duration-300 ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'} ${themeContainerClass}`}>
+      <style>{`
+        input, textarea, select { font-size: 16px !important; }
+      `}</style>
       {myInfo.theme === 'ocean' && (
         <style>{`
           .theme-ocean.dark, .theme-ocean .bg-slate-950 { background-color: #021526 !important; }
@@ -2463,7 +2390,7 @@ export default function App() {
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} currentUser={currentUser} myInfo={myInfo} setCurrentTab={setCurrentTab} onSendRequest={handleSendFriendRequest} />}
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />}
-        {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onSendPartnerRequest={handleSendPartnerRequest} onAcceptPartnerRequest={handleAcceptPartnerRequest} onRejectPartnerRequest={handleRejectPartnerRequest} onRemovePartner={handleRemovePartner} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} onImportFromDuoFit={handleImportFromDuoFit} posts={posts} />}
+        {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onSendPartnerRequest={handleSendPartnerRequest} onAcceptPartnerRequest={handleAcceptPartnerRequest} onRejectPartnerRequest={handleRejectPartnerRequest} onRemovePartner={handleRemovePartner} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} posts={posts} />}
       </main>
 
       {editingPost && <EditWorkoutModal post={editingPost} gyms={allGyms} exercises={exercises} onClose={() => setEditingPost(null)} onSave={handleUpdateWorkout} myPastPosts={posts.filter(p => p.author === currentUser)} />}
@@ -4326,7 +4253,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
 }
 
 // --- フレンド画面 ---
-function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccept, onReject, onRemoveFriend, onSendPartnerRequest, onAcceptPartnerRequest, onRejectPartnerRequest, onRemovePartner, onFriendClick, onGenerateFriendCode, onImportFromDuoFit, posts }) {
+function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccept, onReject, onRemoveFriend, onSendPartnerRequest, onAcceptPartnerRequest, onRejectPartnerRequest, onRemovePartner, onFriendClick, onGenerateFriendCode, posts }) {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [searchUsername, setSearchUsername] = useState('');
   const [searchPartnerName, setSearchPartnerName] = useState('');
@@ -4377,24 +4304,6 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
 
     return { globalRanking: allUsersArray, friendRanking };
   }, [posts, currentUser, myInfo.friends, accountsInfo]);
-  
-  const [duofitUsername, setDuofitUsername] = useState('');
-  const [duofitPin, setDuofitPin] = useState('');
-  const [isImporting, setIsImporting] = useState(false);
-
-  const handleExecuteImport = async () => {
-    if (!duofitUsername || !duofitPin) return;
-    setIsImporting(true);
-    const result = await onImportFromDuoFit(duofitUsername, duofitPin);
-    setIsImporting(false);
-    if (result.success) {
-      alert('DuoFitからの引継ぎが完了しました！');
-      setDuofitUsername('');
-      setDuofitPin('');
-    } else {
-      alert(result.message);
-    }
-  };
 
   useEffect(() => {
     const timerId = setInterval(() => setCurrentTime(Date.now()), 5000);
@@ -4712,23 +4621,6 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
               </button>
             </form>
           )}
-
-          <div className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900 rounded-2xl p-5 shadow-sm">
-            <h3 className="text-indigo-700 dark:text-indigo-300 font-bold mb-3 text-sm flex items-center gap-2">
-               <Download size={16}/> DuoFitからデータ引継ぎ
-            </h3>
-            <p className="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold mb-4">
-               DuoFitで記録した過去のトレーニングや種目をWithFitにコピーします。<br/>(2回目以降は重複せずデータが上書き更新されます)
-            </p>
-            <div className="space-y-3">
-               <input type="text" value={duofitUsername} onChange={e => setDuofitUsername(e.target.value)} placeholder="DuoFitのユーザー名 (例: 勇太)" className="w-full bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-indigo-500 text-sm" />
-               <input type="password" value={duofitPin} onChange={e => setDuofitPin(e.target.value)} placeholder="DuoFitのPINコード (4桁)" maxLength={4} className="w-full bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-indigo-500 text-sm" />
-               <button onClick={handleExecuteImport} disabled={isImporting || !duofitUsername || duofitPin.length !== 4} className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-2">
-                  {isImporting ? <Activity size={16} className="animate-spin" /> : <Download size={16} />}
-                  {isImporting ? '引継ぎ処理中...' : 'データを引き継ぐ'}
-               </button>
-            </div>
-          </div>
         </div>
       )}
 
@@ -4851,7 +4743,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 17:04, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 17:08, updated)</p>
       </div>
     </div>
   );
