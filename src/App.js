@@ -3529,10 +3529,12 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
   const updateDropSetField = (itemId, parentSetId, dropId, field, value, targetArray = 'dropSets') => { setWorkoutItems(prev => prev.map(item => { if (item.id !== itemId) return item; return { ...item, sets: item.sets.map(set => { if (set.id !== parentSetId) return set; return { ...set, [targetArray]: (set[targetArray] || []).map(ds => ds.id === dropId ? { ...ds, [field]: value } : ds) }; })}; })); }
 
   const longPressTimer = useRef(null);
+  const touchStartPos = useRef({ x: 0, y: 0 });
 
   const handleTouchStart = (e, index, itemId) => {
     if (itemDnd.draggedIndex !== null || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
     const touch = e.changedTouches[0];
+    touchStartPos.current = { x: touch.clientX, y: touch.clientY };
     const touchObj = { clientX: touch.clientX, clientY: touch.clientY, identifier: touch.identifier };
     longPressTimer.current = setTimeout(() => {
       itemDnd.setDraggableId(itemId);
@@ -3543,11 +3545,17 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
 
   const handleTouchMove = (e) => {
     if (itemDnd.draggedIndex === null && longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
+      const touch = e.changedTouches[0];
+      const dx = Math.abs(touch.clientX - touchStartPos.current.x);
+      const dy = Math.abs(touch.clientY - touchStartPos.current.y);
+      if (dx > 10 || dy > 10) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
     }
     if (itemDnd.draggedIndex !== null) {
       itemDnd.handlers.onTouchMove(e);
+      if (e.cancelable) e.preventDefault();
     }
   };
 
@@ -3563,10 +3571,22 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
 
   const handleMouseDown = (e, index, itemId) => {
     if (itemDnd.draggedIndex !== null || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+    touchStartPos.current = { x: e.clientX, y: e.clientY };
     longPressTimer.current = setTimeout(() => {
       itemDnd.setDraggableId(itemId);
       itemDnd.handlers.onDragStart(e, index);
     }, 400);
+  };
+
+  const handleMouseMove = (e) => {
+    if (itemDnd.draggedIndex === null && longPressTimer.current) {
+      const dx = Math.abs(e.clientX - touchStartPos.current.x);
+      const dy = Math.abs(e.clientY - touchStartPos.current.y);
+      if (dx > 10 || dy > 10) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+    }
   };
 
   const handleMouseUpOrLeave = () => {
@@ -4823,7 +4843,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 10:35, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 10:37, updated)</p>
       </div>
     </div>
   );
