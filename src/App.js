@@ -608,7 +608,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
           <div className="relative ml-auto">
             {!showImportOptions ? (
               <button onClick={() => setShowImportOptions(true)} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-2 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/80 transition-colors border border-emerald-100 dark:border-emerald-900">
-                <Copy size={14} /> 構成をコピー
+                <Copy size={14} /> 構成コピー
               </button>
             ) : (
               <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
@@ -2241,7 +2241,7 @@ export default function App() {
     const friendName = friendInfo?.displayName || f;
     const gymId = friendInfo?.currentGymId;
     const gymName = gymId ? allGyms.find(g => g.id === gymId)?.name : null;
-    return gymName ? `${friendName}(${gymName})` : friendName;
+    return gymName ? `${gymName}で${friendName}` : friendName;
   }).join('、');
 
   const isDarkMode = ['dark', 'ocean', 'mono'].includes(myInfo.theme);
@@ -2759,7 +2759,7 @@ function TimelineView({ posts, onToggleLike, onImport, currentUser, onDelete, on
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">直近のフレンドのトレーニング</h2>
+      <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">タイムライン</h2>
       {!posts || posts.length === 0 ? (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center mt-10 shadow-sm">
           <Dumbbell className="mx-auto text-slate-300 dark:text-slate-600 w-12 h-12 mb-4" />
