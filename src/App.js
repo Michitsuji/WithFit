@@ -673,9 +673,9 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
               </div>
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-2">
               {item.sets && Array.isArray(item.sets) && item.sets.map((set, sIdx) => (
-                <div key={sIdx} className="mb-4 last:mb-0 bg-white/40 dark:bg-slate-900/40 p-2 rounded-lg border border-slate-200/40 dark:border-slate-800/40">
+                <div key={sIdx} className="bg-white/40 dark:bg-slate-900/40 p-2 rounded-lg border border-slate-200/40 dark:border-slate-800/40">
                   {renderSetRow(set, item.weightType, 'main', false, `set ${sIdx + 1}`)}
                   
                   {item.isDropSet && set.dropSets && set.dropSets.map((ds, dsIdx) => (
@@ -1524,6 +1524,7 @@ export default function App() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [focusedPost, setFocusedPost] = useState(null);
   const [redirectUser, setRedirectUser] = useState(null);
+  const [targetFriendTab, setTargetFriendTab] = useState(null);
 
   const handleAddComment = async (postId, text) => {
     if (!currentUser || !db || !text.trim()) return;
@@ -2011,8 +2012,12 @@ export default function App() {
 
   const handleNotificationClick = (notif) => {
     setShowNotifications(false);
-    if (notif.type === 'friend_request' || notif.type === 'partner_request') {
+    if (notif.type === 'friend_request') {
        setCurrentTab('friends');
+       setTargetFriendTab('friends');
+    } else if (notif.type === 'partner_request') {
+       setCurrentTab('friends');
+       setTargetFriendTab('partner');
     } else if (notif.postId) {
        const targetPost = posts.find(p => p.id === notif.postId);
        if (targetPost) setFocusedPost(targetPost);
@@ -2333,8 +2338,28 @@ export default function App() {
           </div>
         </div>
         {activeFriends.length > 0 && (
-          <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-4 py-2 flex flex-col items-center justify-center text-xs font-bold animate-in slide-in-from-top duration-300">
-            <div className="flex items-center gap-2 mb-0.5"><Flame size={14} className="animate-pulse text-amber-300 shrink-0" /> <span className="truncate">{activeFriendsText}さんがトレーニング中です！</span></div>
+          <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white py-2 flex items-center text-xs font-bold animate-in slide-in-from-top duration-300 overflow-hidden w-full">
+            <style>{`
+              @keyframes marquee {
+                0% { transform: translateX(0%); }
+                100% { transform: translateX(-50%); }
+              }
+              .animate-marquee {
+                display: flex;
+                white-space: nowrap;
+                animation: marquee 20s linear infinite;
+              }
+            `}</style>
+            <div className="animate-marquee min-w-max">
+               <div className="flex items-center gap-2 px-8">
+                 <Flame size={14} className="animate-pulse text-amber-300 shrink-0" />
+                 <span>{activeFriendsText}さんがトレーニング中です！</span>
+               </div>
+               <div className="flex items-center gap-2 px-8">
+                 <Flame size={14} className="animate-pulse text-amber-300 shrink-0" />
+                 <span>{activeFriendsText}さんがトレーニング中です！</span>
+               </div>
+            </div>
           </div>
         )}
         {showNotifications && (
@@ -2388,7 +2413,7 @@ export default function App() {
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} currentUser={currentUser} myInfo={myInfo} setCurrentTab={setCurrentTab} onSendRequest={handleSendFriendRequest} />}
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />}
-        {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onSendPartnerRequest={handleSendPartnerRequest} onAcceptPartnerRequest={handleAcceptPartnerRequest} onRejectPartnerRequest={handleRejectPartnerRequest} onRemovePartner={handleRemovePartner} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} posts={posts} />}
+        {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onSendPartnerRequest={handleSendPartnerRequest} onAcceptPartnerRequest={handleAcceptPartnerRequest} onRejectPartnerRequest={handleRejectPartnerRequest} onRemovePartner={handleRemovePartner} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} posts={posts} targetFriendTab={targetFriendTab} setTargetFriendTab={setTargetFriendTab} />}
       </main>
 
       {editingPost && <EditWorkoutModal post={editingPost} gyms={allGyms} exercises={exercises} onClose={() => setEditingPost(null)} onSave={handleUpdateWorkout} myPastPosts={posts.filter(p => p.author === currentUser)} />}
@@ -4251,14 +4276,21 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
 }
 
 // --- フレンド画面 ---
-function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccept, onReject, onRemoveFriend, onSendPartnerRequest, onAcceptPartnerRequest, onRejectPartnerRequest, onRemovePartner, onFriendClick, onGenerateFriendCode, posts }) {
+function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccept, onReject, onRemoveFriend, onSendPartnerRequest, onAcceptPartnerRequest, onRejectPartnerRequest, onRemovePartner, onFriendClick, onGenerateFriendCode, posts, targetFriendTab, setTargetFriendTab }) {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [searchUsername, setSearchUsername] = useState('');
   const [searchPartnerName, setSearchPartnerName] = useState('');
   const partnerName = myInfo?.partnerId;
   const partnerInfo = partnerName ? accountsInfo[partnerName] : null;
   const isPartnerEnabled = myInfo?.enablePartnerFeature || false;
-  const [activeTab, setActiveTab] = useState(isPartnerEnabled ? 'partner' : 'friends');
+  const [activeTab, setActiveTab] = useState(targetFriendTab || (isPartnerEnabled ? 'partner' : 'friends'));
+
+  useEffect(() => {
+    if (targetFriendTab) {
+      setActiveTab(targetFriendTab);
+      if (setTargetFriendTab) setTargetFriendTab(null);
+    }
+  }, [targetFriendTab, setTargetFriendTab]);
   const [rankingType, setRankingType] = useState('friends');
   const [isRankingExpanded, setIsRankingExpanded] = useState(false);
   const [reportText, setReportText] = useState('');
@@ -4741,7 +4773,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 17:08, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 20:47, updated)</p>
       </div>
     </div>
   );
