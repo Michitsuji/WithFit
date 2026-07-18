@@ -1291,13 +1291,20 @@ function useDragAndDrop(items, setItems) {
     if (!touch) return;
     const x = touch.clientX;
     const y = touch.clientY;
-    let hoverIndex = dragOverIndex;
+    let minDistance = Infinity;
+    let closestIndex = dragOverIndex;
     refs.current.forEach((el, idx) => {
        if (!el) return;
        const rect = el.getBoundingClientRect();
-       if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) hoverIndex = idx;
+       const centerX = rect.left + rect.width / 2;
+       const centerY = rect.top + rect.height / 2;
+       const distance = Math.hypot(x - centerX, y - centerY);
+       if (distance < minDistance) {
+         minDistance = distance;
+         closestIndex = idx;
+       }
     });
-    if (hoverIndex !== null && hoverIndex !== dragOverIndex) setDragOverIndex(hoverIndex);
+    if (closestIndex !== null && closestIndex !== dragOverIndex) setDragOverIndex(closestIndex);
   };
   const handleTouchEnd = (e) => {
     if (touchIdRef.current === null) return;
@@ -3024,10 +3031,12 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   });
 
   const longPressTimer = useRef(null);
+  const touchStartPos = useRef({ x: 0, y: 0 });
 
   const handleTouchStart = (e, index, itemId) => {
     if (itemDnd.draggedIndex !== null || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
     const touch = e.changedTouches[0];
+    touchStartPos.current = { x: touch.clientX, y: touch.clientY };
     const touchObj = { clientX: touch.clientX, clientY: touch.clientY, identifier: touch.identifier };
     longPressTimer.current = setTimeout(() => {
       itemDnd.setDraggableId(itemId);
@@ -3038,11 +3047,17 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
 
   const handleTouchMove = (e) => {
     if (itemDnd.draggedIndex === null && longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
+      const touch = e.changedTouches[0];
+      const dx = Math.abs(touch.clientX - touchStartPos.current.x);
+      const dy = Math.abs(touch.clientY - touchStartPos.current.y);
+      if (dx > 10 || dy > 10) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
     }
     if (itemDnd.draggedIndex !== null) {
       itemDnd.handlers.onTouchMove(e);
+      if (e.cancelable) e.preventDefault();
     }
   };
 
@@ -3058,10 +3073,22 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
 
   const handleMouseDown = (e, index, itemId) => {
     if (itemDnd.draggedIndex !== null || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+    touchStartPos.current = { x: e.clientX, y: e.clientY };
     longPressTimer.current = setTimeout(() => {
       itemDnd.setDraggableId(itemId);
       itemDnd.handlers.onDragStart(e, index);
     }, 400);
+  };
+
+  const handleMouseMove = (e) => {
+    if (itemDnd.draggedIndex === null && longPressTimer.current) {
+      const dx = Math.abs(e.clientX - touchStartPos.current.x);
+      const dy = Math.abs(e.clientY - touchStartPos.current.y);
+      if (dx > 10 || dy > 10) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+    }
   };
 
   const handleMouseUpOrLeave = () => {
@@ -3639,9 +3666,9 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
                   onDragLeave={itemDnd.handlers.onDragLeave}
                   onDrop={(e) => itemDnd.handlers.onDrop(e, index)}
                   onDragEnd={itemDnd.handlers.onDragEnd}
-                  className={`snap-center shrink-0 w-[88%] sm:w-[320px] relative transition-all duration-200 ${itemDnd.draggedIndex === index ? (itemDnd.dragOverIndex === index ? 'opacity-70 scale-[0.98] ring-2 ring-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] rounded-2xl' : 'opacity-40 scale-[0.98] border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl') : ''}`}
+                  className={`snap-center shrink-0 w-[88%] sm:w-[320px] relative transition-all duration-200 ${itemDnd.draggedIndex === index ? 'z-50 scale-[1.02] shadow-2xl ring-4 ring-emerald-500 opacity-95 rounded-2xl bg-white dark:bg-slate-900' : itemDnd.draggedIndex !== null ? 'opacity-40 scale-95' : ''}`}
                >
-                  {itemDnd.dragOverIndex === index && itemDnd.draggedIndex !== index && <div className={`absolute top-0 h-full w-1.5 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${itemDnd.draggedIndex < itemDnd.dragOverIndex ? '-right-2.5' : '-left-2.5'}`} />}
+                  {itemDnd.dragOverIndex === index && itemDnd.draggedIndex !== index && <div className={`absolute top-0 h-full w-2 bg-emerald-500 rounded-full z-10 shadow-[0_0_12px_rgba(16,185,129,0.9)] animate-pulse ${itemDnd.draggedIndex < itemDnd.dragOverIndex ? '-right-3' : '-left-3'}`} />}
                   <WorkoutItemForm 
                     item={item} 
                     index={index}
@@ -3664,6 +3691,7 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
                       onTouchEnd: handleTouchEndOrCancel,
                       onTouchCancel: handleTouchEndOrCancel,
                       onMouseDown: (e) => handleMouseDown(e, index, item.id),
+                      onMouseMove: handleMouseMove,
                       onMouseUp: handleMouseUpOrLeave,
                       onMouseLeave: handleMouseUpOrLeave
                     }}
@@ -4787,7 +4815,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 10:26, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 10:31, updated)</p>
       </div>
     </div>
   );
