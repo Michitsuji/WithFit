@@ -2241,7 +2241,7 @@ export default function App() {
     const friendName = friendInfo?.displayName || f;
     const gymId = friendInfo?.currentGymId;
     const gymName = gymId ? allGyms.find(g => g.id === gymId)?.name : null;
-    return gymName ? `${friendName}(${gymName})` : friendName;
+    return gymName ? `${friendName}` : friendName;
   }).join('、');
 
   const isDarkMode = ['dark', 'ocean', 'mono'].includes(myInfo.theme);
