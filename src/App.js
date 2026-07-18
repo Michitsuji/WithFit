@@ -2777,36 +2777,23 @@ function LoginScreen({ onLogin, onGoogleLogin, isOnline }) {
 
 // --- 広告コンポーネント ---
 function AdBanner() {
-  const adHtml = `
-    <!DOCTYPE html>
-    <html lang="ja">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; background: transparent; }</style>
-      </head>
-      <body>
-        <!-- admax -->
-        <script src="https://adm.shinobi.jp/s/a04ca2be115f37f6cb540834ad84c602"></script>
-        <!-- admax -->
-      </body>
-    </html>
-  `;
+  const adRef = useRef(null);
+
+  useEffect(() => {
+    if (!adRef.current) return;
+    if (adRef.current.querySelector('script')) return; // 重複読み込み防止
+
+    const scriptUrl = 'https://adm.shinobi.jp/s/a04ca2be115f37f6cb540834ad84c602';
+    const script = document.createElement('script');
+    script.src = scriptUrl;
+    script.async = true;
+    adRef.current.appendChild(script);
+  }, []);
 
   return (
     <div className="w-full flex flex-col items-center justify-center mb-4 overflow-hidden">
       <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-1">スポンサー</span>
-      <div className="flex justify-center items-center min-h-[50px] w-full max-w-[320px] bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden">
-        <iframe
-          title="admax-banner"
-          srcDoc={adHtml}
-          width="320"
-          height="50"
-          frameBorder="0"
-          scrolling="no"
-          sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin"
-          style={{ border: 'none', overflow: 'hidden', backgroundColor: 'transparent' }}
-        />
+      <div ref={adRef} className="flex justify-center items-center min-h-[50px] w-full max-w-[320px]">
       </div>
     </div>
   );
@@ -4818,7 +4805,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 21:07, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 21:09, updated)</p>
       </div>
     </div>
   );
