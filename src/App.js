@@ -4608,7 +4608,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
               </h3>
               <div className="flex bg-black/20 rounded-lg p-0.5">
                 <button onClick={() => setRankingType('friends')} className={`text-[10px] font-bold px-2 py-1 rounded-md transition-colors ${rankingType === 'friends' ? 'bg-white/20 text-white' : 'text-white/60'}`}>フレンド</button>
-                <button onClick={() => setRankingType('global')} className={`text-[10px] font-bold px-2 py-1 rounded-md transition-colors ${rankingType === 'global' ? 'bg-white/20 text-white' : 'text-white/60'}`}>全体</button>
+                <button onClick={() => setRankingType('global')} className={`text-[10px] font-bold px-2 py-1 rounded-md transition-colors ${rankingType === 'global' ? 'bg-white/20 text-white' : 'text-white/60'}`}>全世界</button>
               </div>
             </div>
             <div className="space-y-2.5 relative z-10">
