@@ -359,10 +359,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 
   const handleReply = (username) => {
     setCommentText(prev => prev ? `${prev} @${username} ` : `@${username} `);
-    setShowComments(true);
-    setTimeout(() => {
-      if (textareaRef.current) textareaRef.current.focus();
-    }, 100);
+    if (textareaRef.current) textareaRef.current.focus();
   };
 
   const handleCommentChange = (e) => {
@@ -805,7 +802,8 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                 value={commentText}
                 onChange={handleCommentChange}
                 placeholder="コメントを追加... (@でメンション)"
-                className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-2 px-3 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500 resize-none min-h-[40px] max-h-24"
+                className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-2 px-3 text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500 resize-none min-h-[40px] max-h-24"
+                style={{ fontSize: '16px' }}
                 rows={1}
               />
               <button onClick={submitComment} disabled={!commentText.trim()} className="bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white p-2 rounded-xl flex items-center justify-center transition-colors h-10 w-10 shrink-0">
@@ -4853,7 +4851,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 16:59, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 17:04, updated)</p>
       </div>
     </div>
   );
