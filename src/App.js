@@ -727,9 +727,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
             <button onClick={() => setShowLikesModal(true)} className="text-sm font-bold text-slate-800 dark:text-slate-200 hover:opacity-70">
               {displayLikesCount} ナイス!
             </button>
-          ) : isMyPost ? (
-            <span className="text-sm font-bold text-slate-400">ナイス待ち</span>
-          ) : null}
+          )  : null}
         </div>
         <div className="flex items-center gap-1.5 pr-4">
           <button onClick={() => { if (showComments) { setShowComments(false); } else { setShowComments(true); setTimeout(() => textareaRef.current?.focus(), 100); } }} className="text-slate-800 dark:text-slate-200 transition-transform active:scale-90 hover:text-slate-500">
