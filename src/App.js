@@ -576,9 +576,13 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
         ) : null}
       </div>
 
-      <div className="pl-3 space-y-3 mb-4">
+      <style>{`
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
+      <div className="pl-3 mb-4 flex overflow-x-auto snap-x snap-mandatory gap-3 pb-2 pr-3 hide-scrollbar">
         {processedItems.map((item, idx) => (
-          <div key={idx} className="bg-slate-50 dark:bg-slate-950/50 rounded-xl p-3 border border-slate-100 dark:border-slate-800">
+          <div key={idx} className="snap-center shrink-0 w-[85%] sm:w-[280px] bg-slate-50 dark:bg-slate-950/50 rounded-xl p-3 border border-slate-100 dark:border-slate-800">
             <div className="flex items-center justify-between mb-3">
               <div className="flex flex-col gap-1.5 flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -648,9 +652,9 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
       </div>
 
       <div className="flex items-center justify-between pl-3 mt-4">
-        {isMyPost ? (
-          <div className="flex items-center gap-3">
-            {displayLikesCount > 0 ? (
+        <div className="flex items-center gap-3">
+          {isMyPost ? (
+            displayLikesCount > 0 ? (
               <button onClick={() => setShowLikesModal(true)} className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-rose-500 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/80 rounded-full transition-colors border border-rose-200 dark:border-rose-900/50">
                 <Heart size={16} fill="currentColor" />
                 {displayLikesCount} ナイス！
@@ -660,21 +664,21 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                 <Heart size={16} fill="none" />
                 ナイス待ち
               </div>
-            )}
-          </div>
-        ) : (
-          <div className="flex items-center gap-3">
-            <button onClick={() => onToggleLike(post.id, displayLikesCount, isCurrentlyLiked, likedUsers)} className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all text-sm font-bold ${isCurrentlyLiked ? 'bg-rose-50 dark:bg-rose-950 text-rose-500 border border-rose-200 dark:border-rose-900' : 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'}`}>
-              <Heart size={16} fill={isCurrentlyLiked ? "currentColor" : "none"} className={isCurrentlyLiked ? "animate-pulse" : ""} />
-              ナイス！
-            </button>
-            {displayLikesCount > 0 && (
-              <button onClick={() => setShowLikesModal(true)} className="flex items-center gap-1 text-sm font-bold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 px-3 py-1.5 rounded-full transition-colors">
-                <Heart size={14} fill="currentColor" /> {displayLikesCount} ナイス！
+            )
+          ) : (
+            <>
+              <button onClick={() => onToggleLike(post.id, displayLikesCount, isCurrentlyLiked, likedUsers)} className={`flex items-center gap-1.5 px-4 py-2 text-sm font-bold rounded-full transition-colors border ${isCurrentlyLiked ? 'text-rose-500 bg-rose-50 dark:bg-rose-950/50 border-rose-200 dark:border-rose-900/50 hover:bg-rose-100 dark:hover:bg-rose-900/80' : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
+                <Heart size={16} fill={isCurrentlyLiked ? "currentColor" : "none"} className={isCurrentlyLiked ? "animate-pulse" : ""} />
+                {displayLikesCount > 0 ? `${displayLikesCount} ナイス！` : 'ナイス！'}
               </button>
-            )}
-          </div>
-        )}
+              {displayLikesCount > 0 && (
+                <button onClick={() => setShowLikesModal(true)} className="text-xs font-bold text-slate-400 hover:text-slate-600 underline">
+                  確認
+                </button>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {showLikesModal && (
@@ -1002,7 +1006,7 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
   const isConfirmed = item.isConfirmed;
 
   return (
-    <div className={`${isConfirmed ? 'bg-emerald-50/30 dark:bg-emerald-950/20 border-2 border-emerald-400 dark:border-emerald-600' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800'} rounded-2xl p-4 shadow-sm relative w-full overflow-hidden mb-6 transition-all duration-200`} onClickCapture={() => onActive && onActive(item.exerciseName)}>
+    <div {...dragHandleProps} className={`${isConfirmed ? 'bg-emerald-50/30 dark:bg-emerald-950/20 border-2 border-emerald-400 dark:border-emerald-600' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800'} rounded-2xl p-4 shadow-sm relative w-full overflow-hidden mb-6 transition-all duration-200 ${isDragging ? 'cursor-grabbing' : 'cursor-auto'}`} onClickCapture={() => onActive && onActive(item.exerciseName)}>
       {isConfirmed && (
         <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl rounded-tr-2xl shadow-sm z-10 flex items-center gap-1">
           <CheckCircle size={12} /> 保存済み
@@ -1010,13 +1014,7 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
       )}
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-start gap-1.5 flex-1 min-w-0">
-          <div 
-            className="mt-2 p-1.5 cursor-grab active:cursor-grabbing text-slate-300 hover:text-emerald-500 rounded bg-slate-50 dark:bg-slate-800 touch-none shrink-0"
-            {...dragHandleProps}
-          >
-            <GripVertical size={20}/>
-          </div>
-          <div className={`flex flex-col flex-1 min-w-0 ml-1 gap-2 ${isConfirmed ? 'pointer-events-none opacity-60' : ''}`}>
+          <div className={`flex flex-col flex-1 min-w-0 gap-2 ${isConfirmed ? 'pointer-events-none opacity-60' : ''}`}>
             {!isAnyDragging && (
               <div className="flex flex-wrap bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg gap-1">
                 <button onClick={() => toggleFilter('gym')} disabled={isConfirmed} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilters.includes('gym') ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>マシン等</button>
@@ -1251,54 +1249,12 @@ function useDragAndDrop(items, setItems) {
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
   const [draggableId, setDraggableId] = useState(null);
+  const touchIdRef = useRef(null);
   const refs = useRef([]);
-
-  const adjustPosition = (idx) => {
-    const el = refs.current[idx];
-    if (!el) return;
-    const container = document.getElementById('edit-modal-scroll-container') || window;
-    const isWindow = container === window;
-    const initialTop = el.getBoundingClientRect().top;
-
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        const currentEl = refs.current[idx];
-        if (!currentEl) return;
-        
-        const currentTop = currentEl.getBoundingClientRect().top;
-        container.scrollBy({ top: currentTop - initialTop, behavior: 'instant' });
-
-        setTimeout(() => {
-          const rect = currentEl.getBoundingClientRect();
-          const totalItems = items.length;
-          
-          const ratio = totalItems > 1 ? idx / (totalItems - 1) : 0.5;
-          
-          if (isWindow) {
-            const scrollTop = window.scrollY || document.documentElement.scrollTop;
-            const absoluteTop = rect.top + scrollTop;
-            const windowHeight = window.innerHeight;
-            const targetViewportY = windowHeight * (0.15 + 0.7 * ratio);
-            const targetScrollY = absoluteTop - targetViewportY + (rect.height / 2);
-            window.scrollTo({ top: targetScrollY, behavior: 'smooth' });
-          } else {
-            const containerRect = container.getBoundingClientRect();
-            const scrollTop = container.scrollTop;
-            const absoluteTop = (rect.top - containerRect.top) + scrollTop;
-            const containerHeight = container.clientHeight;
-            const targetViewportY = containerHeight * (0.15 + 0.7 * ratio);
-            const targetScrollY = absoluteTop - targetViewportY + (rect.height / 2);
-            container.scrollTo({ top: targetScrollY, behavior: 'smooth' });
-          }
-        }, 50);
-      }, 50);
-    });
-  };
 
   const handleDragStart = (e, idx) => {
     setDraggedIndex(idx);
     e.dataTransfer.effectAllowed = 'move';
-    adjustPosition(idx);
   };
   const handleDragOver = (e, idx) => {
     e.preventDefault();
@@ -1325,14 +1281,16 @@ function useDragAndDrop(items, setItems) {
     setDraggableId(null);
   };
   const handleTouchStart = (e, idx) => {
+    if (touchIdRef.current !== null) return;
+    touchIdRef.current = e.changedTouches[0].identifier;
     setDraggedIndex(idx);
-    document.body.style.overflow = 'hidden';
-    adjustPosition(idx);
   };
   const handleTouchMove = (e) => {
-    if (draggedIndex === null) return;
-    const x = e.touches[0].clientX;
-    const y = e.touches[0].clientY;
+    if (draggedIndex === null || touchIdRef.current === null) return;
+    const touch = Array.from(e.changedTouches).find(t => t.identifier === touchIdRef.current);
+    if (!touch) return;
+    const x = touch.clientX;
+    const y = touch.clientY;
     let hoverIndex = dragOverIndex;
     refs.current.forEach((el, idx) => {
        if (!el) return;
@@ -1341,7 +1299,10 @@ function useDragAndDrop(items, setItems) {
     });
     if (hoverIndex !== null && hoverIndex !== dragOverIndex) setDragOverIndex(hoverIndex);
   };
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e) => {
+    if (touchIdRef.current === null) return;
+    const touch = Array.from(e.changedTouches).find(t => t.identifier === touchIdRef.current);
+    if (!touch) return;
     if (draggedIndex !== null && dragOverIndex !== null && draggedIndex !== dragOverIndex) {
       setItems(prev => {
         const newItems = [...prev];
@@ -1353,7 +1314,7 @@ function useDragAndDrop(items, setItems) {
     setDraggedIndex(null);
     setDragOverIndex(null);
     setDraggableId(null);
-    document.body.style.overflow = '';
+    touchIdRef.current = null;
   };
 
   return {
@@ -3062,6 +3023,54 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
     return selectedCategories.includes(ex.category || 'その他');
   });
 
+  const longPressTimer = useRef(null);
+
+  const handleTouchStart = (e, index, itemId) => {
+    if (itemDnd.draggedIndex !== null || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+    const touch = e.changedTouches[0];
+    const touchObj = { clientX: touch.clientX, clientY: touch.clientY, identifier: touch.identifier };
+    longPressTimer.current = setTimeout(() => {
+      itemDnd.setDraggableId(itemId);
+      itemDnd.handlers.onTouchStart({ changedTouches: [touchObj] }, index);
+      if (navigator.vibrate) navigator.vibrate(50);
+    }, 400);
+  };
+
+  const handleTouchMove = (e) => {
+    if (itemDnd.draggedIndex === null && longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    if (itemDnd.draggedIndex !== null) {
+      itemDnd.handlers.onTouchMove(e);
+    }
+  };
+
+  const handleTouchEndOrCancel = (e) => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    if (itemDnd.draggedIndex !== null) {
+      itemDnd.handlers.onTouchEnd(e);
+    }
+  };
+
+  const handleMouseDown = (e, index, itemId) => {
+    if (itemDnd.draggedIndex !== null || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+    longPressTimer.current = setTimeout(() => {
+      itemDnd.setDraggableId(itemId);
+      itemDnd.handlers.onDragStart(e, index);
+    }, 400);
+  };
+
+  const handleMouseUpOrLeave = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
   const handleStart = () => {
     if (!selectedGymId) { alert("ジムを選択してください"); return; }
     onStart(selectedGymId);
@@ -3485,6 +3494,54 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
   const removeDropSet = (itemId, parentSetId, dropId, targetArray = 'dropSets') => { setWorkoutItems(prev => prev.map(item => { if (item.id !== itemId) return item; return { ...item, sets: item.sets.map(set => { if (set.id !== parentSetId) return set; return { ...set, [targetArray]: (set[targetArray] || []).filter(ds => ds.id !== dropId) }; })}; })); }
   const updateDropSetField = (itemId, parentSetId, dropId, field, value, targetArray = 'dropSets') => { setWorkoutItems(prev => prev.map(item => { if (item.id !== itemId) return item; return { ...item, sets: item.sets.map(set => { if (set.id !== parentSetId) return set; return { ...set, [targetArray]: (set[targetArray] || []).map(ds => ds.id === dropId ? { ...ds, [field]: value } : ds) }; })}; })); }
 
+  const longPressTimer = useRef(null);
+
+  const handleTouchStart = (e, index, itemId) => {
+    if (itemDnd.draggedIndex !== null || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+    const touch = e.changedTouches[0];
+    const touchObj = { clientX: touch.clientX, clientY: touch.clientY, identifier: touch.identifier };
+    longPressTimer.current = setTimeout(() => {
+      itemDnd.setDraggableId(itemId);
+      itemDnd.handlers.onTouchStart({ changedTouches: [touchObj] }, index);
+      if (navigator.vibrate) navigator.vibrate(50);
+    }, 400);
+  };
+
+  const handleTouchMove = (e) => {
+    if (itemDnd.draggedIndex === null && longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    if (itemDnd.draggedIndex !== null) {
+      itemDnd.handlers.onTouchMove(e);
+    }
+  };
+
+  const handleTouchEndOrCancel = (e) => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    if (itemDnd.draggedIndex !== null) {
+      itemDnd.handlers.onTouchEnd(e);
+    }
+  };
+
+  const handleMouseDown = (e, index, itemId) => {
+    if (itemDnd.draggedIndex !== null || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+    longPressTimer.current = setTimeout(() => {
+      itemDnd.setDraggableId(itemId);
+      itemDnd.handlers.onDragStart(e, index);
+    }, 400);
+  };
+
+  const handleMouseUpOrLeave = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
   const handleSave = () => {
     const isValid = workoutItems.every(item => {
       if (!item.exerciseName || !item.sets || item.sets.length === 0) return false;
@@ -3602,12 +3659,13 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
                     isDragging={itemDnd.draggedIndex === index}
                     isAnyDragging={itemDnd.draggedIndex !== null}
                     dragHandleProps={{
-                      onMouseEnter: () => itemDnd.setDraggableId(item.id),
-                      onMouseLeave: () => itemDnd.setDraggableId(null),
-                      onTouchStart: (e) => { itemDnd.setDraggableId(item.id); itemDnd.handlers.onTouchStart(e, index); },
-                      onTouchMove: itemDnd.handlers.onTouchMove,
-                      onTouchEnd: itemDnd.handlers.onTouchEnd,
-                      onTouchCancel: itemDnd.handlers.onTouchCancel
+                      onTouchStart: (e) => handleTouchStart(e, index, item.id),
+                      onTouchMove: handleTouchMove,
+                      onTouchEnd: handleTouchEndOrCancel,
+                      onTouchCancel: handleTouchEndOrCancel,
+                      onMouseDown: (e) => handleMouseDown(e, index, item.id),
+                      onMouseUp: handleMouseUpOrLeave,
+                      onMouseLeave: handleMouseUpOrLeave
                     }}
                   />
                </div>
@@ -4729,7 +4787,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 09:20, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 10:26, updated)</p>
       </div>
     </div>
   );
