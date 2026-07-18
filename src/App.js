@@ -3168,6 +3168,9 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
     if (selectedCategories.length === 0) return false;
     if (ex.gymId === 'common') {
        if (ex.author && ex.author !== currentUser && ex.author !== MASTER_USER) return false;
+    } else {
+       const gym = gyms.find(g => g.id === ex.gymId);
+       if (gym && ex.author && ex.author !== gym.owner && ex.author !== currentUser && ex.author !== MASTER_USER) return false;
     }
     return selectedCategories.includes(ex.category || 'その他');
   });
@@ -3561,6 +3564,9 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
     if (selectedCategories.length === 0) return false;
     if (ex.gymId === 'common') {
        if (ex.author && ex.author !== post.author && ex.author !== MASTER_USER) return false;
+    } else {
+       const exGym = gyms.find(g => g.id === ex.gymId);
+       if (exGym && ex.author && ex.author !== exGym.owner && ex.author !== post.author && ex.author !== MASTER_USER) return false;
     }
     return selectedCategories.includes(ex.category || 'その他');
   });
@@ -4262,6 +4268,8 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                       if (filterCategory !== 'all' && ex.category !== filterCategory) return false;
                       if (ex.gymId === 'common') {
                          if (ex.author && ex.author !== currentUser && ex.author !== MASTER_USER) return false;
+                      } else {
+                         if (ex.author && ex.author !== gym.owner && ex.author !== currentUser && ex.author !== MASTER_USER) return false;
                       }
                       return true;
                     }).sort((a, b) => {
@@ -4295,7 +4303,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                                   <button onClick={() => handleMuteExercise(ex.name)} className={`p-2 rounded-lg transition-colors border ${isMuted ? 'text-indigo-400 bg-indigo-50 border-indigo-100 hover:bg-indigo-100 dark:bg-indigo-950/30 dark:border-indigo-900' : 'text-slate-400 bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-800 hover:bg-slate-100'}`} title={isMuted ? '表示する' : '非表示にする'}>
                                     <EyeOff size={16}/>
                                   </button>
-                                  {(ex.gymId !== 'common' || isAdmin || ex.author === currentUser) && (
+                                  {(isAdmin || ex.author === currentUser || (ex.gymId !== 'common' && gym.owner === currentUser)) && (
                                     <>
                                       <button onClick={() => startEdit(ex)} className="p-2 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 bg-slate-50 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-100 dark:border-slate-800"><Edit2 size={16} /></button>
                                       <button onClick={() => { if(window.confirm(`${ex.name}を削除しますか？`)) handleDeleteExercise(ex.id); }} className="p-2 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 bg-slate-50 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-100 dark:border-slate-800"><Trash2 size={16} /></button>
@@ -4845,7 +4853,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 16:48, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 16:51, updated)</p>
       </div>
     </div>
   );
