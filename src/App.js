@@ -2750,6 +2750,9 @@ function LoginScreen({ onLogin, onGoogleLogin, isOnline }) {
                />
                <span className="text-xs font-bold text-slate-600">利用規約に同意する</span>
              </label>
+             <div className="mt-4">
+               <AdBanner />
+             </div>
            </div>
            <button 
              disabled={!agreed}
@@ -4805,7 +4808,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 21:09, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 21:12, updated)</p>
       </div>
     </div>
   );
