@@ -1331,12 +1331,13 @@ function useDragAndDrop(items, setItems) {
   };
   const handleTouchMove = (e) => {
     if (draggedIndex === null) return;
+    const x = e.touches[0].clientX;
     const y = e.touches[0].clientY;
     let hoverIndex = dragOverIndex;
     refs.current.forEach((el, idx) => {
        if (!el) return;
        const rect = el.getBoundingClientRect();
-       if (y >= rect.top && y <= rect.bottom) hoverIndex = idx;
+       if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) hoverIndex = idx;
     });
     if (hoverIndex !== null && hoverIndex !== dragOverIndex) setDragOverIndex(hoverIndex);
   };
@@ -3351,7 +3352,11 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
         </div>
       )}
 
-      <div className="space-y-4">
+      <style>{`
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
+      <div className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start">
         {workoutItems.map((item, index) => (
           <div key={item.id}
              ref={(el) => (itemDnd.refs.current[index] = el)}
@@ -3361,9 +3366,9 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
              onDragLeave={itemDnd.handlers.onDragLeave}
              onDrop={(e) => itemDnd.handlers.onDrop(e, index)}
              onDragEnd={itemDnd.handlers.onDragEnd}
-             className={`relative transition-all duration-200 ${itemDnd.draggedIndex === index ? (itemDnd.dragOverIndex === index ? 'opacity-70 scale-[0.98] ring-2 ring-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] rounded-2xl' : 'opacity-40 scale-[0.98] border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl') : ''}`}
+             className={`snap-center shrink-0 w-[88%] sm:w-[320px] relative transition-all duration-200 ${itemDnd.draggedIndex === index ? (itemDnd.dragOverIndex === index ? 'opacity-70 scale-[0.98] ring-2 ring-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] rounded-2xl' : 'opacity-40 scale-[0.98] border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl') : ''}`}
           >
-             {itemDnd.dragOverIndex === index && itemDnd.draggedIndex !== index && <div className={`absolute left-0 w-full h-1.5 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${itemDnd.draggedIndex < itemDnd.dragOverIndex ? '-bottom-2' : '-top-2'}`} />}
+             {itemDnd.dragOverIndex === index && itemDnd.draggedIndex !== index && <div className={`absolute top-0 h-full w-1.5 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${itemDnd.draggedIndex < itemDnd.dragOverIndex ? '-right-2.5' : '-left-2.5'}`} />}
              <WorkoutItemForm 
                item={item} 
                index={index}
@@ -3393,7 +3398,13 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
           </div>
         ))}
 
-        <button onClick={() => addExerciseItem()} className="w-full py-4 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border border-slate-200 dark:border-slate-800"><ListPlus size={18} /> 次の種目を追加</button>
+        <div className="snap-center shrink-0 w-[88%] sm:w-[320px] flex flex-col justify-center h-full min-h-[200px]">
+          <button onClick={() => addExerciseItem()} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
+            <div className="bg-white dark:bg-slate-800 p-3 rounded-full shadow-sm"><ListPlus size={24} className="text-emerald-500" /></div>
+            <span>次の種目を追加</span>
+          </button>
+        </div>
+      </div>
 
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm mt-6">
           <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2"><Activity size={16} /> 本日の体組成（任意）</h3>
@@ -3556,47 +3567,58 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
             </div>
           )}
 
-          {workoutItems.map((item, index) => (
-             <div key={item.id}
-                ref={(el) => (itemDnd.refs.current[index] = el)}
-                draggable={itemDnd.draggableId === item.id}
-                onDragStart={(e) => itemDnd.handlers.onDragStart(e, index)}
-                onDragOver={(e) => itemDnd.handlers.onDragOver(e, index)}
-                onDragLeave={itemDnd.handlers.onDragLeave}
-                onDrop={(e) => itemDnd.handlers.onDrop(e, index)}
-                onDragEnd={itemDnd.handlers.onDragEnd}
-                className={`relative transition-all duration-200 ${itemDnd.draggedIndex === index ? (itemDnd.dragOverIndex === index ? 'opacity-70 scale-[0.98] ring-2 ring-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] rounded-2xl' : 'opacity-40 scale-[0.98] border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl') : ''}`}
-             >
-                {itemDnd.dragOverIndex === index && itemDnd.draggedIndex !== index && <div className={`absolute left-0 w-full h-1.5 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${itemDnd.draggedIndex < itemDnd.dragOverIndex ? '-bottom-2' : '-top-2'}`} />}
-                <WorkoutItemForm 
-                  item={item} 
-                  index={index}
-                  availableExercises={availableExercises} 
-                  updateItem={updateItem} 
-                  removeItem={removeExerciseItem}
-                  addSet={addSet} 
-                  removeSet={removeSet} 
-                  updateSet={updateSetField} 
-                  addDropSet={addDropSet} 
-                  removeDropSet={removeDropSet} 
-                  updateDropSet={updateDropSetField}
-                  reorderSet={reorderSet}
-                  myPastPosts={myPastPosts}
-                  isDragging={itemDnd.draggedIndex === index}
-                  isAnyDragging={itemDnd.draggedIndex !== null}
-                  dragHandleProps={{
-                    onMouseEnter: () => itemDnd.setDraggableId(item.id),
-                    onMouseLeave: () => itemDnd.setDraggableId(null),
-                    onTouchStart: (e) => { itemDnd.setDraggableId(item.id); itemDnd.handlers.onTouchStart(e, index); },
-                    onTouchMove: itemDnd.handlers.onTouchMove,
-                    onTouchEnd: itemDnd.handlers.onTouchEnd,
-                    onTouchCancel: itemDnd.handlers.onTouchCancel
-                  }}
-                />
-             </div>
-          ))}
+          <style>{`
+            .hide-scrollbar::-webkit-scrollbar { display: none; }
+            .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+          `}</style>
+          <div className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start">
+            {workoutItems.map((item, index) => (
+               <div key={item.id}
+                  ref={(el) => (itemDnd.refs.current[index] = el)}
+                  draggable={itemDnd.draggableId === item.id}
+                  onDragStart={(e) => itemDnd.handlers.onDragStart(e, index)}
+                  onDragOver={(e) => itemDnd.handlers.onDragOver(e, index)}
+                  onDragLeave={itemDnd.handlers.onDragLeave}
+                  onDrop={(e) => itemDnd.handlers.onDrop(e, index)}
+                  onDragEnd={itemDnd.handlers.onDragEnd}
+                  className={`snap-center shrink-0 w-[88%] sm:w-[320px] relative transition-all duration-200 ${itemDnd.draggedIndex === index ? (itemDnd.dragOverIndex === index ? 'opacity-70 scale-[0.98] ring-2 ring-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] rounded-2xl' : 'opacity-40 scale-[0.98] border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl') : ''}`}
+               >
+                  {itemDnd.dragOverIndex === index && itemDnd.draggedIndex !== index && <div className={`absolute top-0 h-full w-1.5 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${itemDnd.draggedIndex < itemDnd.dragOverIndex ? '-right-2.5' : '-left-2.5'}`} />}
+                  <WorkoutItemForm 
+                    item={item} 
+                    index={index}
+                    availableExercises={availableExercises} 
+                    updateItem={updateItem} 
+                    removeItem={removeExerciseItem}
+                    addSet={addSet} 
+                    removeSet={removeSet} 
+                    updateSet={updateSetField} 
+                    addDropSet={addDropSet} 
+                    removeDropSet={removeDropSet} 
+                    updateDropSet={updateDropSetField}
+                    reorderSet={reorderSet}
+                    myPastPosts={myPastPosts}
+                    isDragging={itemDnd.draggedIndex === index}
+                    isAnyDragging={itemDnd.draggedIndex !== null}
+                    dragHandleProps={{
+                      onMouseEnter: () => itemDnd.setDraggableId(item.id),
+                      onMouseLeave: () => itemDnd.setDraggableId(null),
+                      onTouchStart: (e) => { itemDnd.setDraggableId(item.id); itemDnd.handlers.onTouchStart(e, index); },
+                      onTouchMove: itemDnd.handlers.onTouchMove,
+                      onTouchEnd: itemDnd.handlers.onTouchEnd,
+                      onTouchCancel: itemDnd.handlers.onTouchCancel
+                    }}
+                  />
+               </div>
+            ))}
 
-          <button onClick={addExerciseItem} className="w-full py-4 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border border-slate-200 dark:border-slate-800"><ListPlus size={18} /> 次の種目を追加</button>
+            <div className="snap-center shrink-0 w-[88%] sm:w-[320px] flex flex-col justify-center h-full min-h-[200px]">
+              <button onClick={addExerciseItem} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
+                <div className="bg-white dark:bg-slate-800 p-3 rounded-full shadow-sm"><ListPlus size={24} className="text-emerald-500" /></div>
+                <span>次の種目を追加</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pb-safe">
@@ -4706,7 +4728,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 09:10, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 09:17, updated)</p>
       </div>
     </div>
   );
