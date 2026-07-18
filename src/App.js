@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus, EyeOff, Bell, Download, CheckCircle, Handshake } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
@@ -711,10 +711,100 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 // --- 共通コンポーネント：ワークアウト入力フォーム ---
 function WorkoutItemForm({ item, index, availableExercises, updateItem, removeItem, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet, reorderSet, myPastPosts, onActive, isDragging, isAnyDragging, dragHandleProps }) {
   const [localFilters, setLocalFilters] = useState([]);
-  
-  const setDnd = useDragAndDrop(item.sets || [], (dragIdx, dropIdx) => {
-    if (reorderSet) reorderSet(item.id, dragIdx, dropIdx);
-  });
+  const [draggedSetIndex, setDraggedSetIndex] = useState(null);
+  const [dragOverSetIndex, setDragOverSetIndex] = useState(null);
+  const [draggableSetId, setDraggableSetId] = useState(null);
+  const setRefs = useRef([]);
+
+  const adjustPosition = (idx) => {
+    const el = setRefs.current[idx];
+    if (!el) return;
+    const container = document.getElementById('edit-modal-scroll-container') || window;
+    const isWindow = container === window;
+    const initialTop = el.getBoundingClientRect().top;
+
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const currentEl = setRefs.current[idx];
+        if (!currentEl) return;
+        
+        const currentTop = currentEl.getBoundingClientRect().top;
+        container.scrollBy({ top: currentTop - initialTop, behavior: 'instant' });
+
+        setTimeout(() => {
+          const rect = currentEl.getBoundingClientRect();
+          const totalItems = item.sets ? item.sets.length : 1;
+          const ratio = totalItems > 1 ? idx / (totalItems - 1) : 0.5;
+          
+          if (isWindow) {
+            const scrollTop = window.scrollY || document.documentElement.scrollTop;
+            const absoluteTop = rect.top + scrollTop;
+            const windowHeight = window.innerHeight;
+            const targetViewportY = windowHeight * (0.15 + 0.7 * ratio);
+            const targetScrollY = absoluteTop - targetViewportY + (rect.height / 2);
+            window.scrollTo({ top: targetScrollY, behavior: 'smooth' });
+          } else {
+            const containerRect = container.getBoundingClientRect();
+            const scrollTop = container.scrollTop;
+            const absoluteTop = (rect.top - containerRect.top) + scrollTop;
+            const containerHeight = container.clientHeight;
+            const targetViewportY = containerHeight * (0.15 + 0.7 * ratio);
+            const targetScrollY = absoluteTop - targetViewportY + (rect.height / 2);
+            container.scrollTo({ top: targetScrollY, behavior: 'smooth' });
+          }
+        }, 50);
+      }, 50);
+    });
+  };
+
+  const handleDragStart = (e, idx) => {
+    setDraggedSetIndex(idx);
+    e.dataTransfer.effectAllowed = 'move';
+    adjustPosition(idx);
+  };
+
+  const handleTouchStart = (e, idx) => {
+    setDraggedSetIndex(idx);
+    document.body.style.overflow = 'hidden';
+    adjustPosition(idx);
+  };
+  const handleTouchMove = (e) => {
+    if (draggedSetIndex === null) return;
+    const y = e.touches[0].clientY;
+    let hoverIndex = dragOverSetIndex;
+    setRefs.current.forEach((el, idx) => {
+       if (!el) return;
+       const rect = el.getBoundingClientRect();
+       if (y >= rect.top && y <= rect.bottom) hoverIndex = idx;
+    });
+    if (hoverIndex !== null && hoverIndex !== dragOverSetIndex) setDragOverSetIndex(hoverIndex);
+  };
+  const handleTouchEnd = () => {
+    if (draggedSetIndex !== null && dragOverSetIndex !== null && draggedSetIndex !== dragOverSetIndex) {
+       if (reorderSet) reorderSet(item.id, draggedSetIndex, dragOverSetIndex);
+    }
+    setDraggedSetIndex(null);
+    setDragOverSetIndex(null);
+    setDraggableSetId(null);
+    document.body.style.overflow = '';
+  };
+  const handleDragOver = (e, idx) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverSetIndex !== idx) setDragOverSetIndex(idx);
+  };
+  const handleDragLeave = () => setDragOverSetIndex(null);
+  const handleDrop = (e, idx) => {
+    e.preventDefault();
+    if (draggedSetIndex !== null && draggedSetIndex !== idx && reorderSet) reorderSet(item.id, draggedSetIndex, idx);
+    setDraggedSetIndex(null);
+    setDragOverSetIndex(null);
+  };
+  const handleDragEnd = () => {
+    setDraggedSetIndex(null);
+    setDragOverSetIndex(null);
+    setDraggableSetId(null);
+  };
 
   const exerciseHistoryMap = useMemo(() => {
     const history = {};
@@ -920,7 +1010,12 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
       )}
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-start gap-1.5 flex-1 min-w-0">
-
+          <div 
+            className="mt-2 p-1.5 cursor-grab active:cursor-grabbing text-slate-300 hover:text-emerald-500 rounded bg-slate-50 dark:bg-slate-800 touch-none shrink-0"
+            {...dragHandleProps}
+          >
+            <GripVertical size={20}/>
+          </div>
           <div className={`flex flex-col flex-1 min-w-0 ml-1 gap-2 ${isConfirmed ? 'pointer-events-none opacity-60' : ''}`}>
             {!isAnyDragging && (
               <div className="flex flex-wrap bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg gap-1">
@@ -1005,38 +1100,44 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
           <div className="w-6 shrink-0"></div>
         </div>
         
-        {(() => {
-          const previewSets = [...(item.sets || [])];
-          if (setDnd.dragState.isDragging && setDnd.dragState.dragIndex !== null && setDnd.dragState.hoverIndex !== null) {
-            const [dragged] = previewSets.splice(setDnd.dragState.dragIndex, 1);
-            previewSets.splice(setDnd.dragState.hoverIndex, 0, dragged);
-          }
-          return previewSets.map((set) => {
-            const sIndex = item.sets.findIndex(s => s.id === set.id);
-            const isPlaceholder = setDnd.dragState.isDragging && sIndex === setDnd.dragState.dragIndex;
-            
-            return (
-              <div key={set.id} 
-                ref={(el) => (setDnd.refs.current[sIndex] = el)}
-                {...setDnd.handlers(sIndex)}
-                className={`bg-slate-50/50 dark:bg-slate-950/50 p-2.5 rounded-xl border transition-all relative ${isPlaceholder ? 'opacity-30 border-dashed border-emerald-500' : 'border-slate-100 dark:border-slate-800'} space-y-3`}
+        {item.sets && Array.isArray(item.sets) && item.sets.map((set, sIndex) => (
+          <div key={set.id} 
+            ref={(el) => (setRefs.current[sIndex] = el)}
+            draggable={draggableSetId === set.id}
+            onDragStart={(e) => handleDragStart(e, sIndex)}
+            onDragOver={(e) => handleDragOver(e, sIndex)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, sIndex)}
+            onDragEnd={handleDragEnd}
+            className={`bg-slate-50/50 dark:bg-slate-950/50 p-2.5 rounded-xl border transition-all relative ${draggedSetIndex === sIndex ? (dragOverSetIndex === sIndex ? 'opacity-70 border-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'opacity-40 border-dashed border-slate-300 dark:border-slate-600') : 'border-slate-100 dark:border-slate-800'} ${draggedSetIndex !== null ? 'space-y-0' : 'space-y-3'}`}
+          >
+            {dragOverSetIndex === sIndex && draggedSetIndex !== sIndex && <div className={`absolute left-0 w-full h-1 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${draggedSetIndex < dragOverSetIndex ? '-bottom-1.5' : '-top-1.5'}`} />}
+            <div className="flex items-center gap-2">
+              <div 
+                 className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-emerald-500 p-1 -ml-1 shrink-0 touch-none"
+                 onMouseEnter={() => setDraggableSetId(set.id)}
+                 onMouseLeave={() => setDraggableSetId(null)}
+                 onTouchStart={(e) => handleTouchStart(e, sIndex)}
+                 onTouchMove={handleTouchMove}
+                 onTouchEnd={handleTouchEnd}
+                 onTouchCancel={handleTouchEnd}
               >
-                <div className="flex items-center gap-2 pointer-events-none">
-                  <div className="w-6 text-center text-slate-400 dark:text-slate-500 font-bold text-sm shrink-0">{sIndex + 1}</div>
-                  
-                  {isPlaceholder ? (
-                    <div className="flex-1 text-sm font-bold text-slate-500 dark:text-slate-400 py-1">入れ替え中...</div>
-                  ) : (
-                    <div className="flex-1 flex gap-2 items-center pointer-events-auto">
-                      {renderInputRow(set, item.weightType, 'main', false)}
-                      <button onClick={() => removeSet(item.id, set.id)} disabled={item.sets.length === 1} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 disabled:opacity-30 flex justify-center"><X size={18} /></button>
-                    </div>
-                  )}
-                </div>
+                <GripVertical size={16} />
+              </div>
+              <div className="w-6 text-center text-slate-400 dark:text-slate-500 font-bold text-sm shrink-0">{sIndex + 1}</div>
+              
+              {draggedSetIndex !== null ? (
+                <div className="flex-1 text-sm font-bold text-slate-500 dark:text-slate-400 py-1">SET {sIndex + 1}</div>
+              ) : (
+                <>
+                  {renderInputRow(set, item.weightType, 'main', false)}
+                  <button onClick={() => removeSet(item.id, set.id)} disabled={item.sets.length === 1} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 disabled:opacity-30 flex justify-center"><X size={18} /></button>
+                </>
+              )}
+            </div>
 
-                {!isPlaceholder && (
-                  <div className="pointer-events-auto">
-                  <>
+            {draggedSetIndex === null && (
+              <>
                 {item.isDropSet && item.weightType !== 'cardio' && set.dropSets && set.dropSets.map(ds => (
                   <div key={ds.id} className="border-l-2 border-orange-200 dark:border-orange-800 pl-3 flex items-center gap-2 ml-4">
                     <TrendingDown size={16} className="text-orange-400 flex-shrink-0" />
@@ -1112,13 +1213,10 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
                     )}
                   </div>
                 )}
-                </>
-                </div>
-                )}
-              </div>
-            );
-          });
-        })()}
+              </>
+            )}
+          </div>
+        ))}
       </div>
 
       <button onClick={() => addSet(item.id)} className="w-full py-3 border border-dashed border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors mb-4 bg-white dark:bg-slate-900">
@@ -1149,152 +1247,122 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
 }
 
 // --- スクロール自動制御フック ---
-function useDragAndDrop(items, onReorder) {
-  const [dragState, setDragState] = useState({
-    isDragging: false,
-    dragIndex: null,
-    hoverIndex: null,
-    touchId: null,
-    offsetY: 0,
-    offsetX: 0,
-    currentY: 0,
-    currentX: 0,
-    width: 0,
-    height: 0,
-  });
-
-  const timerRef = useRef(null);
-  const dragStateRef = useRef(dragState);
-  dragStateRef.current = dragState;
+function useDragAndDrop(items, setItems) {
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+  const [draggableId, setDraggableId] = useState(null);
   const refs = useRef([]);
 
-  const handlePointerDown = (e, index) => {
-    const targetTags = ['INPUT', 'TEXTAREA', 'BUTTON', 'SELECT', 'OPTION'];
-    if (targetTags.includes(e.target.tagName) || e.target.closest('button')) return;
-    if (dragStateRef.current.isDragging) return;
+  const adjustPosition = (idx) => {
+    const el = refs.current[idx];
+    if (!el) return;
+    const container = document.getElementById('edit-modal-scroll-container') || window;
+    const isWindow = container === window;
+    const initialTop = el.getBoundingClientRect().top;
 
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    const touchId = e.touches ? e.touches[0].identifier : 'mouse';
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const currentEl = refs.current[idx];
+        if (!currentEl) return;
+        
+        const currentTop = currentEl.getBoundingClientRect().top;
+        container.scrollBy({ top: currentTop - initialTop, behavior: 'instant' });
 
-    timerRef.current = setTimeout(() => {
-      if (navigator.vibrate) navigator.vibrate(50);
-      const el = refs.current[index];
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      setDragState({
-        isDragging: true,
-        dragIndex: index,
-        hoverIndex: index,
-        touchId: touchId,
-        offsetY: clientY - rect.top,
-        offsetX: clientX - rect.left,
-        currentY: rect.top,
-        currentX: rect.left,
-        width: rect.width,
-        height: rect.height,
-      });
-    }, 400);
+        setTimeout(() => {
+          const rect = currentEl.getBoundingClientRect();
+          const totalItems = items.length;
+          
+          const ratio = totalItems > 1 ? idx / (totalItems - 1) : 0.5;
+          
+          if (isWindow) {
+            const scrollTop = window.scrollY || document.documentElement.scrollTop;
+            const absoluteTop = rect.top + scrollTop;
+            const windowHeight = window.innerHeight;
+            const targetViewportY = windowHeight * (0.15 + 0.7 * ratio);
+            const targetScrollY = absoluteTop - targetViewportY + (rect.height / 2);
+            window.scrollTo({ top: targetScrollY, behavior: 'smooth' });
+          } else {
+            const containerRect = container.getBoundingClientRect();
+            const scrollTop = container.scrollTop;
+            const absoluteTop = (rect.top - containerRect.top) + scrollTop;
+            const containerHeight = container.clientHeight;
+            const targetViewportY = containerHeight * (0.15 + 0.7 * ratio);
+            const targetScrollY = absoluteTop - targetViewportY + (rect.height / 2);
+            container.scrollTo({ top: targetScrollY, behavior: 'smooth' });
+          }
+        }, 50);
+      }, 50);
+    });
   };
 
-  const handlePointerMoveGlobal = useCallback((e) => {
-    const state = dragStateRef.current;
-    if (!state.isDragging) return;
-
-    let clientX, clientY, isValid = false;
-    if (e.touches) {
-      for (let i = 0; i < e.touches.length; i++) {
-        if (e.touches[i].identifier === state.touchId) {
-          clientX = e.touches[i].clientX;
-          clientY = e.touches[i].clientY;
-          isValid = true;
-          break;
-        }
-      }
-    } else {
-      if (state.touchId === 'mouse') {
-        clientX = e.clientX;
-        clientY = e.clientY;
-        isValid = true;
-      }
-    }
-
-    if (isValid) {
-      const newY = clientY - state.offsetY;
-      const newX = clientX - state.offsetX;
-      let newHoverIndex = state.hoverIndex;
-
-      refs.current.forEach((el, idx) => {
-        if (!el || idx === state.dragIndex) return;
-        const rect = el.getBoundingClientRect();
-        // 横スクロール・縦スクロールの両方に対応するため、カーソル位置が要素内に収まっているかを判定
-        if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
-          newHoverIndex = idx;
-        }
+  const handleDragStart = (e, idx) => {
+    setDraggedIndex(idx);
+    e.dataTransfer.effectAllowed = 'move';
+    adjustPosition(idx);
+  };
+  const handleDragOver = (e, idx) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverIndex !== idx) setDragOverIndex(idx);
+  };
+  const handleDragLeave = () => setDragOverIndex(null);
+  const handleDrop = (e, idx) => {
+    e.preventDefault();
+    if (draggedIndex !== null && draggedIndex !== idx) {
+      setItems(prev => {
+        const newItems = [...prev];
+        const [dragged] = newItems.splice(draggedIndex, 1);
+        newItems.splice(idx, 0, dragged);
+        return newItems;
       });
-
-      setDragState(prev => ({
-        ...prev,
-        currentY: newY,
-        currentX: clientX - state.offsetX,
-        hoverIndex: newHoverIndex !== prev.hoverIndex ? newHoverIndex : prev.hoverIndex
-      }));
     }
-  }, []);
-
-  const handlePointerUpGlobal = useCallback((e) => {
-    const state = dragStateRef.current;
-    if (state.isDragging) {
-      let stillHolding = false;
-      if (e.touches) {
-        for (let i = 0; i < e.touches.length; i++) {
-          if (e.touches[i].identifier === state.touchId) {
-            stillHolding = true;
-            break;
-          }
-        }
-      }
-      if (!stillHolding) {
-        if (state.dragIndex !== null && state.hoverIndex !== null && state.dragIndex !== state.hoverIndex) {
-          if (typeof onReorder === 'function') {
-            onReorder(state.dragIndex, state.hoverIndex);
-          }
-        }
-        setDragState({ isDragging: false, dragIndex: null, hoverIndex: null, touchId: null, offsetY: 0, offsetX: 0, currentY: 0, currentX: 0, width: 0, height: 0 });
-      }
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    setDraggableId(null);
+  };
+  const handleTouchStart = (e, idx) => {
+    setDraggedIndex(idx);
+    document.body.style.overflow = 'hidden';
+    adjustPosition(idx);
+  };
+  const handleTouchMove = (e) => {
+    if (draggedIndex === null) return;
+    const x = e.touches[0].clientX;
+    const y = e.touches[0].clientY;
+    let hoverIndex = dragOverIndex;
+    refs.current.forEach((el, idx) => {
+       if (!el) return;
+       const rect = el.getBoundingClientRect();
+       if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) hoverIndex = idx;
+    });
+    if (hoverIndex !== null && hoverIndex !== dragOverIndex) setDragOverIndex(hoverIndex);
+  };
+  const handleTouchEnd = () => {
+    if (draggedIndex !== null && dragOverIndex !== null && draggedIndex !== dragOverIndex) {
+      setItems(prev => {
+        const newItems = [...prev];
+        const [dragged] = newItems.splice(draggedIndex, 1);
+        newItems.splice(dragOverIndex, 0, dragged);
+        return newItems;
+      });
     }
-  }, [onReorder]);
-
-  useEffect(() => {
-    window.addEventListener('touchmove', handlePointerMoveGlobal, { passive: true });
-    window.addEventListener('touchend', handlePointerUpGlobal);
-    window.addEventListener('touchcancel', handlePointerUpGlobal);
-    window.addEventListener('mousemove', handlePointerMoveGlobal);
-    window.addEventListener('mouseup', handlePointerUpGlobal);
-    return () => {
-      window.removeEventListener('touchmove', handlePointerMoveGlobal);
-      window.removeEventListener('touchend', handlePointerUpGlobal);
-      window.removeEventListener('touchcancel', handlePointerUpGlobal);
-      window.removeEventListener('mousemove', handlePointerMoveGlobal);
-      window.removeEventListener('mouseup', handlePointerUpGlobal);
-    };
-  }, [handlePointerMoveGlobal, handlePointerUpGlobal]);
-
-  const cancelTimer = () => { if (timerRef.current) clearTimeout(timerRef.current); };
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    setDraggableId(null);
+    document.body.style.overflow = '';
+  };
 
   return {
-    dragState,
-    refs,
-    handlers: (index) => ({
-      onTouchStart: (e) => handlePointerDown(e, index),
-      onTouchMove: cancelTimer,
-      onTouchEnd: cancelTimer,
-      onTouchCancel: cancelTimer,
-      onMouseDown: (e) => handlePointerDown(e, index),
-      onMouseMove: cancelTimer,
-      onMouseUp: cancelTimer,
-      onMouseLeave: cancelTimer,
-    })
+    draggedIndex, dragOverIndex, draggableId, setDraggableId, refs,
+    handlers: {
+      onDragStart: handleDragStart, onDragOver: handleDragOver, onDragLeave: handleDragLeave,
+      onDrop: handleDrop, onDragEnd: handleDragEnd, onTouchStart: handleTouchStart,
+      onTouchMove: handleTouchMove, onTouchEnd: handleTouchEnd, onTouchCancel: handleTouchEnd
+    }
   };
 }
 
@@ -1320,61 +1388,6 @@ function useAutoScrollDisable() {
       document.body.style.overflow = '';
     };
   }, []);
-}
-
-// 中央にあるカード要素を判定し、コンテナの高さを自動調整するカスタムフック
-function useDynamicHeight(dependencies) {
-  const containerRef = useRef(null);
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    let reqId;
-    
-    const updateHeight = () => {
-      const containerCenter = container.getBoundingClientRect().left + container.offsetWidth / 2;
-      let closestChild = null;
-      let minDiff = Infinity;
-      
-      Array.from(container.children).forEach((child) => {
-        if (child.style.position === 'fixed' || child.classList.contains('fixed-overlay')) return;
-        const rect = child.getBoundingClientRect();
-        if (rect.width === 0) return;
-        
-        const childCenter = rect.left + rect.width / 2;
-        const diff = Math.abs(containerCenter - childCenter);
-        if (diff < minDiff) {
-           minDiff = diff;
-           closestChild = child;
-        }
-      });
-
-      if (closestChild) {
-         const newHeight = closestChild.offsetHeight + 32; // 余白分を追加
-         container.style.height = `${newHeight}px`;
-      }
-    };
-
-    const handleScroll = () => {
-       cancelAnimationFrame(reqId);
-       reqId = requestAnimationFrame(updateHeight);
-    };
-
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    const observer = new ResizeObserver(() => {
-       cancelAnimationFrame(reqId);
-       reqId = requestAnimationFrame(updateHeight);
-    });
-    
-    Array.from(container.children).forEach(child => observer.observe(child));
-    updateHeight();
-    
-    return () => {
-      container.removeEventListener('scroll', handleScroll);
-      observer.disconnect();
-      cancelAnimationFrame(reqId);
-    };
-  }, dependencies);
-  return containerRef;
 }
 
 // === メインアプリケーション ===
@@ -3000,15 +3013,7 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
 function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workoutItems, setWorkoutItems, selectedCategories, setSelectedCategories, posts, currentUser, isManual, setIsManual, onActiveExerciseChange, accountsInfo }) {
   const joinedGyms = myInfo.joinedGyms || ['common'];
   const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (gyms.filter(g => joinedGyms.includes(g.id) && g.id !== 'common')[0]?.id || ''));
-  const itemDnd = useDragAndDrop(workoutItems, (dragIdx, dropIdx) => {
-    setWorkoutItems(prev => {
-      const newItems = [...prev];
-      const [dragged] = newItems.splice(dragIdx, 1);
-      newItems.splice(dropIdx, 0, dragged);
-      return newItems;
-    });
-  });
-  const activeHeightRef = useDynamicHeight([workoutItems, selectedCategories, itemDnd.dragState.isDragging]);
+  const itemDnd = useDragAndDrop(workoutItems, setWorkoutItems);
   const [restTimerStart, setRestTimerStart] = useState(null);
   const [restTimeElapsed, setRestTimeElapsed] = useState(0);
 
@@ -3352,60 +3357,49 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
           .hide-scrollbar::-webkit-scrollbar { display: none; }
           .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         `}</style>
-      <div ref={activeHeightRef} className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start transition-[height] duration-300">
-        {(() => {
-          const previewItems = [...workoutItems];
-          if (itemDnd.dragState.isDragging && itemDnd.dragState.dragIndex !== null && itemDnd.dragState.hoverIndex !== null) {
-            const [dragged] = previewItems.splice(itemDnd.dragState.dragIndex, 1);
-            previewItems.splice(itemDnd.dragState.hoverIndex, 0, dragged);
-          }
-          return previewItems.map((item) => {
-            const originalIndex = workoutItems.findIndex(i => i.id === item.id);
-            const isPlaceholder = itemDnd.dragState.isDragging && originalIndex === itemDnd.dragState.dragIndex;
-
-            return (
-              <div key={item.id}
-                 ref={(el) => (itemDnd.refs.current[originalIndex] = el)}
-                 {...itemDnd.handlers(originalIndex)}
-                 className={`snap-center shrink-0 w-[88%] sm:w-[320px] relative transition-all duration-200 ${isPlaceholder ? 'opacity-30 border-2 border-dashed border-emerald-500 rounded-2xl pointer-events-none' : ''}`}
-              >
-                 <WorkoutItemForm 
-                   item={item} 
-                   index={originalIndex}
-                   availableExercises={availableExercises} 
-                   updateItem={updateItem} 
-                   removeItem={removeExerciseItem}
-                   addSet={addSet} 
-                   removeSet={removeSet} 
-                   updateSet={updateSetField} 
-                   addDropSet={addDropSet} 
-                   removeDropSet={removeDropSet} 
-                   updateDropSet={updateDropSetField}
-                   reorderSet={reorderSet}
-                   myPastPosts={myPastPosts}
-                   onActive={onActiveExerciseChange}
-                   isDragging={isPlaceholder}
-                   isAnyDragging={itemDnd.dragState.isDragging}
-                 />
-              </div>
-            );
-          });
-        })()}
-        
-        {itemDnd.dragState.isDragging && itemDnd.dragState.dragIndex !== null && (
-          <div style={{ position: 'fixed', top: itemDnd.dragState.currentY, left: itemDnd.dragState.currentX, width: itemDnd.dragState.width, zIndex: 100, pointerEvents: 'none', opacity: 0.95, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}>
-            <WorkoutItemForm 
-              item={workoutItems[itemDnd.dragState.dragIndex]} 
-              index={itemDnd.dragState.dragIndex}
-              availableExercises={availableExercises}
-              updateItem={()=>{}} removeItem={()=>{}} addSet={()=>{}} removeSet={()=>{}} updateSet={()=>{}} addDropSet={()=>{}} removeDropSet={()=>{}} updateDropSet={()=>{}} reorderSet={()=>{}}
-              isDragging={true}
-              isAnyDragging={false}
-            />
+      <div className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start">
+        {workoutItems.map((item, index) => (
+          <div key={item.id}
+             ref={(el) => (itemDnd.refs.current[index] = el)}
+             draggable={itemDnd.draggableId === item.id}
+             onDragStart={(e) => itemDnd.handlers.onDragStart(e, index)}
+             onDragOver={(e) => itemDnd.handlers.onDragOver(e, index)}
+             onDragLeave={itemDnd.handlers.onDragLeave}
+             onDrop={(e) => itemDnd.handlers.onDrop(e, index)}
+             onDragEnd={itemDnd.handlers.onDragEnd}
+             className={`snap-center shrink-0 w-[88%] sm:w-[320px] relative transition-all duration-200 ${itemDnd.draggedIndex === index ? (itemDnd.dragOverIndex === index ? 'opacity-70 scale-[0.98] ring-2 ring-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] rounded-2xl' : 'opacity-40 scale-[0.98] border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl') : ''}`}
+          >
+             {itemDnd.dragOverIndex === index && itemDnd.draggedIndex !== index && <div className={`absolute top-0 h-full w-1.5 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${itemDnd.draggedIndex < itemDnd.dragOverIndex ? '-right-2.5' : '-left-2.5'}`} />}
+             <WorkoutItemForm 
+               item={item} 
+               index={index}
+               availableExercises={availableExercises} 
+               updateItem={updateItem} 
+               removeItem={removeExerciseItem}
+               addSet={addSet} 
+               removeSet={removeSet} 
+               updateSet={updateSetField} 
+               addDropSet={addDropSet} 
+               removeDropSet={removeDropSet} 
+               updateDropSet={updateDropSetField}
+               reorderSet={reorderSet}
+               myPastPosts={myPastPosts}
+               onActive={onActiveExerciseChange}
+               isDragging={itemDnd.draggedIndex === index}
+               isAnyDragging={itemDnd.draggedIndex !== null}
+               dragHandleProps={{
+                 onMouseEnter: () => itemDnd.setDraggableId(item.id),
+                 onMouseLeave: () => itemDnd.setDraggableId(null),
+                 onTouchStart: (e) => { itemDnd.setDraggableId(item.id); itemDnd.handlers.onTouchStart(e, index); },
+                 onTouchMove: itemDnd.handlers.onTouchMove,
+                 onTouchEnd: itemDnd.handlers.onTouchEnd,
+                 onTouchCancel: itemDnd.handlers.onTouchCancel
+               }}
+             />
           </div>
-        )}
+        ))}
 
-        <div className="w-full flex flex-col justify-center h-full min-h-[160px]">
+        <div className="snap-center shrink-0 w-[88%] sm:w-[320px] flex flex-col justify-center h-full min-h-[200px]">
           <button onClick={() => addExerciseItem()} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
             <div className="bg-white dark:bg-slate-800 p-3 rounded-full shadow-sm"><ListPlus size={24} className="text-emerald-500" /></div>
             <span>次の種目を追加</span>
@@ -3441,15 +3435,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
 function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts }) {
   const safeItems = post.items ? JSON.parse(JSON.stringify(post.items)) : [];
   const [workoutItems, setWorkoutItems] = useState(safeItems);
-  const itemDnd = useDragAndDrop(workoutItems, (dragIdx, dropIdx) => {
-    setWorkoutItems(prev => {
-      const newItems = [...prev];
-      const [dragged] = newItems.splice(dragIdx, 1);
-      newItems.splice(dropIdx, 0, dragged);
-      return newItems;
-    });
-  });
-  const activeHeightRef = useDynamicHeight([workoutItems, selectedCategories, itemDnd.dragState.isDragging]);
+  const itemDnd = useDragAndDrop(workoutItems, setWorkoutItems);
   
   const [editDate, setEditDate] = useState(formatDateFromTimestamp(post.startTime || post.timestamp));
   const [editStartTime, setEditStartTime] = useState(formatTimeFromTimestamp(post.startTime || post.timestamp));
@@ -3586,59 +3572,48 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
             .hide-scrollbar::-webkit-scrollbar { display: none; }
             .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
           `}</style>
-          <div ref={activeHeightRef} className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start transition-[height] duration-300">
-            {(() => {
-              const previewItems = [...workoutItems];
-              if (itemDnd.dragState.isDragging && itemDnd.dragState.dragIndex !== null && itemDnd.dragState.hoverIndex !== null) {
-                const [dragged] = previewItems.splice(itemDnd.dragState.dragIndex, 1);
-                previewItems.splice(itemDnd.dragState.hoverIndex, 0, dragged);
-              }
-              return previewItems.map((item) => {
-                const originalIndex = workoutItems.findIndex(i => i.id === item.id);
-                const isPlaceholder = itemDnd.dragState.isDragging && originalIndex === itemDnd.dragState.dragIndex;
-    
-                return (
-                  <div key={item.id}
-                     ref={(el) => (itemDnd.refs.current[originalIndex] = el)}
-                     {...itemDnd.handlers(originalIndex)}
-                     className={`snap-center shrink-0 w-[88%] sm:w-[320px] relative transition-all duration-200 ${isPlaceholder ? 'opacity-30 border-2 border-dashed border-emerald-500 rounded-2xl pointer-events-none' : ''}`}
-                  >
-                     <WorkoutItemForm 
-                       item={item} 
-                       index={originalIndex}
-                       availableExercises={availableExercises} 
-                       updateItem={updateItem} 
-                       removeItem={removeExerciseItem}
-                       addSet={addSet} 
-                       removeSet={removeSet} 
-                       updateSet={updateSetField} 
-                       addDropSet={addDropSet} 
-                       removeDropSet={removeDropSet} 
-                       updateDropSet={updateDropSetField}
-                       reorderSet={reorderSet}
-                       myPastPosts={myPastPosts}
-                       isDragging={isPlaceholder}
-                       isAnyDragging={itemDnd.dragState.isDragging}
-                     />
-                  </div>
-                );
-              });
-            })()}
-            
-            {itemDnd.dragState.isDragging && itemDnd.dragState.dragIndex !== null && (
-              <div style={{ position: 'fixed', top: itemDnd.dragState.currentY, left: itemDnd.dragState.currentX, width: itemDnd.dragState.width, zIndex: 100, pointerEvents: 'none', opacity: 0.95, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}>
-                <WorkoutItemForm 
-                  item={workoutItems[itemDnd.dragState.dragIndex]} 
-                  index={itemDnd.dragState.dragIndex}
-                  availableExercises={availableExercises}
-                  updateItem={()=>{}} removeItem={()=>{}} addSet={()=>{}} removeSet={()=>{}} updateSet={()=>{}} addDropSet={()=>{}} removeDropSet={()=>{}} updateDropSet={()=>{}} reorderSet={()=>{}}
-                  isDragging={true}
-                  isAnyDragging={false}
-                />
-              </div>
-            )}
+          <div className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start">
+            {workoutItems.map((item, index) => (
+               <div key={item.id}
+                  ref={(el) => (itemDnd.refs.current[index] = el)}
+                  draggable={itemDnd.draggableId === item.id}
+                  onDragStart={(e) => itemDnd.handlers.onDragStart(e, index)}
+                  onDragOver={(e) => itemDnd.handlers.onDragOver(e, index)}
+                  onDragLeave={itemDnd.handlers.onDragLeave}
+                  onDrop={(e) => itemDnd.handlers.onDrop(e, index)}
+                  onDragEnd={itemDnd.handlers.onDragEnd}
+                  className={`snap-center shrink-0 w-[88%] sm:w-[320px] relative transition-all duration-200 ${itemDnd.draggedIndex === index ? (itemDnd.dragOverIndex === index ? 'opacity-70 scale-[0.98] ring-2 ring-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] rounded-2xl' : 'opacity-40 scale-[0.98] border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl') : ''}`}
+               >
+                  {itemDnd.dragOverIndex === index && itemDnd.draggedIndex !== index && <div className={`absolute top-0 h-full w-1.5 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${itemDnd.draggedIndex < itemDnd.dragOverIndex ? '-right-2.5' : '-left-2.5'}`} />}
+                  <WorkoutItemForm 
+                    item={item} 
+                    index={index}
+                    availableExercises={availableExercises} 
+                    updateItem={updateItem} 
+                    removeItem={removeExerciseItem}
+                    addSet={addSet} 
+                    removeSet={removeSet} 
+                    updateSet={updateSetField} 
+                    addDropSet={addDropSet} 
+                    removeDropSet={removeDropSet} 
+                    updateDropSet={updateDropSetField}
+                    reorderSet={reorderSet}
+                    myPastPosts={myPastPosts}
+                    isDragging={itemDnd.draggedIndex === index}
+                    isAnyDragging={itemDnd.draggedIndex !== null}
+                    dragHandleProps={{
+                      onMouseEnter: () => itemDnd.setDraggableId(item.id),
+                      onMouseLeave: () => itemDnd.setDraggableId(null),
+                      onTouchStart: (e) => { itemDnd.setDraggableId(item.id); itemDnd.handlers.onTouchStart(e, index); },
+                      onTouchMove: itemDnd.handlers.onTouchMove,
+                      onTouchEnd: itemDnd.handlers.onTouchEnd,
+                      onTouchCancel: itemDnd.handlers.onTouchCancel
+                    }}
+                  />
+               </div>
+            ))}
 
-            <div className="snap-center shrink-0 w-[88%] sm:w-[320px] flex flex-col justify-center h-full min-h-[160px]">
+            <div className="snap-center shrink-0 w-[88%] sm:w-[320px] flex flex-col justify-center h-full min-h-[200px]">
               <button onClick={addExerciseItem} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
                 <div className="bg-white dark:bg-slate-800 p-3 rounded-full shadow-sm"><ListPlus size={24} className="text-emerald-500" /></div>
                 <span>次の種目を追加</span>
@@ -4754,7 +4729,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 09:50, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 09:20, updated)</p>
       </div>
     </div>
   );
