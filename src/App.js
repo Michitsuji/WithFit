@@ -4173,6 +4173,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
   const isPartnerEnabled = myInfo?.enablePartnerFeature || false;
   const [activeTab, setActiveTab] = useState(isPartnerEnabled ? 'partner' : 'friends');
   const [rankingType, setRankingType] = useState('friends');
+  const [isRankingExpanded, setIsRankingExpanded] = useState(false);
   const [reportText, setReportText] = useState('');
   const [isSendingReport, setIsSendingReport] = useState(false);
   const [showReportsModal, setShowReportsModal] = useState(false);
@@ -4586,7 +4587,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
               </div>
             </div>
             <div className="space-y-2.5 relative z-10">
-              {(rankingType === 'global' ? rankingData.globalRanking : rankingData.friendRanking).slice(0, 5).map((user, idx) => {
+              {(rankingType === 'global' ? rankingData.globalRanking : rankingData.friendRanking).slice(0, isRankingExpanded ? 100 : 5).map((user, idx) => {
                 const isMe = user.username === currentUser;
                 let rankBadge = <span className="text-xs font-bold w-6 text-center text-white/70">{idx + 1}</span>;
                 if (idx === 0) rankBadge = <Award className="text-amber-300 shrink-0" size={20} />;
@@ -4608,6 +4609,14 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
                   </div>
                 );
               })} 
+              {(rankingType === 'global' ? rankingData.globalRanking : rankingData.friendRanking).length > 5 && (
+                <button 
+                  onClick={() => setIsRankingExpanded(!isRankingExpanded)} 
+                  className="w-full mt-3 py-2.5 text-xs font-bold text-white/90 bg-black/20 hover:bg-black/30 rounded-xl transition-colors backdrop-blur-md border border-white/10 flex items-center justify-center gap-1"
+                >
+                  {isRankingExpanded ? <><ArrowUp size={14}/> 閉じる</> : <><ArrowDown size={14}/> もっと見る</>}
+                </button>
+              )}
             </div>
           </div>
 
@@ -4680,7 +4689,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 11:23, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 11:28, updated)</p>
       </div>
     </div>
   );
