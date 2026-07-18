@@ -1249,7 +1249,9 @@ function useDragAndDrop(items, setItems) {
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
   const [draggableId, setDraggableId] = useState(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const touchIdRef = useRef(null);
+  const startPosRef = useRef({ x: 0, y: 0 });
   const refs = useRef([]);
 
   const handleDragStart = (e, idx) => {
@@ -1282,7 +1284,10 @@ function useDragAndDrop(items, setItems) {
   };
   const handleTouchStart = (e, idx) => {
     if (touchIdRef.current !== null) return;
-    touchIdRef.current = e.changedTouches[0].identifier;
+    const touch = e.changedTouches[0];
+    touchIdRef.current = touch.identifier;
+    startPosRef.current = { x: touch.clientX, y: touch.clientY };
+    setDragOffset({ x: 0, y: 0 });
     setDraggedIndex(idx);
   };
   const handleTouchMove = (e) => {
@@ -1291,6 +1296,7 @@ function useDragAndDrop(items, setItems) {
     if (!touch) return;
     const x = touch.clientX;
     const y = touch.clientY;
+    setDragOffset({ x: x - startPosRef.current.x, y: y - startPosRef.current.y });
     let minDistance = Infinity;
     let closestIndex = dragOverIndex;
     refs.current.forEach((el, idx) => {
@@ -1321,11 +1327,12 @@ function useDragAndDrop(items, setItems) {
     setDraggedIndex(null);
     setDragOverIndex(null);
     setDraggableId(null);
+    setDragOffset({ x: 0, y: 0 });
     touchIdRef.current = null;
   };
 
   return {
-    draggedIndex, dragOverIndex, draggableId, setDraggableId, refs,
+    draggedIndex, dragOverIndex, draggableId, setDraggableId, dragOffset, refs,
     handlers: {
       onDragStart: handleDragStart, onDragOver: handleDragOver, onDragLeave: handleDragLeave,
       onDrop: handleDrop, onDragEnd: handleDragEnd, onTouchStart: handleTouchStart,
@@ -3666,7 +3673,8 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
                   onDragLeave={itemDnd.handlers.onDragLeave}
                   onDrop={(e) => itemDnd.handlers.onDrop(e, index)}
                   onDragEnd={itemDnd.handlers.onDragEnd}
-                  className={`snap-center shrink-0 w-[88%] sm:w-[320px] relative transition-all duration-200 ${itemDnd.draggedIndex === index ? 'z-50 scale-[1.02] shadow-2xl ring-4 ring-emerald-500 opacity-95 rounded-2xl bg-white dark:bg-slate-900' : itemDnd.draggedIndex !== null ? 'opacity-40 scale-95' : ''}`}
+                  className={`snap-center shrink-0 w-[88%] sm:w-[320px] relative ${itemDnd.draggedIndex === index ? 'z-50 scale-[1.02] shadow-2xl ring-4 ring-emerald-500 opacity-95 rounded-2xl bg-white dark:bg-slate-900 transition-none' : itemDnd.draggedIndex !== null ? 'opacity-40 scale-95 transition-all duration-200' : 'transition-all duration-200'}`}
+                  style={itemDnd.draggedIndex === index ? { transform: `translate(${itemDnd.dragOffset.x}px, ${itemDnd.dragOffset.y}px)` } : {}}
                >
                   {itemDnd.dragOverIndex === index && itemDnd.draggedIndex !== index && <div className={`absolute top-0 h-full w-2 bg-emerald-500 rounded-full z-10 shadow-[0_0_12px_rgba(16,185,129,0.9)] animate-pulse ${itemDnd.draggedIndex < itemDnd.dragOverIndex ? '-right-3' : '-left-3'}`} />}
                   <WorkoutItemForm 
@@ -4815,7 +4823,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 10:31, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 10:35, updated)</p>
       </div>
     </div>
   );
