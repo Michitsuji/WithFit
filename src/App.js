@@ -1221,13 +1221,14 @@ function useDragAndDrop(items, onReorder) {
 
     if (isValid) {
       const newY = clientY - state.offsetY;
-      const centerY = newY + state.height / 2;
+      const newX = clientX - state.offsetX;
       let newHoverIndex = state.hoverIndex;
 
       refs.current.forEach((el, idx) => {
         if (!el || idx === state.dragIndex) return;
         const rect = el.getBoundingClientRect();
-        if (centerY > rect.top && centerY < rect.bottom) {
+        // 横スクロール・縦スクロールの両方に対応するため、カーソル位置が要素内に収まっているかを判定
+        if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
           newHoverIndex = idx;
         }
       });
@@ -1319,6 +1320,61 @@ function useAutoScrollDisable() {
       document.body.style.overflow = '';
     };
   }, []);
+}
+
+// 中央にあるカード要素を判定し、コンテナの高さを自動調整するカスタムフック
+function useDynamicHeight(dependencies) {
+  const containerRef = useRef(null);
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    let reqId;
+    
+    const updateHeight = () => {
+      const containerCenter = container.getBoundingClientRect().left + container.offsetWidth / 2;
+      let closestChild = null;
+      let minDiff = Infinity;
+      
+      Array.from(container.children).forEach((child) => {
+        if (child.style.position === 'fixed' || child.classList.contains('fixed-overlay')) return;
+        const rect = child.getBoundingClientRect();
+        if (rect.width === 0) return;
+        
+        const childCenter = rect.left + rect.width / 2;
+        const diff = Math.abs(containerCenter - childCenter);
+        if (diff < minDiff) {
+           minDiff = diff;
+           closestChild = child;
+        }
+      });
+
+      if (closestChild) {
+         const newHeight = closestChild.offsetHeight + 32; // 余白分を追加
+         container.style.height = `${newHeight}px`;
+      }
+    };
+
+    const handleScroll = () => {
+       cancelAnimationFrame(reqId);
+       reqId = requestAnimationFrame(updateHeight);
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    const observer = new ResizeObserver(() => {
+       cancelAnimationFrame(reqId);
+       reqId = requestAnimationFrame(updateHeight);
+    });
+    
+    Array.from(container.children).forEach(child => observer.observe(child));
+    updateHeight();
+    
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      observer.disconnect();
+      cancelAnimationFrame(reqId);
+    };
+  }, dependencies);
+  return containerRef;
 }
 
 // === メインアプリケーション ===
@@ -2952,6 +3008,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
       return newItems;
     });
   });
+  const activeHeightRef = useDynamicHeight([workoutItems, selectedCategories, itemDnd.dragState.isDragging]);
   const [restTimerStart, setRestTimerStart] = useState(null);
   const [restTimeElapsed, setRestTimeElapsed] = useState(0);
 
@@ -3291,7 +3348,11 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
       )}
 
       <div className="space-y-4">
-      <div className="flex flex-col gap-4 pb-6 pt-2">
+        <style>{`
+          .hide-scrollbar::-webkit-scrollbar { display: none; }
+          .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        `}</style>
+      <div ref={activeHeightRef} className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start transition-[height] duration-300">
         {(() => {
           const previewItems = [...workoutItems];
           if (itemDnd.dragState.isDragging && itemDnd.dragState.dragIndex !== null && itemDnd.dragState.hoverIndex !== null) {
@@ -3306,7 +3367,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
               <div key={item.id}
                  ref={(el) => (itemDnd.refs.current[originalIndex] = el)}
                  {...itemDnd.handlers(originalIndex)}
-                 className={`w-full relative transition-all duration-200 ${isPlaceholder ? 'opacity-30 border-2 border-dashed border-emerald-500 rounded-2xl pointer-events-none' : ''}`}
+                 className={`snap-center shrink-0 w-[88%] sm:w-[320px] relative transition-all duration-200 ${isPlaceholder ? 'opacity-30 border-2 border-dashed border-emerald-500 rounded-2xl pointer-events-none' : ''}`}
               >
                  <WorkoutItemForm 
                    item={item} 
@@ -3388,6 +3449,7 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
       return newItems;
     });
   });
+  const activeHeightRef = useDynamicHeight([workoutItems, selectedCategories, itemDnd.dragState.isDragging]);
   
   const [editDate, setEditDate] = useState(formatDateFromTimestamp(post.startTime || post.timestamp));
   const [editStartTime, setEditStartTime] = useState(formatTimeFromTimestamp(post.startTime || post.timestamp));
@@ -3520,7 +3582,11 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
             </div>
           )}
 
-          <div className="flex flex-col gap-4 pb-6 pt-2">
+          <style>{`
+            .hide-scrollbar::-webkit-scrollbar { display: none; }
+            .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+          `}</style>
+          <div ref={activeHeightRef} className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start transition-[height] duration-300">
             {(() => {
               const previewItems = [...workoutItems];
               if (itemDnd.dragState.isDragging && itemDnd.dragState.dragIndex !== null && itemDnd.dragState.hoverIndex !== null) {
@@ -3535,7 +3601,7 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
                   <div key={item.id}
                      ref={(el) => (itemDnd.refs.current[originalIndex] = el)}
                      {...itemDnd.handlers(originalIndex)}
-                     className={`w-full relative transition-all duration-200 ${isPlaceholder ? 'opacity-30 border-2 border-dashed border-emerald-500 rounded-2xl pointer-events-none' : ''}`}
+                     className={`snap-center shrink-0 w-[88%] sm:w-[320px] relative transition-all duration-200 ${isPlaceholder ? 'opacity-30 border-2 border-dashed border-emerald-500 rounded-2xl pointer-events-none' : ''}`}
                   >
                      <WorkoutItemForm 
                        item={item} 
@@ -3572,7 +3638,7 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
               </div>
             )}
 
-            <div className="w-full flex flex-col justify-center h-full min-h-[160px]">
+            <div className="snap-center shrink-0 w-[88%] sm:w-[320px] flex flex-col justify-center h-full min-h-[160px]">
               <button onClick={addExerciseItem} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
                 <div className="bg-white dark:bg-slate-800 p-3 rounded-full shadow-sm"><ListPlus size={24} className="text-emerald-500" /></div>
                 <span>次の種目を追加</span>
@@ -4688,7 +4754,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 09:46, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 09:49, updated)</p>
       </div>
     </div>
   );
