@@ -580,7 +580,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
-      <div className="pl-3 mb-4 flex overflow-x-auto snap-x snap-mandatory gap-3 pb-2 pr-3 hide-scrollbar items-start">
+      <div className="pl-3 mb-4 flex overflow-x-auto snap-x snap-mandatory gap-3 pb-2 pr-3 hide-scrollbar">
         {processedItems.map((item, idx) => (
           <div key={idx} className="snap-center shrink-0 w-[85%] sm:w-[280px] bg-slate-50 dark:bg-slate-950/50 rounded-xl p-3 border border-slate-100 dark:border-slate-800">
             <div className="flex items-center justify-between mb-3">
@@ -713,7 +713,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 }
 
 // --- 共通コンポーネント：ワークアウト入力フォーム ---
-function WorkoutItemForm({ item, index, availableExercises, updateItem, removeItem, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet, reorderSet, myPastPosts, onActive, isDragging, isAnyDragging, dragHandleProps, moveItemUp, moveItemDown, isFirst, isLast }) {
+function WorkoutItemForm({ item, index, availableExercises, updateItem, removeItem, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet, reorderSet, myPastPosts, onActive, isDragging, isAnyDragging, dragHandleProps }) {
   const [localFilters, setLocalFilters] = useState([]);
   const [draggedSetIndex, setDraggedSetIndex] = useState(null);
   const [dragOverSetIndex, setDragOverSetIndex] = useState(null);
@@ -963,17 +963,19 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
       );
     } else {
       inputContent = (
-        <div className="flex-1 flex gap-1 min-w-0">
+        <div className="flex-1 flex gap-2 min-w-0">
           {isLR ? (
             <>
-              <input type="number" inputMode="decimal" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder={getWeightPlaceholder(wType)} className="w-[48px] sm:w-[60px] shrink-0 text-center text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded focus:outline-none focus:border-emerald-500 py-2 px-0" style={{ fontSize: '16px' }}/>
-              <div className="flex flex-1 items-center gap-0 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-1 min-w-0">
-                <span className="text-[10px] text-slate-400 font-bold shrink-0">L:</span>
+              <input type="number" inputMode="decimal" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder={getWeightPlaceholder(wType)} className="w-[52px] sm:w-[64px] shrink-0 text-center text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded focus:outline-none focus:border-emerald-500 py-2 px-0" style={{ fontSize: '16px' }}/>
+              <div className="flex flex-1 items-center gap-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-1 sm:px-2 min-w-0">
+                <span className="text-[10px] sm:text-xs text-slate-400 font-bold shrink-0">L:</span>
                 <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('lReps')} onChange={(e) => update('lReps', e.target.value)} placeholder="0" className="w-full text-center text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0 px-0" style={{ fontSize: '16px' }}/>
+                <span className="text-[10px] text-slate-400 font-bold shrink-0">回</span>
               </div>
-              <div className="flex flex-1 items-center gap-0 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-1 min-w-0">
-                <span className="text-[10px] text-slate-400 font-bold shrink-0">R:</span>
+              <div className="flex flex-1 items-center gap-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-1 sm:px-2 min-w-0">
+                <span className="text-[10px] sm:text-xs text-slate-400 font-bold shrink-0">R:</span>
                 <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('rReps')} onChange={(e) => update('rReps', e.target.value)} placeholder="0" className="w-full text-center text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0 px-0" style={{ fontSize: '16px' }}/>
+                <span className="text-[10px] text-slate-400 font-bold shrink-0">回</span>
               </div>
             </>
           ) : (
@@ -1033,19 +1035,7 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
             </div>
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row items-center gap-1 ml-2 mt-2">
-          {moveItemUp && !isFirst && (
-            <button onClick={() => moveItemUp(index)} disabled={isConfirmed} className={`text-slate-400 hover:text-emerald-500 p-1.5 flex-shrink-0 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors ${isConfirmed ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''}`}>
-               <ArrowUp size={16} className="-rotate-90 sm:rotate-0" />
-            </button>
-          )}
-          {moveItemDown && !isLast && (
-            <button onClick={() => moveItemDown(index)} disabled={isConfirmed} className={`text-slate-400 hover:text-emerald-500 p-1.5 flex-shrink-0 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors ${isConfirmed ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''}`}>
-               <ArrowDown size={16} className="-rotate-90 sm:rotate-0" />
-            </button>
-          )}
-          <button onClick={() => removeItem(item.id)} disabled={isConfirmed} className={`text-slate-400 hover:text-rose-500 p-1.5 flex-shrink-0 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors ${isConfirmed ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''}`}><Trash2 size={16} /></button>
-        </div>
+        <button onClick={() => removeItem(item.id)} disabled={isConfirmed} className={`ml-2 text-slate-400 hover:text-rose-500 p-2 flex-shrink-0 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors mt-2 ${isConfirmed ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''}`}><Trash2 size={18} /></button>
       </div>
 
       <div className={`transition-all overflow-hidden ${isAnyDragging ? 'h-0 opacity-0' : 'h-auto opacity-100'}`}>
@@ -3746,6 +3736,14 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
           `}</style>
           <div className={`flex overflow-x-auto gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start ${itemDnd.draggedIndex !== null ? 'snap-none' : 'snap-x snap-mandatory'}`}>
             {workoutItems.map((item, index) => {
+               let shiftTransform = '';
+               if (itemDnd.draggedIndex !== null && itemDnd.draggedIndex !== index) {
+                 if (itemDnd.draggedIndex < itemDnd.dragOverIndex && index > itemDnd.draggedIndex && index <= itemDnd.dragOverIndex) {
+                   shiftTransform = 'translateX(calc(-100% - 16px))';
+                 } else if (itemDnd.draggedIndex > itemDnd.dragOverIndex && index < itemDnd.draggedIndex && index >= itemDnd.dragOverIndex) {
+                   shiftTransform = 'translateX(calc(100% + 16px))';
+                 }
+               }
                return (
                  <div key={item.id}
                     ref={(el) => (itemDnd.refs.current[index] = el)}
@@ -3755,8 +3753,8 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
                     onDragLeave={itemDnd.handlers.onDragLeave}
                     onDrop={(e) => itemDnd.handlers.onDrop(e, index)}
                     onDragEnd={itemDnd.handlers.onDragEnd}
-                    className={`shrink-0 w-[88%] sm:w-[320px] relative transition-all duration-300 ease-out ${itemDnd.draggedIndex === index ? 'z-50 scale-105 shadow-2xl ring-4 ring-emerald-500 opacity-95 rounded-2xl bg-white dark:bg-slate-900 transition-none' : itemDnd.draggedIndex !== null ? (itemDnd.dragOverIndex === index ? 'opacity-100 ring-2 ring-emerald-400 rounded-2xl' : 'opacity-60 rounded-2xl') : 'snap-center'}`}
-                    style={itemDnd.draggedIndex === index ? { transform: `translate(${itemDnd.dragOffset.x}px, ${itemDnd.dragOffset.y}px)` } : {}}
+                    className={`shrink-0 w-[88%] sm:w-[320px] relative transition-all duration-300 ease-out ${itemDnd.draggedIndex === index ? 'z-50 scale-105 shadow-2xl ring-4 ring-emerald-500 opacity-95 rounded-2xl bg-white dark:bg-slate-900 transition-none' : itemDnd.draggedIndex !== null ? 'opacity-80 rounded-2xl' : 'snap-center'}`}
+                    style={itemDnd.draggedIndex === index ? { transform: `translate(${itemDnd.dragOffset.x}px, ${itemDnd.dragOffset.y}px)` } : { transform: shiftTransform }}
                  >
                     <WorkoutItemForm 
                       item={item} 
@@ -3774,10 +3772,6 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
                       myPastPosts={myPastPosts}
                       isDragging={itemDnd.draggedIndex === index}
                       isAnyDragging={itemDnd.draggedIndex !== null}
-                      moveItemUp={moveItemUp}
-                      moveItemDown={moveItemDown}
-                      isFirst={index === 0}
-                      isLast={index === workoutItems.length - 1}
                       dragHandleProps={{
                         onTouchStart: (e) => handleTouchStart(e, index, item.id),
                         onTouchMove: handleTouchMove,
@@ -4909,7 +4903,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 10:55, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 10:47, updated)</p>
       </div>
     </div>
   );
