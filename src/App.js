@@ -722,34 +722,34 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
       </div>
 
       <div className="flex items-center justify-between pl-3 mt-4 mb-2">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-1.5">
           <button onClick={() => !isMyPost && onToggleLike(post.id, displayLikesCount, isCurrentlyLiked, likedUsers)} disabled={isMyPost} className={`transition-transform active:scale-90 ${isCurrentlyLiked ? 'text-rose-500' : 'text-slate-800 dark:text-slate-200'}`}>
             <Heart size={26} fill={isCurrentlyLiked ? "currentColor" : "none"} className={isCurrentlyLiked && !isMyPost ? "animate-pulse" : ""} />
           </button>
+          {displayLikesCount > 0 ? (
+            <button onClick={() => setShowLikesModal(true)} className="text-sm font-bold text-slate-800 dark:text-slate-200 hover:opacity-70">
+              {displayLikesCount} ナイス!
+            </button>
+          ) : isMyPost ? (
+            <span className="text-sm font-bold text-slate-400">ナイス待ち</span>
+          ) : null}
         </div>
-        <div className="flex items-center pr-4">
-          <button onClick={() => { setShowComments(true); setTimeout(() => textareaRef.current?.focus(), 100); }} className="text-slate-800 dark:text-slate-200 transition-transform active:scale-90 hover:text-slate-500">
+        <div className="flex items-center gap-1.5 pr-4">
+          {comments.length > 0 && (
+            <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{comments.length} コメント</span>
+          )}
+          <button onClick={() => { if (showComments) { setShowComments(false); } else { setShowComments(true); setTimeout(() => textareaRef.current?.focus(), 100); } }} className="text-slate-800 dark:text-slate-200 transition-transform active:scale-90 hover:text-slate-500">
             <MessageCircle size={26} />
           </button>
         </div>
       </div>
-      <div className="pl-3 mb-2 flex flex-col gap-1">
-        {displayLikesCount > 0 ? (
-          <button onClick={() => setShowLikesModal(true)} className="text-sm font-bold text-slate-800 dark:text-slate-200 hover:opacity-70 text-left">
-            ♡{displayLikesCount}ナイス!
-          </button>
-        ) : isMyPost ? (
-          <span className="text-xs font-bold text-slate-400">
-            ナイス待ち
-          </span>
-        ) : null}
-        
-        {comments.length > 2 && !showAllComments && (
+      {comments.length > 2 && !showAllComments && (
+        <div className="pl-3 mb-2 flex flex-col gap-1">
           <button onClick={() => setShowAllComments(true)} className="text-sm font-bold text-slate-500 hover:opacity-70 text-left">
             コメント{comments.length}件をすべて見る
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {showComments && (
         <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-800 animate-in fade-in duration-200">
@@ -4853,7 +4853,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 16:51, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 16:55, updated)</p>
       </div>
     </div>
   );
