@@ -450,37 +450,47 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
     }
 
     return (
-      <div className={`flex justify-between items-center border-b border-slate-200/50 dark:border-slate-800/50 pb-2 pt-2 last:border-0 ${isDrop ? 'pl-8' : ''}`}>
-        <span className={`font-bold w-16 text-sm shrink-0 flex flex-col ${labelColorClass}`}>
+      <div className={`flex justify-between items-center border-b border-slate-200/50 dark:border-slate-800/50 pb-1.5 pt-1.5 last:border-0 ${isDrop ? 'pl-5' : ''}`}>
+        <span className={`font-bold w-12 text-xs shrink-0 flex items-center ${labelColorClass}`}>
           {label}
         </span>
         {isLR ? (
-           <div className="flex-1 flex justify-between items-center px-1 gap-2 min-w-0">
-             <span className="font-bold text-base tracking-wide text-slate-800 dark:text-slate-100 flex-1 min-w-0 flex flex-col items-center">
-               <span className="truncate w-full text-center">{displayWeight}{weightLabel && <span className="text-xs font-normal text-slate-400 ml-0.5">{weightLabel}</span>}</span>
+           <div className="flex-1 flex justify-center items-center px-1 gap-1.5 sm:gap-2 min-w-0">
+             <div className="flex flex-col items-end min-w-[50px] sm:min-w-[60px]">
+               <div className="flex items-baseline gap-0.5">
+                 <span className="font-bold text-[15px] sm:text-base tracking-wide text-slate-800 dark:text-slate-100">{displayWeight}</span>
+                 {weightLabel && <span className="text-[10px] font-normal text-slate-400">{weightLabel}</span>}
+               </div>
                {prBadgeWeight}
-             </span>
-             <span className="font-bold text-sm sm:text-base tracking-wide text-slate-800 dark:text-slate-100 shrink-0 whitespace-nowrap flex flex-col items-end">
-               <span>L:{lReps || 0} <span className="text-slate-300 dark:text-slate-600 font-normal mx-0.5">/</span> R:{rReps || 0}<span className="text-xs font-normal text-slate-400 ml-0.5">回</span>{forced}</span>
+             </div>
+             <span className="text-slate-300 dark:text-slate-600 font-bold px-1">×</span>
+             <div className="flex flex-col items-start min-w-[70px] sm:min-w-[80px]">
+               <div className="flex items-baseline gap-0.5">
+                 <span className="font-bold text-sm text-slate-800 dark:text-slate-100">L:{lReps||0} R:{rReps||0}</span>
+                 <span className="text-[10px] font-normal text-slate-400">回</span>
+                 {forced}
+               </div>
                {prBadgeReps}
-               {Number(displayWeight) > 0 && Math.max(Number(lReps), Number(rReps)) > 0 && wType !== 'bodyWeight' && (
-                 <span className="text-[10px] text-slate-400 font-normal mt-0.5">推定1RM: {Math.round(Number(displayWeight) * (1 + Math.max(Number(lReps), Number(rReps)) / 30))}kg</span>
-               )}
-             </span>
+             </div>
            </div>
         ) : (
-           <div className="flex-1 flex justify-between items-center px-1 gap-2 min-w-0">
-             <span className="font-bold text-base tracking-wide text-slate-800 dark:text-slate-100 flex-1 min-w-0 flex flex-col items-center">
-               <span className="truncate w-full text-center">{displayWeight}{weightLabel && <span className="text-xs font-normal text-slate-400 ml-1">{weightLabel}</span>}</span>
+           <div className="flex-1 flex justify-center items-center px-1 gap-2 sm:gap-3 min-w-0">
+             <div className="flex flex-col items-end min-w-[50px] sm:min-w-[60px]">
+               <div className="flex items-baseline gap-0.5">
+                 <span className="font-bold text-[15px] sm:text-base tracking-wide text-slate-800 dark:text-slate-100">{displayWeight}</span>
+                 {weightLabel && <span className="text-[10px] font-normal text-slate-400">{weightLabel}</span>}
+               </div>
                {prBadgeWeight}
-             </span>
-             <span className="font-bold text-base tracking-wide text-slate-800 dark:text-slate-100 shrink-0 whitespace-nowrap flex flex-col items-end">
-               <span>{reps || 0} <span className="text-xs font-normal text-slate-400 ml-0.5">回</span>{forced}</span>
+             </div>
+             <span className="text-slate-300 dark:text-slate-600 font-bold">×</span>
+             <div className="flex flex-col items-start min-w-[50px] sm:min-w-[60px]">
+               <div className="flex items-baseline gap-0.5">
+                 <span className="font-bold text-[15px] sm:text-base tracking-wide text-slate-800 dark:text-slate-100">{reps || 0}</span>
+                 <span className="text-[10px] font-normal text-slate-400">回</span>
+                 {forced}
+               </div>
                {prBadgeReps}
-               {Number(displayWeight) > 0 && Number(reps) > 0 && wType !== 'bodyWeight' && (
-                 <span className="text-[10px] text-slate-400 font-normal mt-0.5">推定1RM: {Math.round(Number(displayWeight) * (1 + Number(reps) / 30))}kg</span>
-               )}
-             </span>
+             </div>
            </div>
         )}
       </div>
@@ -963,29 +973,27 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
       );
     } else {
       inputContent = (
-        <div className="flex-1 flex gap-2 min-w-0">
+        <div className="flex-1 flex gap-1.5 min-w-0">
           {isLR ? (
             <>
-              <input type="number" inputMode="decimal" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder={getWeightPlaceholder(wType)} className="w-[52px] sm:w-[64px] shrink-0 text-center text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded focus:outline-none focus:border-emerald-500 py-2 px-0" style={{ fontSize: '16px' }}/>
-              <div className="flex flex-1 items-center gap-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-1 sm:px-2 min-w-0">
-                <span className="text-[10px] sm:text-xs text-slate-400 font-bold shrink-0">L:</span>
-                <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('lReps')} onChange={(e) => update('lReps', e.target.value)} placeholder="0" className="w-full text-center text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0 px-0" style={{ fontSize: '16px' }}/>
-                <span className="text-[10px] text-slate-400 font-bold shrink-0">回</span>
+              <input type="number" inputMode="decimal" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder={getWeightPlaceholder(wType)} className="w-[48px] sm:w-[60px] shrink-0 text-center text-sm font-bold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded focus:outline-none focus:border-emerald-500 py-1.5 px-0" style={{ fontSize: '16px' }}/>
+              <div className="flex flex-1 items-center gap-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-1 min-w-0">
+                <span className="text-[10px] text-slate-400 font-bold shrink-0">L:</span>
+                <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('lReps')} onChange={(e) => update('lReps', e.target.value)} placeholder="0" className="w-full text-center text-sm font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0 px-0" style={{ fontSize: '16px' }}/>
               </div>
-              <div className="flex flex-1 items-center gap-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-1 sm:px-2 min-w-0">
-                <span className="text-[10px] sm:text-xs text-slate-400 font-bold shrink-0">R:</span>
-                <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('rReps')} onChange={(e) => update('rReps', e.target.value)} placeholder="0" className="w-full text-center text-sm sm:text-base font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0 px-0" style={{ fontSize: '16px' }}/>
-                <span className="text-[10px] text-slate-400 font-bold shrink-0">回</span>
+              <div className="flex flex-1 items-center gap-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-1 min-w-0">
+                <span className="text-[10px] text-slate-400 font-bold shrink-0">R:</span>
+                <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('rReps')} onChange={(e) => update('rReps', e.target.value)} placeholder="0" className="w-full text-center text-sm font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0 px-0" style={{ fontSize: '16px' }}/>
               </div>
             </>
           ) : (
             <>
-              <input type="number" inputMode="decimal" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder={getWeightPlaceholder(wType)} className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-2 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
-              <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('reps')} onChange={(e) => update('reps', e.target.value)} placeholder="回数" className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-2 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
+              <input type="number" inputMode="decimal" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder={getWeightPlaceholder(wType)} className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-1.5 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-sm" style={{ fontSize: '16px' }}/>
+              <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('reps')} onChange={(e) => update('reps', e.target.value)} placeholder="回数" className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-1.5 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-sm" style={{ fontSize: '16px' }}/>
             </>
           )}
           {item.isForcedReps && (
-            <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('forcedReps')} onChange={(e) => update('forcedReps', e.target.value)} placeholder="+補" className="w-10 sm:w-12 shrink-0 text-center text-sm font-bold text-rose-600 bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-800 rounded focus:outline-none focus:border-rose-500 py-2 px-0" style={{ fontSize: '16px' }}/>
+            <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('forcedReps')} onChange={(e) => update('forcedReps', e.target.value)} placeholder="+補" className="w-10 shrink-0 text-center text-sm font-bold text-rose-600 bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-800 rounded focus:outline-none focus:border-rose-500 py-1.5 px-0" style={{ fontSize: '16px' }}/>
           )}
         </div>
       );
@@ -1091,7 +1099,7 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
         </div>
       )}
 
-      <div className="space-y-4 mb-5 w-full pl-2">
+      <div className="space-y-2 mb-4 w-full pl-0">
         <div className="flex text-[10px] text-slate-500 dark:text-slate-400 font-bold px-1 mb-1 pl-6">
           <div className="w-6 text-center shrink-0">Set</div>
           <div className="flex-1 text-center min-w-0">記録</div>
@@ -1107,10 +1115,10 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, sIndex)}
             onDragEnd={handleDragEnd}
-            className={`bg-slate-50/50 dark:bg-slate-950/50 p-2.5 rounded-xl border transition-all relative ${draggedSetIndex === sIndex ? (dragOverSetIndex === sIndex ? 'opacity-70 border-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'opacity-40 border-dashed border-slate-300 dark:border-slate-600') : 'border-slate-100 dark:border-slate-800'} ${draggedSetIndex !== null ? 'space-y-0' : 'space-y-3'}`}
+            className={`bg-slate-50/50 dark:bg-slate-950/50 p-2 rounded-xl border transition-all relative ${draggedSetIndex === sIndex ? (dragOverSetIndex === sIndex ? 'opacity-70 border-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'opacity-40 border-dashed border-slate-300 dark:border-slate-600') : 'border-slate-100 dark:border-slate-800'} ${draggedSetIndex !== null ? 'space-y-0' : 'space-y-2'}`}
           >
             {dragOverSetIndex === sIndex && draggedSetIndex !== sIndex && <div className={`absolute left-0 w-full h-1 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${draggedSetIndex < dragOverSetIndex ? '-bottom-1.5' : '-top-1.5'}`} />}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <div 
                  className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-emerald-500 p-1 -ml-1 shrink-0 touch-none"
                  onMouseEnter={() => setDraggableSetId(set.id)}
@@ -1122,7 +1130,7 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
               >
                 <GripVertical size={16} />
               </div>
-              <div className="w-6 text-center text-slate-400 dark:text-slate-500 font-bold text-sm shrink-0">{sIndex + 1}</div>
+              <div className="w-5 text-center text-slate-400 dark:text-slate-500 font-bold text-xs shrink-0">{sIndex + 1}</div>
               
               {draggedSetIndex !== null ? (
                 <div className="flex-1 text-sm font-bold text-slate-500 dark:text-slate-400 py-1">SET {sIndex + 1}</div>
@@ -1137,77 +1145,77 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
             {draggedSetIndex === null && (
               <>
                 {item.isDropSet && item.weightType !== 'cardio' && set.dropSets && set.dropSets.map(ds => (
-                  <div key={ds.id} className="border-l-2 border-orange-200 dark:border-orange-800 pl-3 flex items-center gap-2 ml-4">
-                    <TrendingDown size={16} className="text-orange-400 flex-shrink-0" />
+                  <div key={ds.id} className="border-l-2 border-orange-200 dark:border-orange-800 pl-2 flex items-center gap-1.5 ml-3 mt-2">
+                    <TrendingDown size={14} className="text-orange-400 flex-shrink-0" />
                     {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'dropSets' }, item.weightType, 'main', true, ds.id)}
-                    <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'dropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
+                    <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'dropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={16} /></button>
                   </div>
                 ))}
 
                 {item.isDropSet && item.weightType !== 'cardio' && (
-                  <button onClick={() => addDropSet(item.id, set.id, 'dropSets')} className="ml-4 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900 border border-orange-200 dark:border-orange-800 px-3 py-1.5 rounded transition-colors font-bold flex items-center gap-1 w-max"><Plus size={12}/>ドロップ追加</button>
+                  <button onClick={() => addDropSet(item.id, set.id, 'dropSets')} className="ml-5 mt-2 text-[10px] text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900 border border-orange-200 dark:border-orange-800 px-2 py-1 rounded transition-colors font-bold flex items-center gap-1 w-max"><Plus size={10}/>ドロップ追加</button>
                 )}
 
                 {item.isSuperSet && item.superExerciseName && item.weightType !== 'cardio' && (
-                  <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-3">
-                    <div className="flex items-center gap-2 pl-4 border-l-2 border-indigo-300 dark:border-indigo-700 ml-1">
-                      <Zap size={16} className="text-indigo-400 flex-shrink-0" />
+                  <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2 mt-2">
+                    <div className="flex items-center gap-1.5 pl-2 border-l-2 border-indigo-300 dark:border-indigo-700 ml-1">
+                      <Zap size={14} className="text-indigo-400 flex-shrink-0" />
                       {renderInputRow(set, item.superWeightType || 'total', 'super2', false)}
                       <div className="w-6 shrink-0"></div>
                     </div>
                     
                     {item.isDropSet && set.dropSets && !set.superDropSets && set.dropSets.map(ds => (
                       ds.superWeight !== undefined ? (
-                      <div key={`super2-old-ds-${ds.id}`} className="flex items-center gap-2 pl-8 border-l-2 border-orange-300 dark:border-orange-700 ml-5">
-                        <TrendingDown size={14} className="text-orange-400 flex-shrink-0" />
+                      <div key={`super2-old-ds-${ds.id}`} className="flex items-center gap-1.5 pl-4 border-l-2 border-orange-300 dark:border-orange-700 ml-4 mt-2">
+                        <TrendingDown size={12} className="text-orange-400 flex-shrink-0" />
                         {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'dropSets' }, item.superWeightType || 'total', 'super2', true, ds.id)}
-                        <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'dropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
+                        <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'dropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={16} /></button>
                       </div>
                       ) : null
                     ))}
                     
                     {item.isDropSet && set.superDropSets && set.superDropSets.map(ds => (
-                      <div key={`super2-ds-${ds.id}`} className="flex items-center gap-2 pl-8 border-l-2 border-orange-300 dark:border-orange-700 ml-5">
-                        <TrendingDown size={14} className="text-orange-400 flex-shrink-0" />
+                      <div key={`super2-ds-${ds.id}`} className="flex items-center gap-1.5 pl-4 border-l-2 border-orange-300 dark:border-orange-700 ml-4 mt-2">
+                        <TrendingDown size={12} className="text-orange-400 flex-shrink-0" />
                         {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'superDropSets' }, item.superWeightType || 'total', 'super2', true, ds.id)}
-                        <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'superDropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
+                        <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'superDropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={16} /></button>
                       </div>
                     ))}
                     
                     {item.isDropSet && (
-                      <button onClick={() => addDropSet(item.id, set.id, 'superDropSets')} className="ml-12 mt-1 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900 border border-orange-200 dark:border-orange-800 px-3 py-1.5 rounded transition-colors font-bold flex items-center gap-1 w-max"><Plus size={12}/>ドロップ追加</button>
+                      <button onClick={() => addDropSet(item.id, set.id, 'superDropSets')} className="ml-8 mt-1 text-[10px] text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900 border border-orange-200 dark:border-orange-800 px-2 py-1 rounded transition-colors font-bold flex items-center gap-1 w-max"><Plus size={10}/>ドロップ追加</button>
                     )}
                   </div>
                 )}
                 
                 {item.isSuperSet && item.superExerciseName3 && item.weightType !== 'cardio' && (
-                  <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-3">
-                    <div className="flex items-center gap-2 pl-4 border-l-2 border-indigo-300 dark:border-indigo-700 ml-1">
-                      <Zap size={16} className="text-indigo-400 flex-shrink-0" />
+                  <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2 mt-2">
+                    <div className="flex items-center gap-1.5 pl-2 border-l-2 border-indigo-300 dark:border-indigo-700 ml-1">
+                      <Zap size={14} className="text-indigo-400 flex-shrink-0" />
                       {renderInputRow(set, item.superWeightType3 || 'total', 'super3', false)}
                       <div className="w-6 shrink-0"></div>
                     </div>
                     
                     {item.isDropSet && set.dropSets && !set.superDropSets3 && set.dropSets.map(ds => (
                       ds.superWeight3 !== undefined ? (
-                      <div key={`super3-old-ds-${ds.id}`} className="flex items-center gap-2 pl-8 border-l-2 border-orange-300 dark:border-orange-700 ml-5">
-                        <TrendingDown size={14} className="text-orange-400 flex-shrink-0" />
+                      <div key={`super3-old-ds-${ds.id}`} className="flex items-center gap-1.5 pl-4 border-l-2 border-orange-300 dark:border-orange-700 ml-4 mt-2">
+                        <TrendingDown size={12} className="text-orange-400 flex-shrink-0" />
                         {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'dropSets' }, item.superWeightType3 || 'total', 'super3', true, ds.id)}
-                        <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'dropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
+                        <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'dropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={16} /></button>
                       </div>
                       ) : null
                     ))}
                     
                     {item.isDropSet && set.superDropSets3 && set.superDropSets3.map(ds => (
-                      <div key={`super3-ds-${ds.id}`} className="flex items-center gap-2 pl-8 border-l-2 border-orange-300 dark:border-orange-700 ml-5">
-                        <TrendingDown size={14} className="text-orange-400 flex-shrink-0" />
+                      <div key={`super3-ds-${ds.id}`} className="flex items-center gap-1.5 pl-4 border-l-2 border-orange-300 dark:border-orange-700 ml-4 mt-2">
+                        <TrendingDown size={12} className="text-orange-400 flex-shrink-0" />
                         {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'superDropSets3' }, item.superWeightType3 || 'total', 'super3', true, ds.id)}
-                        <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'superDropSets3')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={18} /></button>
+                        <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'superDropSets3')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={16} /></button>
                       </div>
                     ))}
                     
                     {item.isDropSet && (
-                      <button onClick={() => addDropSet(item.id, set.id, 'superDropSets3')} className="ml-12 mt-1 text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900 border border-orange-200 dark:border-orange-800 px-3 py-1.5 rounded transition-colors font-bold flex items-center gap-1 w-max"><Plus size={12}/>ドロップ追加</button>
+                      <button onClick={() => addDropSet(item.id, set.id, 'superDropSets3')} className="ml-8 mt-1 text-[10px] text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900 border border-orange-200 dark:border-orange-800 px-2 py-1 rounded transition-colors font-bold flex items-center gap-1 w-max"><Plus size={10}/>ドロップ追加</button>
                     )}
                   </div>
                 )}
@@ -1244,140 +1252,74 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
   );
 }
 
-// --- スクロール自動制御フック ---
-function useDragAndDrop(items, setItems) {
-  const [draggedIndex, setDraggedIndex] = useState(null);
-  const [dragOverIndex, setDragOverIndex] = useState(null);
-  const [draggableId, setDraggableId] = useState(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const touchIdRef = useRef(null);
-  const startPosRef = useRef({ x: 0, y: 0 });
-  const refs = useRef([]);
-  const scrollIntervalRef = useRef(null);
-  const lastTouchPosRef = useRef({ x: 0, y: 0 });
+// --- 種目並び替えモーダル ---
+function ReorderItemsModal({ items, onClose, onSave }) {
+  const [localItems, setLocalItems] = useState([...items]);
+  const [draggedIdx, setDraggedIdx] = useState(null);
 
-  const evaluateDragOver = (x, y) => {
-    let minDistance = Infinity;
-    let closestIndex = dragOverIndex;
-    refs.current.forEach((el, idx) => {
-       if (!el || idx === draggedIndex) return;
-       const rect = el.getBoundingClientRect();
-       const centerX = rect.left + rect.width / 2;
-       const centerY = rect.top + rect.height / 2;
-       const distance = Math.hypot(x - centerX, y - centerY);
-       if (distance < minDistance) {
-         minDistance = distance;
-         closestIndex = idx;
-       }
-    });
-    if (closestIndex !== null && closestIndex !== dragOverIndex) {
-      setDragOverIndex(closestIndex);
-    }
+  const moveUp = (idx) => {
+    if (idx === 0) return;
+    const newItems = [...localItems];
+    [newItems[idx - 1], newItems[idx]] = [newItems[idx], newItems[idx - 1]];
+    setLocalItems(newItems);
   };
-
-  const startAutoScroll = (container, direction) => {
-    if (scrollIntervalRef.current) return;
-    scrollIntervalRef.current = setInterval(() => {
-      container.scrollBy({ left: direction * 10, behavior: 'auto' });
-      evaluateDragOver(lastTouchPosRef.current.x, lastTouchPosRef.current.y);
-    }, 16);
-  };
-
-  const stopAutoScroll = () => {
-    if (scrollIntervalRef.current) {
-      clearInterval(scrollIntervalRef.current);
-      scrollIntervalRef.current = null;
-    }
+  const moveDown = (idx) => {
+    if (idx === localItems.length - 1) return;
+    const newItems = [...localItems];
+    [newItems[idx + 1], newItems[idx]] = [newItems[idx], newItems[idx + 1]];
+    setLocalItems(newItems);
   };
 
   const handleDragStart = (e, idx) => {
-    setDraggedIndex(idx);
-    setDragOverIndex(idx);
+    setDraggedIdx(idx);
     e.dataTransfer.effectAllowed = 'move';
   };
   const handleDragOver = (e, idx) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    if (dragOverIndex !== idx) setDragOverIndex(idx);
   };
-  const handleDragLeave = () => {};
   const handleDrop = (e, idx) => {
     e.preventDefault();
-    if (draggedIndex !== null && draggedIndex !== idx) {
-      setItems(prev => {
-        const newItems = [...prev];
-        const [dragged] = newItems.splice(draggedIndex, 1);
-        newItems.splice(idx, 0, dragged);
-        return newItems;
-      });
+    if (draggedIdx !== null && draggedIdx !== idx) {
+      const newItems = [...localItems];
+      const [dragged] = newItems.splice(draggedIdx, 1);
+      newItems.splice(idx, 0, dragged);
+      setLocalItems(newItems);
     }
-    handleDragEnd();
-  };
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
-    setDragOverIndex(null);
-    setDraggableId(null);
-  };
-  const handleTouchStart = (e, idx) => {
-    if (touchIdRef.current !== null) return;
-    const touch = e.changedTouches[0];
-    touchIdRef.current = touch.identifier;
-    startPosRef.current = { x: touch.clientX, y: touch.clientY };
-    setDragOffset({ x: 0, y: 0 });
-    setDraggedIndex(idx);
-    setDragOverIndex(idx);
-  };
-  const handleTouchMove = (e) => {
-    if (draggedIndex === null || touchIdRef.current === null) return;
-    const touch = Array.from(e.changedTouches).find(t => t.identifier === touchIdRef.current);
-    if (!touch) return;
-    const x = touch.clientX;
-    const y = touch.clientY;
-    lastTouchPosRef.current = { x, y };
-    setDragOffset({ x: x - startPosRef.current.x, y: y - startPosRef.current.y });
-
-    const container = refs.current[draggedIndex]?.parentElement;
-    if (container) {
-      const containerRect = container.getBoundingClientRect();
-      const edgeThreshold = 80;
-      if (x < containerRect.left + edgeThreshold) {
-        startAutoScroll(container, -1);
-      } else if (x > containerRect.right - edgeThreshold) {
-        startAutoScroll(container, 1);
-      } else {
-        stopAutoScroll();
-      }
-    }
-    evaluateDragOver(x, y);
-  };
-  const handleTouchEnd = (e) => {
-    stopAutoScroll();
-    if (touchIdRef.current === null) return;
-    const touch = Array.from(e.changedTouches).find(t => t.identifier === touchIdRef.current);
-    if (!touch) return;
-    if (draggedIndex !== null && dragOverIndex !== null && draggedIndex !== dragOverIndex) {
-      setItems(prev => {
-        const newItems = [...prev];
-        const [dragged] = newItems.splice(draggedIndex, 1);
-        newItems.splice(dragOverIndex, 0, dragged);
-        return newItems;
-      });
-    }
-    setDraggedIndex(null);
-    setDragOverIndex(null);
-    setDraggableId(null);
-    setDragOffset({ x: 0, y: 0 });
-    touchIdRef.current = null;
+    setDraggedIdx(null);
   };
 
-  return {
-    draggedIndex, dragOverIndex, draggableId, setDraggableId, dragOffset, refs,
-    handlers: {
-      onDragStart: handleDragStart, onDragOver: handleDragOver, onDragLeave: handleDragLeave,
-      onDrop: handleDrop, onDragEnd: handleDragEnd, onTouchStart: handleTouchStart,
-      onTouchMove: handleTouchMove, onTouchEnd: handleTouchEnd, onTouchCancel: handleTouchEnd
-    }
-  };
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-in fade-in">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[80vh]">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+          <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2"><ArrowUp size={18}/><ArrowDown size={18} className="-ml-2"/> 種目の並び替え</h3>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20}/></button>
+        </div>
+        <div className="p-4 overflow-y-auto space-y-2 flex-1">
+          {localItems.map((item, idx) => (
+            <div key={item.id}
+              draggable
+              onDragStart={(e) => handleDragStart(e, idx)}
+              onDragOver={(e) => handleDragOver(e, idx)}
+              onDrop={(e) => handleDrop(e, idx)}
+              className={`flex items-center gap-3 bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border transition-all ${draggedIdx === idx ? 'border-emerald-500 opacity-50' : 'border-slate-200 dark:border-slate-800'}`}
+            >
+               <div className="cursor-grab text-slate-400"><GripVertical size={18}/></div>
+               <div className="flex-1 font-bold text-sm text-slate-800 dark:text-slate-100 truncate">{item.exerciseName || '未選択'}</div>
+               <div className="flex gap-1">
+                 <button onClick={() => moveUp(idx)} disabled={idx === 0} className="p-2 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg disabled:opacity-30 hover:bg-slate-300 transition-colors"><ArrowUp size={16}/></button>
+                 <button onClick={() => moveDown(idx)} disabled={idx === localItems.length - 1} className="p-2 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg disabled:opacity-30 hover:bg-slate-300 transition-colors"><ArrowDown size={16}/></button>
+               </div>
+            </div>
+          ))}
+        </div>
+        <div className="p-4 border-t border-slate-200 dark:border-slate-800">
+           <button onClick={() => onSave(localItems)} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl transition-colors shadow-sm">完了</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function useAutoScrollDisable() {
@@ -3027,7 +2969,7 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
 function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workoutItems, setWorkoutItems, selectedCategories, setSelectedCategories, posts, currentUser, isManual, setIsManual, onActiveExerciseChange, accountsInfo }) {
   const joinedGyms = myInfo.joinedGyms || ['common'];
   const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (gyms.filter(g => joinedGyms.includes(g.id) && g.id !== 'common')[0]?.id || ''));
-  const itemDnd = useDragAndDrop(workoutItems, setWorkoutItems);
+  const [showReorderModal, setShowReorderModal] = useState(false);
   const [restTimerStart, setRestTimerStart] = useState(null);
   const [restTimeElapsed, setRestTimeElapsed] = useState(0);
 
@@ -3076,73 +3018,6 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
     return selectedCategories.includes(ex.category || 'その他');
   });
 
-  const longPressTimer = useRef(null);
-  const touchStartPos = useRef({ x: 0, y: 0 });
-
-  const handleTouchStart = (e, index, itemId) => {
-    if (itemDnd.draggedIndex !== null || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
-    const touch = e.changedTouches[0];
-    touchStartPos.current = { x: touch.clientX, y: touch.clientY };
-    const touchObj = { clientX: touch.clientX, clientY: touch.clientY, identifier: touch.identifier };
-    longPressTimer.current = setTimeout(() => {
-      itemDnd.setDraggableId(itemId);
-      itemDnd.handlers.onTouchStart({ changedTouches: [touchObj] }, index);
-      if (navigator.vibrate) navigator.vibrate(50);
-    }, 400);
-  };
-
-  const handleTouchMove = (e) => {
-    if (itemDnd.draggedIndex === null && longPressTimer.current) {
-      const touch = e.changedTouches[0];
-      const dx = Math.abs(touch.clientX - touchStartPos.current.x);
-      const dy = Math.abs(touch.clientY - touchStartPos.current.y);
-      if (dx > 10 || dy > 10) {
-        clearTimeout(longPressTimer.current);
-        longPressTimer.current = null;
-      }
-    }
-    if (itemDnd.draggedIndex !== null) {
-      itemDnd.handlers.onTouchMove(e);
-      if (e.cancelable) e.preventDefault();
-    }
-  };
-
-  const handleTouchEndOrCancel = (e) => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-    if (itemDnd.draggedIndex !== null) {
-      itemDnd.handlers.onTouchEnd(e);
-    }
-  };
-
-  const handleMouseDown = (e, index, itemId) => {
-    if (itemDnd.draggedIndex !== null || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
-    touchStartPos.current = { x: e.clientX, y: e.clientY };
-    longPressTimer.current = setTimeout(() => {
-      itemDnd.setDraggableId(itemId);
-      itemDnd.handlers.onDragStart(e, index);
-    }, 400);
-  };
-
-  const handleMouseMove = (e) => {
-    if (itemDnd.draggedIndex === null && longPressTimer.current) {
-      const dx = Math.abs(e.clientX - touchStartPos.current.x);
-      const dy = Math.abs(e.clientY - touchStartPos.current.y);
-      if (dx > 10 || dy > 10) {
-        clearTimeout(longPressTimer.current);
-        longPressTimer.current = null;
-      }
-    }
-  };
-
-  const handleMouseUpOrLeave = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-  };
 
   const handleStart = () => {
     if (!selectedGymId) { alert("ジムを選択してください"); return; }
@@ -3418,7 +3293,14 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
         </div>
       )}
 
-      <h2 className="text-lg font-bold text-slate-900 dark:text-white mt-6 mb-2">{isManual ? '記録内容' : 'ワークアウト中'}</h2>
+      <div className="flex justify-between items-center mt-6 mb-2">
+        <h2 className="text-lg font-bold text-slate-900 dark:text-white">{isManual ? '記録内容' : 'ワークアウト中'}</h2>
+        {workoutItems.length > 1 && (
+          <button onClick={() => setShowReorderModal(true)} className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 flex items-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-colors shadow-sm">
+            <ArrowUp size={14} /><ArrowDown size={14} className="-ml-2" /> 並び替え
+          </button>
+        )}
+      </div>
 
       <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-6">
         {MUSCLE_CATEGORIES.map(cat => {
@@ -3439,28 +3321,9 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
           .hide-scrollbar::-webkit-scrollbar { display: none; }
           .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         `}</style>
-      <div className={`flex overflow-x-auto gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start ${itemDnd.draggedIndex !== null ? 'snap-none' : 'snap-x snap-mandatory'}`}>
-        {workoutItems.map((item, index) => {
-           let shiftTransform = '';
-           if (itemDnd.draggedIndex !== null && itemDnd.draggedIndex !== index) {
-             if (itemDnd.draggedIndex < itemDnd.dragOverIndex && index > itemDnd.draggedIndex && index <= itemDnd.dragOverIndex) {
-               shiftTransform = 'translateX(calc(-100% - 16px))';
-             } else if (itemDnd.draggedIndex > itemDnd.dragOverIndex && index < itemDnd.draggedIndex && index >= itemDnd.dragOverIndex) {
-               shiftTransform = 'translateX(calc(100% + 16px))';
-             }
-           }
-           return (
-             <div key={item.id}
-                ref={(el) => (itemDnd.refs.current[index] = el)}
-                draggable={itemDnd.draggableId === item.id}
-                onDragStart={(e) => itemDnd.handlers.onDragStart(e, index)}
-                onDragOver={(e) => itemDnd.handlers.onDragOver(e, index)}
-                onDragLeave={itemDnd.handlers.onDragLeave}
-                onDrop={(e) => itemDnd.handlers.onDrop(e, index)}
-                onDragEnd={itemDnd.handlers.onDragEnd}
-                className={`shrink-0 w-[88%] sm:w-[320px] relative transition-all duration-300 ease-out ${itemDnd.draggedIndex === index ? 'z-50 scale-105 shadow-2xl ring-4 ring-emerald-500 opacity-95 rounded-2xl bg-white dark:bg-slate-900 transition-none' : itemDnd.draggedIndex !== null ? 'opacity-80 rounded-2xl' : 'snap-center'}`}
-                style={itemDnd.draggedIndex === index ? { transform: `translate(${itemDnd.dragOffset.x}px, ${itemDnd.dragOffset.y}px)` } : { transform: shiftTransform }}
-             >
+      <div className="flex overflow-x-auto gap-3 sm:gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start snap-x snap-mandatory">
+        {workoutItems.map((item, index) => (
+             <div key={item.id} className="snap-center shrink-0 w-[88%] sm:w-[320px] relative">
                 <WorkoutItemForm 
                   item={item} 
                   index={index}
@@ -3476,22 +3339,12 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
                   reorderSet={reorderSet}
                   myPastPosts={myPastPosts}
                   onActive={onActiveExerciseChange}
-                  isDragging={itemDnd.draggedIndex === index}
-                  isAnyDragging={itemDnd.draggedIndex !== null}
-                  dragHandleProps={{
-                    onTouchStart: (e) => handleTouchStart(e, index, item.id),
-                    onTouchMove: handleTouchMove,
-                    onTouchEnd: handleTouchEndOrCancel,
-                    onTouchCancel: handleTouchEndOrCancel,
-                    onMouseDown: (e) => handleMouseDown(e, index, item.id),
-                    onMouseMove: handleMouseMove,
-                    onMouseUp: handleMouseUpOrLeave,
-                    onMouseLeave: handleMouseUpOrLeave
-                  }}
+                  isDragging={false}
+                  isAnyDragging={false}
+                  dragHandleProps={{}}
                 />
              </div>
-           );
-        })}
+        ))}
 
         <div className="snap-center shrink-0 w-[88%] sm:w-[320px] flex flex-col justify-center h-full min-h-[200px]">
           <button onClick={() => addExerciseItem()} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
@@ -3521,6 +3374,13 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
         
         <button onClick={handleCancel} className="w-full text-slate-500 dark:text-slate-400 font-bold py-3 rounded-xl flex items-center justify-center gap-2 mt-2 mb-8 transition-all bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:text-rose-500 hover:border-rose-200 dark:hover:border-rose-800">記録を破棄して終了</button>
       </div>
+      {showReorderModal && (
+        <ReorderItemsModal 
+          items={workoutItems} 
+          onClose={() => setShowReorderModal(false)} 
+          onSave={(newItems) => { setWorkoutItems(newItems); setShowReorderModal(false); }}
+        />
+      )}
     </div>
   );
 }
@@ -3529,7 +3389,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
 function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts }) {
   const safeItems = post.items ? JSON.parse(JSON.stringify(post.items)) : [];
   const [workoutItems, setWorkoutItems] = useState(safeItems);
-  const itemDnd = useDragAndDrop(workoutItems, setWorkoutItems);
+  const [showReorderModal, setShowReorderModal] = useState(false);
   
   const [editDate, setEditDate] = useState(formatDateFromTimestamp(post.startTime || post.timestamp));
   const [editStartTime, setEditStartTime] = useState(formatTimeFromTimestamp(post.startTime || post.timestamp));
@@ -3579,73 +3439,6 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
   const removeDropSet = (itemId, parentSetId, dropId, targetArray = 'dropSets') => { setWorkoutItems(prev => prev.map(item => { if (item.id !== itemId) return item; return { ...item, sets: item.sets.map(set => { if (set.id !== parentSetId) return set; return { ...set, [targetArray]: (set[targetArray] || []).filter(ds => ds.id !== dropId) }; })}; })); }
   const updateDropSetField = (itemId, parentSetId, dropId, field, value, targetArray = 'dropSets') => { setWorkoutItems(prev => prev.map(item => { if (item.id !== itemId) return item; return { ...item, sets: item.sets.map(set => { if (set.id !== parentSetId) return set; return { ...set, [targetArray]: (set[targetArray] || []).map(ds => ds.id === dropId ? { ...ds, [field]: value } : ds) }; })}; })); }
 
-  const longPressTimer = useRef(null);
-  const touchStartPos = useRef({ x: 0, y: 0 });
-
-  const handleTouchStart = (e, index, itemId) => {
-    if (itemDnd.draggedIndex !== null || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
-    const touch = e.changedTouches[0];
-    touchStartPos.current = { x: touch.clientX, y: touch.clientY };
-    const touchObj = { clientX: touch.clientX, clientY: touch.clientY, identifier: touch.identifier };
-    longPressTimer.current = setTimeout(() => {
-      itemDnd.setDraggableId(itemId);
-      itemDnd.handlers.onTouchStart({ changedTouches: [touchObj] }, index);
-      if (navigator.vibrate) navigator.vibrate(50);
-    }, 400);
-  };
-
-  const handleTouchMove = (e) => {
-    if (itemDnd.draggedIndex === null && longPressTimer.current) {
-      const touch = e.changedTouches[0];
-      const dx = Math.abs(touch.clientX - touchStartPos.current.x);
-      const dy = Math.abs(touch.clientY - touchStartPos.current.y);
-      if (dx > 10 || dy > 10) {
-        clearTimeout(longPressTimer.current);
-        longPressTimer.current = null;
-      }
-    }
-    if (itemDnd.draggedIndex !== null) {
-      itemDnd.handlers.onTouchMove(e);
-      if (e.cancelable) e.preventDefault();
-    }
-  };
-
-  const handleTouchEndOrCancel = (e) => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-    if (itemDnd.draggedIndex !== null) {
-      itemDnd.handlers.onTouchEnd(e);
-    }
-  };
-
-  const handleMouseDown = (e, index, itemId) => {
-    if (itemDnd.draggedIndex !== null || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
-    touchStartPos.current = { x: e.clientX, y: e.clientY };
-    longPressTimer.current = setTimeout(() => {
-      itemDnd.setDraggableId(itemId);
-      itemDnd.handlers.onDragStart(e, index);
-    }, 400);
-  };
-
-  const handleMouseMove = (e) => {
-    if (itemDnd.draggedIndex === null && longPressTimer.current) {
-      const dx = Math.abs(e.clientX - touchStartPos.current.x);
-      const dy = Math.abs(e.clientY - touchStartPos.current.y);
-      if (dx > 10 || dy > 10) {
-        clearTimeout(longPressTimer.current);
-        longPressTimer.current = null;
-      }
-    }
-  };
-
-  const handleMouseUpOrLeave = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-  };
 
   const handleSave = () => {
     const isValid = workoutItems.every(item => {
@@ -3716,6 +3509,14 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
             </div>
           </div>
 
+          <div className="flex justify-between items-center mb-2 mt-4">
+            <h3 className="font-bold text-slate-800 dark:text-white">記録内容</h3>
+            {workoutItems.length > 1 && (
+              <button onClick={() => setShowReorderModal(true)} className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 flex items-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-colors shadow-sm">
+                <ArrowUp size={14} /><ArrowDown size={14} className="-ml-2" /> 並び替え
+              </button>
+            )}
+          </div>
           <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-6">
             {MUSCLE_CATEGORIES.map(cat => {
               const isSelected = selectedCategories.includes(cat);
@@ -3734,28 +3535,9 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
             .hide-scrollbar::-webkit-scrollbar { display: none; }
             .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
           `}</style>
-          <div className={`flex overflow-x-auto gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start ${itemDnd.draggedIndex !== null ? 'snap-none' : 'snap-x snap-mandatory'}`}>
-            {workoutItems.map((item, index) => {
-               let shiftTransform = '';
-               if (itemDnd.draggedIndex !== null && itemDnd.draggedIndex !== index) {
-                 if (itemDnd.draggedIndex < itemDnd.dragOverIndex && index > itemDnd.draggedIndex && index <= itemDnd.dragOverIndex) {
-                   shiftTransform = 'translateX(calc(-100% - 16px))';
-                 } else if (itemDnd.draggedIndex > itemDnd.dragOverIndex && index < itemDnd.draggedIndex && index >= itemDnd.dragOverIndex) {
-                   shiftTransform = 'translateX(calc(100% + 16px))';
-                 }
-               }
-               return (
-                 <div key={item.id}
-                    ref={(el) => (itemDnd.refs.current[index] = el)}
-                    draggable={itemDnd.draggableId === item.id}
-                    onDragStart={(e) => itemDnd.handlers.onDragStart(e, index)}
-                    onDragOver={(e) => itemDnd.handlers.onDragOver(e, index)}
-                    onDragLeave={itemDnd.handlers.onDragLeave}
-                    onDrop={(e) => itemDnd.handlers.onDrop(e, index)}
-                    onDragEnd={itemDnd.handlers.onDragEnd}
-                    className={`shrink-0 w-[88%] sm:w-[320px] relative transition-all duration-300 ease-out ${itemDnd.draggedIndex === index ? 'z-50 scale-105 shadow-2xl ring-4 ring-emerald-500 opacity-95 rounded-2xl bg-white dark:bg-slate-900 transition-none' : itemDnd.draggedIndex !== null ? 'opacity-80 rounded-2xl' : 'snap-center'}`}
-                    style={itemDnd.draggedIndex === index ? { transform: `translate(${itemDnd.dragOffset.x}px, ${itemDnd.dragOffset.y}px)` } : { transform: shiftTransform }}
-                 >
+          <div className="flex overflow-x-auto gap-3 sm:gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start snap-x snap-mandatory">
+            {workoutItems.map((item, index) => (
+                 <div key={item.id} className="snap-center shrink-0 w-[88%] sm:w-[320px] relative">
                     <WorkoutItemForm 
                       item={item} 
                       index={index}
@@ -3770,22 +3552,12 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
                       updateDropSet={updateDropSetField}
                       reorderSet={reorderSet}
                       myPastPosts={myPastPosts}
-                      isDragging={itemDnd.draggedIndex === index}
-                      isAnyDragging={itemDnd.draggedIndex !== null}
-                      dragHandleProps={{
-                        onTouchStart: (e) => handleTouchStart(e, index, item.id),
-                        onTouchMove: handleTouchMove,
-                        onTouchEnd: handleTouchEndOrCancel,
-                        onTouchCancel: handleTouchEndOrCancel,
-                        onMouseDown: (e) => handleMouseDown(e, index, item.id),
-                        onMouseMove: handleMouseMove,
-                        onMouseUp: handleMouseUpOrLeave,
-                        onMouseLeave: handleMouseUpOrLeave
-                      }}
+                      isDragging={false}
+                      isAnyDragging={false}
+                      dragHandleProps={{}}
                     />
                  </div>
-               );
-            })}
+            ))}
 
             <div className="snap-center shrink-0 w-[88%] sm:w-[320px] flex flex-col justify-center h-full min-h-[200px]">
               <button onClick={addExerciseItem} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
@@ -3802,6 +3574,13 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
           </button>
         </div>
       </div>
+      {showReorderModal && (
+        <ReorderItemsModal 
+          items={workoutItems} 
+          onClose={() => setShowReorderModal(false)} 
+          onSave={(newItems) => { setWorkoutItems(newItems); setShowReorderModal(false); }}
+        />
+      )}
     </div>
   );
 }
@@ -4903,7 +4682,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 10:47, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 11:10, updated)</p>
       </div>
     </div>
   );
