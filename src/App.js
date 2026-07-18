@@ -4198,6 +4198,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
   const partnerInfo = partnerName ? accountsInfo[partnerName] : null;
   const isPartnerEnabled = myInfo?.enablePartnerFeature || false;
   const [activeTab, setActiveTab] = useState(isPartnerEnabled ? 'partner' : 'friends');
+  const [rankingType, setRankingType] = useState('friends');
   const [reportText, setReportText] = useState('');
   const [isSendingReport, setIsSendingReport] = useState(false);
   const [showReportsModal, setShowReportsModal] = useState(false);
@@ -4214,20 +4215,19 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
     const month = now.getMonth();
     const userVolumes = {};
     
-    userVolumes[currentUser] = 0;
-    const myFriends = myInfo.friends || [];
-    myFriends.forEach(f => { userVolumes[f] = 0; });
-
     (posts || []).forEach(p => {
-      if (userVolumes[p.author] !== undefined) {
-        const d = new Date(p.timestamp);
-        if (d.getFullYear() === year && d.getMonth() === month) {
-          userVolumes[p.author] += Number(p.volume) || 0;
-        }
+      const d = new Date(p.timestamp);
+      if (d.getFullYear() === year && d.getMonth() === month) {
+        if (userVolumes[p.author] === undefined) userVolumes[p.author] = 0;
+        userVolumes[p.author] += Number(p.volume) || 0;
       }
     });
 
-    return Object.entries(userVolumes)
+    if (userVolumes[currentUser] === undefined) userVolumes[currentUser] = 0;
+
+    const myFriends = myInfo.friends || [];
+
+    const allUsersArray = Object.entries(userVolumes)
       .map(([username, volume]) => ({
         username,
         volume,
@@ -4235,6 +4235,10 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
         photoUrl: accountsInfo[username]?.photoUrl || null
       }))
       .sort((a, b) => b.volume - a.volume);
+
+    const friendRanking = allUsersArray.filter(u => u.username === currentUser || myFriends.includes(u.username));
+
+    return { globalRanking: allUsersArray, friendRanking };
   }, [posts, currentUser, myInfo.friends, accountsInfo]);
   
   const [duofitUsername, setDuofitUsername] = useState('');
@@ -4597,12 +4601,18 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
             <div className="absolute -right-6 -bottom-6 text-white/10 transform rotate-12 pointer-events-none">
               <Trophy size={140} />
             </div>
-            <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
-              <Trophy className="text-amber-300 animate-bounce" size={18} />
-              今月の総負荷量ランキング
-            </h3>
+            <div className="flex items-center justify-between mb-4 relative z-10">
+              <h3 className="text-sm font-bold flex items-center gap-2">
+                <Trophy className="text-amber-300 animate-bounce" size={18} />
+                今月の総負荷ランキング
+              </h3>
+              <div className="flex bg-black/20 rounded-lg p-0.5">
+                <button onClick={() => setRankingType('friends')} className={`text-[10px] font-bold px-2 py-1 rounded-md transition-colors ${rankingType === 'friends' ? 'bg-white/20 text-white' : 'text-white/60'}`}>フレンド</button>
+                <button onClick={() => setRankingType('global')} className={`text-[10px] font-bold px-2 py-1 rounded-md transition-colors ${rankingType === 'global' ? 'bg-white/20 text-white' : 'text-white/60'}`}>全体</button>
+              </div>
+            </div>
             <div className="space-y-2.5 relative z-10">
-              {rankingData.slice(0, 5).map((user, idx) => {
+              {(rankingType === 'global' ? rankingData.globalRanking : rankingData.friendRanking).slice(0, 5).map((user, idx) => {
                 const isMe = user.username === currentUser;
                 let rankBadge = <span className="text-xs font-bold w-6 text-center text-white/70">{idx + 1}</span>;
                 if (idx === 0) rankBadge = <Award className="text-amber-300 shrink-0" size={20} />;
@@ -4696,7 +4706,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 09:07, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 09:10, updated)</p>
       </div>
     </div>
   );
