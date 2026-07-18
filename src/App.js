@@ -1507,60 +1507,6 @@ export default function App() {
   const [focusedPost, setFocusedPost] = useState(null);
   const [redirectUser, setRedirectUser] = useState(null);
 
-  const [isBgmPlaying, setIsBgmPlaying] = useState(false);
-  const [bgmIndex, setBgmIndex] = useState(0);
-  const bgmTracks = useMemo(() => [
-    { name: 'LoFi 1', url: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3' },
-    { name: 'Upbeat', url: 'https://cdn.pixabay.com/download/audio/2022/03/24/audio_34b4a1b02b.mp3' },
-    { name: 'Chill', url: 'https://cdn.pixabay.com/download/audio/2022/10/25/audio_29759d53f3.mp3' }
-  ], []);
-  const audioRef = useRef(null);
-
-  useEffect(() => {
-    audioRef.current = new Audio(bgmTracks[0].url);
-    audioRef.current.loop = true;
-    audioRef.current.volume = 0.3;
-
-    const handleFirstInteraction = () => {
-      audioRef.current.play().then(() => {
-        setIsBgmPlaying(true);
-      }).catch(err => console.log("Auto-play prevented", err));
-      document.removeEventListener('click', handleFirstInteraction);
-    };
-    document.addEventListener('click', handleFirstInteraction);
-
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-      document.removeEventListener('click', handleFirstInteraction);
-    };
-  }, [bgmTracks]);
-
-  useEffect(() => {
-    if (audioRef.current && isBgmPlaying) {
-      audioRef.current.pause();
-      audioRef.current.src = bgmTracks[bgmIndex].url;
-      audioRef.current.play().catch(e => console.log(e));
-    } else if (audioRef.current) {
-      audioRef.current.src = bgmTracks[bgmIndex].url;
-    }
-  }, [bgmIndex, bgmTracks]);
-
-  const toggleBgm = () => {
-    if (isBgmPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play().catch(e => console.log(e));
-    }
-    setIsBgmPlaying(!isBgmPlaying);
-  };
-
-  const nextBgm = () => {
-    setBgmIndex((prev) => (prev + 1) % bgmTracks.length);
-  };
-
   const handleAddComment = async (postId, text) => {
     if (!currentUser || !db || !text.trim()) return;
     const newComment = {
@@ -2516,18 +2462,6 @@ export default function App() {
           </div>
         </div>
       )}
-
-      <div className="fixed top-20 right-4 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur border border-slate-200 dark:border-slate-800 rounded-full p-2 shadow-lg flex items-center gap-2">
-        {isBgmPlaying && (
-          <div className="flex items-center gap-1 pl-2">
-             <span className="text-[10px] font-bold text-slate-500 truncate max-w-[60px]">{bgmTracks[bgmIndex].name}</span>
-             <button onClick={nextBgm} className="text-slate-400 hover:text-emerald-500 p-1 rounded-full"><Play size={12} fill="currentColor" /></button>
-          </div>
-        )}
-        <button onClick={toggleBgm} className="text-emerald-500 hover:text-emerald-600 p-1">
-          {isBgmPlaying ? <Volume2 size={20} /> : <VolumeX size={20} />}
-        </button>
-      </div>
 
       <nav className="fixed bottom-0 w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pt-1 pb-safe z-30 transition-colors" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
         <div className="flex justify-around items-center p-2 max-w-md mx-auto">
@@ -4889,7 +4823,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 16:40, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 16:43, updated)</p>
       </div>
     </div>
   );
