@@ -1010,13 +1010,7 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
       )}
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-start gap-1.5 flex-1 min-w-0">
-          <div 
-            className="mt-2 p-1.5 cursor-grab active:cursor-grabbing text-slate-300 hover:text-emerald-500 rounded bg-slate-50 dark:bg-slate-800 touch-none shrink-0"
-            {...dragHandleProps}
-          >
-            <GripVertical size={20}/>
-          </div>
-          <div className={`flex flex-col flex-1 min-w-0 ml-1 gap-2 ${isConfirmed ? 'pointer-events-none opacity-60' : ''}`}>
+          <div className={`flex flex-col flex-1 min-w-0 gap-2 ${isConfirmed ? 'pointer-events-none opacity-60' : ''}`}>
             {!isAnyDragging && (
               <div className="flex flex-wrap bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg gap-1">
                 <button onClick={() => toggleFilter('gym')} disabled={isConfirmed} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilters.includes('gym') ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>マシン等</button>
@@ -3655,16 +3649,17 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
             </div>
           )}
 
-          <style>{`
-            .hide-scrollbar::-webkit-scrollbar { display: none; }
-            .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-          `}</style>
-          <div 
-            ref={carouselRef}
-            onScroll={updateCarouselHeight}
-            className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start transition-[height] duration-300 ease-in-out"
-            style={{ height: carouselHeight === 'auto' ? 'auto' : `${carouselHeight + 32}px`, overflowY: 'hidden' }}
-          >
+          <div className="space-y-4">
+            <style>{`
+              .hide-scrollbar::-webkit-scrollbar { display: none; }
+              .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
+            <div 
+              ref={carouselRef}
+              onScroll={updateCarouselHeight}
+              className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start transition-[height] duration-300 ease-in-out"
+              style={{ height: carouselHeight === 'auto' ? 'auto' : `${carouselHeight + 32}px`, overflowY: 'hidden' }}
+            >
             {workoutItems.map((item, index) => (
                <div key={item.id}
                   ref={(el) => (itemDnd.refs.current[index] = el)}
@@ -3705,6 +3700,7 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
                 <span>次の種目を追加</span>
               </button>
             </div>
+          </div>
           </div>
         </div>
 
@@ -4815,7 +4811,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 09:32, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 09:38, updated)</p>
       </div>
     </div>
   );
