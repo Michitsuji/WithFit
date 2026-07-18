@@ -711,39 +711,30 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
         ))}
       </div>
 
-      <div className="flex items-center justify-between pl-3 mt-4">
-        <div className="flex items-center gap-3">
-          {isMyPost ? (
-            displayLikesCount > 0 ? (
-              <button onClick={() => setShowLikesModal(true)} className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-rose-500 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/80 rounded-full transition-colors border border-rose-200 dark:border-rose-900/50">
-                <Heart size={16} fill="currentColor" />
-                {displayLikesCount} ナイス！
-              </button>
-            ) : (
-              <div className="flex items-center gap-2 px-3 py-2 text-sm font-bold text-slate-400 dark:text-slate-500">
-                <Heart size={16} fill="none" />
-                ナイス待ち
-              </div>
-            )
-          ) : (
-            <>
-              <button onClick={() => onToggleLike(post.id, displayLikesCount, isCurrentlyLiked, likedUsers)} className={`flex items-center gap-1.5 px-4 py-2 text-sm font-bold rounded-full transition-colors border ${isCurrentlyLiked ? 'text-rose-500 bg-rose-50 dark:bg-rose-950/50 border-rose-200 dark:border-rose-900/50 hover:bg-rose-100 dark:hover:bg-rose-900/80' : 'text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
-                <Heart size={16} fill={isCurrentlyLiked ? "currentColor" : "none"} className={isCurrentlyLiked ? "animate-pulse" : ""} />
-                {displayLikesCount > 0 ? `${displayLikesCount} ナイス！` : 'ナイス！'}
-              </button>
-              {displayLikesCount > 0 && (
-                <button onClick={() => setShowLikesModal(true)} className="text-xs font-bold text-slate-400 hover:text-slate-600 underline">
-                  確認
-                </button>
-              )}
-              <button onClick={() => setShowComments(!showComments)} className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold rounded-full transition-colors border text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700">
-                <MessageCircle size={16} />
-                {comments.length > 0 ? comments.length : 'コメント'}
-              </button>
-            </>
-          )}
+      <div className="flex items-center justify-between pl-3 mt-4 mb-2">
+        <div className="flex items-center gap-4">
+          <button onClick={() => !isMyPost && onToggleLike(post.id, displayLikesCount, isCurrentlyLiked, likedUsers)} disabled={isMyPost} className={`transition-transform active:scale-90 ${isCurrentlyLiked ? 'text-rose-500' : 'text-slate-800 dark:text-slate-200'}`}>
+            <Heart size={26} fill={isCurrentlyLiked ? "currentColor" : "none"} className={isCurrentlyLiked && !isMyPost ? "animate-pulse" : ""} />
+          </button>
+        </div>
+        <div className="flex items-center pr-4">
+          <button onClick={() => setShowComments(!showComments)} className="text-slate-800 dark:text-slate-200 transition-transform active:scale-90 hover:text-slate-500">
+            <MessageCircle size={26} />
+          </button>
         </div>
       </div>
+      {displayLikesCount > 0 && (
+        <div className="pl-3 mb-2">
+          <button onClick={() => setShowLikesModal(true)} className="text-sm font-bold text-slate-800 dark:text-slate-200 hover:opacity-70">
+            いいね！{displayLikesCount}件
+          </button>
+        </div>
+      )}
+      {displayLikesCount === 0 && isMyPost && (
+        <div className="pl-3 mb-2 text-xs font-bold text-slate-400">
+          いいね待ち
+        </div>
+      )}
 
       {showComments && (
         <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 animate-in fade-in duration-200">
@@ -1517,10 +1508,16 @@ export default function App() {
   const [redirectUser, setRedirectUser] = useState(null);
 
   const [isBgmPlaying, setIsBgmPlaying] = useState(false);
+  const [bgmIndex, setBgmIndex] = useState(0);
+  const bgmTracks = useMemo(() => [
+    { name: 'LoFi 1', url: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3' },
+    { name: 'Upbeat', url: 'https://cdn.pixabay.com/download/audio/2022/03/24/audio_34b4a1b02b.mp3' },
+    { name: 'Chill', url: 'https://cdn.pixabay.com/download/audio/2022/10/25/audio_29759d53f3.mp3' }
+  ], []);
   const audioRef = useRef(null);
 
   useEffect(() => {
-    audioRef.current = new Audio('https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3');
+    audioRef.current = new Audio(bgmTracks[0].url);
     audioRef.current.loop = true;
     audioRef.current.volume = 0.3;
 
@@ -1539,15 +1536,29 @@ export default function App() {
       }
       document.removeEventListener('click', handleFirstInteraction);
     };
-  }, []);
+  }, [bgmTracks]);
+
+  useEffect(() => {
+    if (audioRef.current && isBgmPlaying) {
+      audioRef.current.pause();
+      audioRef.current.src = bgmTracks[bgmIndex].url;
+      audioRef.current.play().catch(e => console.log(e));
+    } else if (audioRef.current) {
+      audioRef.current.src = bgmTracks[bgmIndex].url;
+    }
+  }, [bgmIndex, bgmTracks]);
 
   const toggleBgm = () => {
     if (isBgmPlaying) {
       audioRef.current.pause();
     } else {
-      audioRef.current.play();
+      audioRef.current.play().catch(e => console.log(e));
     }
     setIsBgmPlaying(!isBgmPlaying);
+  };
+
+  const nextBgm = () => {
+    setBgmIndex((prev) => (prev + 1) % bgmTracks.length);
   };
 
   const handleAddComment = async (postId, text) => {
@@ -2506,11 +2517,16 @@ export default function App() {
         </div>
       )}
 
-      <div className="fixed bottom-20 left-4 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur border border-slate-200 dark:border-slate-800 rounded-full p-2 shadow-lg flex items-center gap-2">
+      <div className="fixed top-20 right-4 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur border border-slate-200 dark:border-slate-800 rounded-full p-2 shadow-lg flex items-center gap-2">
+        {isBgmPlaying && (
+          <div className="flex items-center gap-1 pl-2">
+             <span className="text-[10px] font-bold text-slate-500 truncate max-w-[60px]">{bgmTracks[bgmIndex].name}</span>
+             <button onClick={nextBgm} className="text-slate-400 hover:text-emerald-500 p-1 rounded-full"><Play size={12} fill="currentColor" /></button>
+          </div>
+        )}
         <button onClick={toggleBgm} className="text-emerald-500 hover:text-emerald-600 p-1">
           {isBgmPlaying ? <Volume2 size={20} /> : <VolumeX size={20} />}
         </button>
-        {isBgmPlaying && <span className="text-[10px] font-bold text-slate-500 pr-2 animate-pulse hidden sm:inline"><Music size={12} className="inline mr-1"/>BGM再生中</span>}
       </div>
 
       <nav className="fixed bottom-0 w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pt-1 pb-safe z-30 transition-colors" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
@@ -4873,7 +4889,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 16:33, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 16:40, updated)</p>
       </div>
     </div>
   );
