@@ -730,57 +730,14 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
   const [draggableSetId, setDraggableSetId] = useState(null);
   const setRefs = useRef([]);
 
-  const adjustPosition = (idx) => {
-    const el = setRefs.current[idx];
-    if (!el) return;
-    const container = document.getElementById('edit-modal-scroll-container') || window;
-    const isWindow = container === window;
-    const initialTop = el.getBoundingClientRect().top;
-
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        const currentEl = setRefs.current[idx];
-        if (!currentEl) return;
-        
-        const currentTop = currentEl.getBoundingClientRect().top;
-        container.scrollBy({ top: currentTop - initialTop, behavior: 'instant' });
-
-        setTimeout(() => {
-          const rect = currentEl.getBoundingClientRect();
-          const totalItems = item.sets ? item.sets.length : 1;
-          const ratio = totalItems > 1 ? idx / (totalItems - 1) : 0.5;
-          
-          if (isWindow) {
-            const scrollTop = window.scrollY || document.documentElement.scrollTop;
-            const absoluteTop = rect.top + scrollTop;
-            const windowHeight = window.innerHeight;
-            const targetViewportY = windowHeight * (0.15 + 0.7 * ratio);
-            const targetScrollY = absoluteTop - targetViewportY + (rect.height / 2);
-            window.scrollTo({ top: targetScrollY, behavior: 'smooth' });
-          } else {
-            const containerRect = container.getBoundingClientRect();
-            const scrollTop = container.scrollTop;
-            const absoluteTop = (rect.top - containerRect.top) + scrollTop;
-            const containerHeight = container.clientHeight;
-            const targetViewportY = containerHeight * (0.15 + 0.7 * ratio);
-            const targetScrollY = absoluteTop - targetViewportY + (rect.height / 2);
-            container.scrollTo({ top: targetScrollY, behavior: 'smooth' });
-          }
-        }, 50);
-      }, 50);
-    });
-  };
-
   const handleDragStart = (e, idx) => {
     setDraggedSetIndex(idx);
     e.dataTransfer.effectAllowed = 'move';
-    adjustPosition(idx);
   };
 
   const handleTouchStart = (e, idx) => {
     setDraggedSetIndex(idx);
     document.body.style.overflow = 'hidden';
-    adjustPosition(idx);
   };
   const handleTouchMove = (e) => {
     if (draggedSetIndex === null) return;
@@ -1334,8 +1291,9 @@ function ReorderItemsModal({ items, onClose, onSave }) {
             return (
             <div key={item.id}
               ref={el => itemRefs.current[idx] = el}
-              className={`flex items-center gap-3 bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border transition-all ${isDragged ? 'border-emerald-500 opacity-60 scale-[0.98]' : 'border-slate-200 dark:border-slate-800'} ${isDragOver ? 'border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.3)] bg-emerald-50/50 dark:bg-emerald-950/20' : ''}`}
+              className={`flex items-center gap-3 bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border transition-all relative ${isDragged ? 'border-emerald-500 opacity-60 scale-[0.98]' : 'border-slate-200 dark:border-slate-800'}`}
             >
+               {isDragOver && <div className={`absolute left-0 w-full h-1 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${draggedIdx < dragOverIdx ? '-bottom-1' : '-top-1'}`} />}
                <div 
                  className={`cursor-grab active:cursor-grabbing p-2 -ml-2 touch-none ${isDragged ? 'text-emerald-500' : 'text-slate-400'}`}
                  onTouchStart={(e) => handleDragStart(e, idx)}
@@ -4723,7 +4681,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 11:16, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 11:20, updated)</p>
       </div>
     </div>
   );
