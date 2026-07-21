@@ -2014,7 +2014,11 @@ export default function App() {
     }
   };
 
-  const unreadNotificationCount = notifications.filter(n => n.time > (myInfo.lastNotificationCheck || 0)).length;
+  const unreadNotifs = notifications.filter(n => n.time > (myInfo.lastNotificationCheck || 0));
+  const unreadNotificationCount = unreadNotifs.length;
+  const unreadLikes = unreadNotifs.filter(n => n.type === 'like').length;
+  const unreadComments = unreadNotifs.filter(n => n.type === 'comment').length;
+  const unreadRequests = unreadNotifs.filter(n => n.type === 'friend_request' || n.type === 'partner_request').length;
 
   const handleOpenNotifications = () => {
     setShowNotifications(!showNotifications);
@@ -2333,7 +2337,15 @@ export default function App() {
           <div className="flex items-center gap-3">
             <button onClick={handleOpenNotifications} className="relative p-1.5 text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors">
               <Bell size={20} />
-              {unreadNotificationCount > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border border-white dark:border-slate-900"></span>}
+              {unreadNotificationCount > 0 && (
+                <div className="absolute -top-7 -right-2 bg-rose-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1.5 shadow-sm whitespace-nowrap z-50 pointer-events-none animate-in zoom-in duration-200">
+                  {unreadLikes > 0 && <span className="flex items-center gap-0.5"><Heart size={10} fill="currentColor" /> {unreadLikes}</span>}
+                  {unreadComments > 0 && <span className="flex items-center gap-0.5"><MessageCircle size={10} fill="currentColor" /> {unreadComments}</span>}
+                  {unreadRequests > 0 && <span className="flex items-center gap-0.5"><UserPlus size={10} fill="currentColor" /> {unreadRequests}</span>}
+                  {unreadLikes === 0 && unreadComments === 0 && unreadRequests === 0 && <span>{unreadNotificationCount}</span>}
+                  <div className="absolute -bottom-1 right-3.5 w-0 h-0 border-l-[5px] border-l-transparent border-t-[6px] border-t-rose-500 border-r-[5px] border-r-transparent"></div>
+                </div>
+              )}
             </button>
             <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 px-2 py-1.5 rounded-full border border-slate-200 dark:border-slate-800">
               <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`}></div>
@@ -4833,7 +4845,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.21, 22:48, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.21, 22:54, updated)</p>
       </div>
     </div>
   );
