@@ -2471,7 +2471,28 @@ export default function App() {
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} currentUser={currentUser} myInfo={myInfo} setCurrentTab={setCurrentTab} onSendRequest={handleSendFriendRequest} />}
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />}
-        {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onSendPartnerRequest={handleSendPartnerRequest} onAcceptPartnerRequest={handleAcceptPartnerRequest} onRejectPartnerRequest={handleRejectPartnerRequest} onRemovePartner={handleRemovePartner} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} posts={posts} targetFriendTab={targetFriendTab} setTargetFriendTab={setTargetFriendTab} />}
+        {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onSendPartnerRequest={handleSendPartnerRequest} onAcceptPartnerRequest={handleAcceptPartnerRequest} onRejectPartnerRequest={handleRejectPartnerRequest} onRemovePartner={handleRemovePartner} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} posts={posts} targetFriendTab={targetFriendTab} setTargetFriendTab={setTargetFriendTab} onSendTestPush={async (targetUser, message) => {
+          if (!db) return;
+          const targetToken = accountsInfo[targetUser]?.fcmToken;
+          if (!targetToken) {
+            alert('相手の端末でプッシュ通知がオンになっていません（トークン未登録）。');
+            return;
+          }
+          try {
+            await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'push_jobs')), {
+              targetUser,
+              targetToken,
+              title: 'WithFit テスト通知',
+              body: message,
+              createdAt: Date.now(),
+              status: 'pending'
+            });
+            alert('プッシュ通知のリクエストをDBに保存しました！\n※実際に端末へ配信するには、このDBを監視して送信するバックエンド(Cloud Functions等)の設定が必要です。');
+          } catch (e) {
+            console.error(e);
+            alert('送信に失敗しました。');
+          }
+        }} />}
       </main>
 
       {editingPost && <EditWorkoutModal post={editingPost} gyms={allGyms} exercises={exercises} onClose={() => setEditingPost(null)} onSave={handleUpdateWorkout} myPastPosts={posts.filter(p => p.author === currentUser)} />}
@@ -4369,7 +4390,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
 }
 
 // --- フレンド画面 ---
-function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccept, onReject, onRemoveFriend, onSendPartnerRequest, onAcceptPartnerRequest, onRejectPartnerRequest, onRemovePartner, onFriendClick, onGenerateFriendCode, posts, targetFriendTab, setTargetFriendTab }) {
+function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccept, onReject, onRemoveFriend, onSendPartnerRequest, onAcceptPartnerRequest, onRejectPartnerRequest, onRemovePartner, onFriendClick, onGenerateFriendCode, posts, targetFriendTab, setTargetFriendTab, onSendTestPush }) {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [searchUsername, setSearchUsername] = useState('');
   const [searchPartnerName, setSearchPartnerName] = useState('');
@@ -4389,6 +4410,8 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
   const [reportText, setReportText] = useState('');
   const [isSendingReport, setIsSendingReport] = useState(false);
   const [showReportsModal, setShowReportsModal] = useState(false);
+  const [testPushTarget, setTestPushTarget] = useState('');
+  const [testPushMessage, setTestPushMessage] = useState('');
 
   const handlePartnerSearchSubmit = (e) => {
     e.preventDefault();
@@ -4697,9 +4720,51 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
           </form>
 
           {currentUser === MASTER_USER && (
-            <button onClick={() => setShowReportsModal(true)} className="w-full py-3 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900 text-indigo-600 dark:text-indigo-400 font-bold rounded-xl shadow-sm hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors flex items-center justify-center gap-2">
-              <AlignLeft size={18} /> 【マスター限定】不具合報告一覧を見る
-            </button>
+            <>
+              <button onClick={() => setShowReportsModal(true)} className="w-full py-3 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900 text-indigo-600 dark:text-indigo-400 font-bold rounded-xl shadow-sm hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors flex items-center justify-center gap-2">
+                <AlignLeft size={18} /> 【マスター限定】不具合報告一覧を見る
+              </button>
+              <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-2xl p-5 shadow-sm mt-4">
+                <h3 className="text-sm font-bold text-amber-700 dark:text-amber-400 mb-4 flex items-center gap-2">
+                  <Bell size={18} /> 【マスター限定】プッシュ通知テスト
+                </h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">送信先フレンド</label>
+                    <select 
+                      value={testPushTarget} 
+                      onChange={(e) => setTestPushTarget(e.target.value)}
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-amber-500 text-sm"
+                    >
+                      <option value="" disabled>送信先を選択</option>
+                      {myFriends.map(f => (
+                        <option key={f} value={f}>{accountsInfo[f]?.displayName || f}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">メッセージ内容</label>
+                    <input 
+                      type="text" 
+                      value={testPushMessage} 
+                      onChange={(e) => setTestPushMessage(e.target.value)} 
+                      placeholder="テストメッセージを入力"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-amber-500 text-sm"
+                    />
+                  </div>
+                  <button 
+                    onClick={() => {
+                      if (onSendTestPush) onSendTestPush(testPushTarget, testPushMessage);
+                      setTestPushMessage('');
+                    }}
+                    disabled={!testPushTarget || !testPushMessage.trim()}
+                    className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl text-sm shadow-md transition-colors disabled:opacity-50 flex justify-center items-center"
+                  >
+                    通知を送信する
+                  </button>
+                </div>
+              </div>
+            </>
           )}
 
           {currentUser !== MASTER_USER && (
@@ -4869,7 +4934,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.21, 23:02, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.21, 23:13, updated)</p>
       </div>
     </div>
   );
