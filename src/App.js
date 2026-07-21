@@ -2501,15 +2501,17 @@ export default function App() {
             return;
           }
           try {
-            await setDoc(doc(collection(db, 'artifacts', appId, 'public', 'data', 'push_jobs')), {
-              targetUser,
-              targetToken,
-              title: 'WithFit テスト通知',
-              body: message,
-              createdAt: Date.now(),
-              status: 'pending'
+            const res = await fetch('/api/sendPush', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                targetToken,
+                title: 'WithFit テスト通知',
+                body: message
+              })
             });
-            alert('プッシュ通知のリクエストをDBに保存しました！\n※実際に端末へ配信するには、このDBを監視して送信するバックエンド(Cloud Functions等)の設定が必要です。');
+            if (!res.ok) throw new Error('送信エラーが発生しました');
+            alert('プッシュ通知を送信しました！');
           } catch (e) {
             console.error(e);
             alert('送信に失敗しました。');
@@ -4977,7 +4979,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.21, 23:25, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.21, 23:41, updated)</p>
       </div>
     </div>
   );
