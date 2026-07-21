@@ -1949,6 +1949,17 @@ export default function App() {
               time: post.timestamp
            });
         }
+        if (post.author === currentUser && post.comments && post.comments.length > 0) {
+           post.comments.forEach(comment => {
+              if (comment.author !== currentUser) {
+                 notifs.push({
+                    id: `comment_${post.id}_${comment.id}`, type: 'comment', user: comment.author, postId: post.id,
+                    message: 'さんがコメントしました',
+                    time: comment.timestamp
+                 });
+              }
+           });
+        }
      });
      return notifs.sort((a, b) => b.time - a.time).slice(0, 10);
   }, [currentUser, myInfo.friendRequests, myInfo.friends, posts]);
@@ -2380,8 +2391,20 @@ export default function App() {
                      const isUnread = notif.time > (myInfo.lastNotificationCheck || 0);
                      return (
                        <div key={notif.id} onClick={() => handleNotificationClick(notif)} className={`flex gap-3 items-center p-2 rounded-xl cursor-pointer transition-colors ${isUnread ? 'bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-100/50 dark:hover:bg-emerald-950/40' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                          <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-xs shrink-0 overflow-hidden">
-                             {accountsInfo[notif.user]?.photoUrl ? <img src={accountsInfo[notif.user].photoUrl} alt="" className="w-full h-full object-cover"/> : accountsInfo[notif.user]?.displayName ? accountsInfo[notif.user].displayName.charAt(0).toUpperCase() : notif.user.charAt(0).toUpperCase()}
+                          <div className="relative shrink-0 mt-0.5">
+                             <div className="w-9 h-9 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-xs overflow-hidden border border-slate-100 dark:border-slate-800">
+                                {accountsInfo[notif.user]?.photoUrl ? <img src={accountsInfo[notif.user].photoUrl} alt="" className="w-full h-full object-cover"/> : accountsInfo[notif.user]?.displayName ? accountsInfo[notif.user].displayName.charAt(0).toUpperCase() : notif.user.charAt(0).toUpperCase()}
+                             </div>
+                             {notif.type === 'like' && (
+                                <div className="absolute -bottom-0.5 -right-0.5 bg-rose-500 text-white w-4 h-4 rounded-full flex items-center justify-center border-[1.5px] border-white dark:border-slate-900 shadow-sm">
+                                   <Heart size={7} fill="currentColor" />
+                                </div>
+                             )}
+                             {notif.type === 'comment' && (
+                                <div className="absolute -bottom-0.5 -right-0.5 bg-emerald-500 text-white w-4 h-4 rounded-full flex items-center justify-center border-[1.5px] border-white dark:border-slate-900 shadow-sm">
+                                   <MessageCircle size={7} fill="currentColor" />
+                                </div>
+                             )}
                           </div>
                           <div className="flex-1 min-w-0">
                              <p className="text-xs font-bold text-slate-800 dark:text-slate-200 break-words whitespace-pre-wrap">
@@ -4810,7 +4833,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.21, 22:40, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.21, 22:48, updated)</p>
       </div>
     </div>
   );
