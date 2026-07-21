@@ -1,10 +1,13 @@
-const admin = require('firebase-admin');
+const { getApps, initializeApp, cert } = require('firebase-admin/app');
+const { getMessaging } = require('firebase-admin/messaging');
 
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
+// Firebase Admin SDKの初期化（重複初期化を防ぐ）
+if (!getApps().length) {
+  initializeApp({
+    credential: cert({
       projectId: process.env.FIREBASE_PROJECT_ID,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      // Vercelの環境変数で改行が崩れるのを防ぐ処理
       privateKey: process.env.FIREBASE_PRIVATE_KEY
         ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
         : undefined,
@@ -29,7 +32,8 @@ module.exports = async function handler(req, res) {
       token: targetToken,
     };
     
-    const response = await admin.messaging().send(message);
+    // 通知を送信
+    const response = await getMessaging().send(message);
     res.status(200).json({ success: true, response });
   } catch (error) {
     console.error('Error sending message:', error);
