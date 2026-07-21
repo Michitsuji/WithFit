@@ -10,15 +10,5 @@ firebase.initializeApp({
   appId: "1:949622687026:web:bcc53a734a31fc1a2a432b",
 });
 
+// Firebaseを初期化するだけで、バックグラウンド時の通知の受信と表示は自動で行われます
 const messaging = firebase.messaging();
-
-messaging.onBackgroundMessage((payload) => {
-  const notificationTitle = payload.notification.title;
-  const notificationOptions = {
-    body: payload.notification.body,
-    // 必要に応じてアイコン画像のパスを指定してください
-    icon: '/icon-192x192.png'
-  };
-
-  self.registration.showNotification(notificationTitle, notificationOptions);
-});
