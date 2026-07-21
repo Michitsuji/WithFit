@@ -4737,8 +4737,8 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
                       className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-amber-500 text-sm"
                     >
                       <option value="" disabled>送信先を選択</option>
-                      {myFriends.map(f => (
-                        <option key={f} value={f}>{accountsInfo[f]?.displayName || f}</option>
+                      {[currentUser, ...myFriends].map(f => (
+                        <option key={f} value={f}>{accountsInfo[f]?.displayName || f}{f === currentUser ? ' (自分)' : ''}</option>
                       ))}
                     </select>
                   </div>
@@ -4934,7 +4934,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.21, 23:13, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.21, 23:16, updated)</p>
       </div>
     </div>
   );

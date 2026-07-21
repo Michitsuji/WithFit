@@ -1,4 +1,3 @@
-// public/firebase-messaging-sw.js
 importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js');
 
@@ -17,7 +16,8 @@ messaging.onBackgroundMessage((payload) => {
   const notificationTitle = payload.notification.title;
   const notificationOptions = {
     body: payload.notification.body,
-    icon: '/icon-192x192.png' // PWAのアイコンパス
+    // 必要に応じてアイコン画像のパスを指定してください
+    icon: '/icon-192x192.png'
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);
