@@ -3,6 +3,7 @@ import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy, getDocs, where } from 'firebase/firestore';
+import { getMessaging, getToken } from 'firebase/messaging';
 
 // --- カスタムアイコン ---
 const WithFitLogo = ({ className = "", size = 24 }) => (
@@ -2164,6 +2165,26 @@ export default function App() {
     } catch (e) {}
   };
 
+  const handleRequestPushPermission = async () => {
+    if (!currentUser || !db || !app) return;
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        const messaging = getMessaging(app);
+        const token = await getToken(messaging, { vapidKey: 'YOUR_VAPID_KEY_HERE' });
+        if (token) {
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { fcmToken: token }, { merge: true });
+          alert('プッシュ通知をオンにしました。');
+        }
+      } else {
+        alert('通知が許可されませんでした。端末の設定から許可してください。');
+      }
+    } catch (error) {
+      console.error('Push permission error:', error);
+      alert('通知の設定に失敗しました。');
+    }
+  };
+
   const handleDeleteAccount = async () => {
     if (!currentUser || !db) return;
     if (!window.confirm("アカウントを完全に削除しますか？この操作は取り消せません。")) return;
@@ -2480,13 +2501,13 @@ export default function App() {
         </div>
       </nav>
 
-      <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} userInfo={myInfo} onSave={handleSaveProfile} currentUser={currentUser} onLinkGoogle={handleLinkGoogle} onDeleteAccount={handleDeleteAccount} />
+      <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} userInfo={myInfo} onSave={handleSaveProfile} currentUser={currentUser} onLinkGoogle={handleLinkGoogle} onDeleteAccount={handleDeleteAccount} onRequestPush={handleRequestPushPermission} />
     </div>
   );
 }
 
 // --- プロフィール設定モーダル ---
-function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGoogle, onDeleteAccount }) {
+function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGoogle, onDeleteAccount, onRequestPush }) {
   const [isUploading, setIsUploading] = useState(false);
   const [goal, setGoal] = useState(userInfo?.goal || '');
   const [theme, setTheme] = useState(userInfo?.theme || 'light');
@@ -2647,7 +2668,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
           <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">表示名 (ユーザー名)</label>
           <input type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-base text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
         </div>
-        <div className="mb-6">
+        <div className="mb-6 space-y-3">
           {userInfo?.googleUid ? (
              <p className="text-sm text-emerald-600 font-bold bg-emerald-50 p-3 rounded-xl text-center border border-emerald-200">✓ Googleアカウント連携済み</p>
           ) : (
@@ -2655,6 +2676,9 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
                 Googleアカウントと連携
              </button>
           )}
+          <button onClick={onRequestPush} className="w-full bg-indigo-50 border border-indigo-200 text-indigo-600 font-bold py-3 rounded-xl shadow-sm flex items-center justify-center gap-2 hover:bg-indigo-100 transition-colors">
+             <Bell size={18} /> プッシュ通知をオンにする
+          </button>
         </div>
         <div className="flex flex-col items-center space-y-6">
           <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800 border-4 border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center relative font-bold text-2xl text-slate-500">
@@ -4845,7 +4869,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.21, 22:54, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.21, 23:02, updated)</p>
       </div>
     </div>
   );
