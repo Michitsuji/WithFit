@@ -1941,9 +1941,11 @@ export default function App() {
            });
         }
         if (post.author === currentUser && post.likes > 0) {
+           const latestLiker = (post.likedUsers && post.likedUsers.length > 0) ? post.likedUsers[post.likedUsers.length - 1] : '誰か';
+           const otherCount = post.likes - 1;
            notifs.push({
-              id: `like_${post.id}`, type: 'like', user: '誰か', postId: post.id,
-              message: 'さんがいいねしました',
+              id: `like_${post.id}`, type: 'like', user: latestLiker, postId: post.id,
+              message: otherCount > 0 ? `さん他${otherCount}人がいいねしました` : 'さんがいいねしました',
               time: post.timestamp
            });
         }
@@ -4808,7 +4810,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.18, 21:12, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.21, 22:40, updated)</p>
       </div>
     </div>
   );
