@@ -2171,7 +2171,7 @@ export default function App() {
       const permission = await Notification.requestPermission();
       if (permission === 'granted') {
         const messaging = getMessaging(app);
-        const token = await getToken(messaging, { vapidKey: 'YOUR_VAPID_KEY_HERE' });
+        const token = await getToken(messaging, { vapidKey: 'BAty8GYk1zuoZVh-ZaSdcJsq_o-7vXJLXPNVNzlgsq9rd3wP-jQtclYEdu1MnnLN_0BnlmiKuoWH3X2YvOFl7aM' });
         if (token) {
           await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { fcmToken: token }, { merge: true });
           alert('プッシュ通知をオンにしました。');
