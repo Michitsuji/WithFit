@@ -2632,10 +2632,10 @@ export default function App() {
                   <Settings size={32} />
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">通知が届かない状態です</h3>
-                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">アプリの通知設定はオンになっていますが、iPhone本体の設定で通知が拒否されています。<br/>iPhoneの「設定」アプリから通知を許可するか、アプリの設定をオフにしてください。</p>
+                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">iPhone本体の設定で通知が拒否されています。<br/>iPhoneの「設定」アプリから通知を許可してください。</p>
                 <div className="w-full space-y-3">
-                  <button onClick={() => { handleTogglePushPermission(true); setShowPushPrompt(false); }} className="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3.5 rounded-xl shadow-md transition-colors">
-                    アプリの通知設定をオフにする
+                  <button onClick={() => { setShowPushPrompt(false); alert('iPhoneのホーム画面から「設定」アプリを開き、本アプリの通知を許可してください。'); }} className="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3.5 rounded-xl shadow-md transition-colors">
+                    iPhoneの設定方法を確認する
                   </button>
                   <button onClick={() => setShowPushPrompt(false)} className="w-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold py-3.5 rounded-xl transition-colors">
                     閉じる
@@ -5106,7 +5106,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.22, 22:33, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.22, 22:42, updated)</p>
       </div>
     </div>
   );
