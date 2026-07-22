@@ -1527,6 +1527,7 @@ export default function App() {
   const [redirectUser, setRedirectUser] = useState(null);
   const [targetFriendTab, setTargetFriendTab] = useState(null);
   const [showPushPrompt, setShowPushPrompt] = useState(false);
+  const [pushPromptType, setPushPromptType] = useState('request');
 
   const sendPushNotification = async (targetUsername, title, body) => {
     if (!targetUsername || targetUsername === currentUser) return;
@@ -1590,9 +1591,16 @@ export default function App() {
   useEffect(() => {
     if (currentUser && dataLoaded.accounts && typeof window !== 'undefined' && 'Notification' in window) {
       const myData = accountsInfo[currentUser];
-      if (myData && !myData.fcmToken && Notification.permission === 'default') {
-        const timer = setTimeout(() => setShowPushPrompt(true), 1500);
-        return () => clearTimeout(timer);
+      if (myData) {
+        if (!myData.fcmToken && Notification.permission === 'default') {
+          setPushPromptType('request');
+          const timer = setTimeout(() => setShowPushPrompt(true), 1500);
+          return () => clearTimeout(timer);
+        } else if (myData.fcmToken && Notification.permission === 'denied') {
+          setPushPromptType('warning');
+          const timer = setTimeout(() => setShowPushPrompt(true), 1500);
+          return () => clearTimeout(timer);
+        }
       }
     }
   }, [currentUser, dataLoaded.accounts, accountsInfo]);
@@ -2588,19 +2596,39 @@ export default function App() {
       {showPushPrompt && (
         <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-[100] flex flex-col items-center justify-end sm:justify-center p-4 animate-in fade-in duration-300">
           <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0">
-            <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-950/50 rounded-full flex items-center justify-center mb-4 text-emerald-500">
-              <Bell size={32} />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">プッシュ通知をオンにしませんか？</h3>
-            <p className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-6">フレンドのトレーニング完了や、いいね・コメントの通知をリアルタイムで受け取ることができます。</p>
-            <div className="w-full space-y-3">
-              <button onClick={() => handleTogglePushPermission(false)} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-xl shadow-md transition-colors flex items-center justify-center gap-2">
-                通知を許可する
-              </button>
-              <button onClick={() => setShowPushPrompt(false)} className="w-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold py-3.5 rounded-xl transition-colors">
-                あとで設定する
-              </button>
-            </div>
+            {pushPromptType === 'warning' ? (
+              <>
+                <div className="w-16 h-16 bg-rose-100 dark:bg-rose-950/50 rounded-full flex items-center justify-center mb-4 text-rose-500">
+                  <Settings size={32} />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">通知が届かない状態です</h3>
+                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">アプリの通知設定はオンになっていますが、iPhone本体の設定で通知が拒否されています。<br/>iPhoneの「設定」アプリから通知を許可するか、アプリの設定をオフにしてください。</p>
+                <div className="w-full space-y-3">
+                  <button onClick={() => { handleTogglePushPermission(true); setShowPushPrompt(false); }} className="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3.5 rounded-xl shadow-md transition-colors">
+                    アプリの通知設定をオフにする
+                  </button>
+                  <button onClick={() => setShowPushPrompt(false)} className="w-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold py-3.5 rounded-xl transition-colors">
+                    閉じる
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-950/50 rounded-full flex items-center justify-center mb-4 text-emerald-500">
+                  <Bell size={32} />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">プッシュ通知をオンにしませんか？</h3>
+                <p className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-6">フレンドのトレーニング完了や、いいね・コメントの通知をリアルタイムで受け取ることができます。</p>
+                <div className="w-full space-y-3">
+                  <button onClick={() => handleTogglePushPermission(false)} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-xl shadow-md transition-colors flex items-center justify-center gap-2">
+                    通知を許可する
+                  </button>
+                  <button onClick={() => setShowPushPrompt(false)} className="w-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold py-3.5 rounded-xl transition-colors">
+                    あとで設定する
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -2789,9 +2817,16 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
           <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
             <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5"><Bell size={16}/> プッシュ通知設定</h3>
             {osPermission === 'denied' ? (
-              <div className="bg-rose-50 border border-rose-200 p-3 rounded-xl flex items-start gap-2">
-                <Settings size={16} className="text-rose-500 shrink-0 mt-0.5" />
-                <p className="text-xs text-rose-700 font-bold leading-relaxed">端末の設定で通知がオフになっています。<br/>iPhoneの「設定」アプリからSafari (または追加したアプリ) の通知を許可してください。</p>
+              <div className="bg-rose-50 border border-rose-200 p-3 rounded-xl flex flex-col gap-3">
+                <div className="flex items-start gap-2">
+                  <Settings size={16} className="text-rose-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-rose-700 font-bold leading-relaxed">端末の設定で通知がオフになっています。<br/>iPhoneの「設定」アプリからSafari (または追加したアプリ) の通知を許可してください。</p>
+                </div>
+                {isPushEnabled && (
+                  <button onClick={() => onTogglePush(true)} className="w-full bg-white border border-rose-200 text-rose-600 hover:bg-rose-100 font-bold py-2 rounded-lg text-xs transition-colors">
+                    アプリの通知設定をオフにする
+                  </button>
+                )}
               </div>
             ) : (
               <>
@@ -5040,7 +5075,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.22, 09:06, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.22, 09:17, updated)</p>
       </div>
     </div>
   );
