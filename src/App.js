@@ -349,20 +349,23 @@ function SimpleChart({ data, color, title }) {
 }
 
 // --- 共通コンポーネント：ワークアウトカード ---
-function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onToggleLike, onImport, onAddComment, onDeleteComment }) {
-  const comments = post.comments || [];
-  const [showComments, setShowComments] = useState(comments.length > 0);
+function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onToggleLike, onImport, onAddComment, onDeleteComment, onToggleCommentLike }) {
+  const [localComments, setLocalComments] = useState(post.comments || []);
+  const [showComments, setShowComments] = useState(localComments.length > 0);
   const [commentText, setCommentText] = useState('');
   const [mentionQuery, setMentionQuery] = useState(null);
   const textareaRef = useRef(null);
   const commentsContainerRef = useRef(null);
-  const displayComments = comments;
+
+  useEffect(() => {
+    setLocalComments(post.comments || []);
+  }, [post.comments]);
 
   useEffect(() => {
     if (showComments && commentsContainerRef.current) {
       commentsContainerRef.current.scrollTop = commentsContainerRef.current.scrollHeight;
     }
-  }, [showComments, comments.length]);
+  }, [showComments, localComments.length]);
 
   const handleReply = (username) => {
     setCommentText(prev => prev ? `${prev} @${username} ` : `@${username} `);
@@ -389,11 +392,35 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 
   const submitComment = () => {
     if (!commentText.trim()) return;
+    
+    // 楽観的UI更新
+    const newComment = {
+      id: 'temp_' + Date.now(),
+      author: currentUser,
+      text: commentText.trim(),
+      timestamp: Date.now(),
+      likedUsers: []
+    };
+    setLocalComments(prev => [...prev, newComment]);
+
     if (onAddComment) {
       onAddComment(post.id, commentText);
       setCommentText('');
       setMentionQuery(null);
     }
+  };
+
+  const handleCommentLike = (commentId) => {
+    // 楽観的UI更新
+    setLocalComments(prev => prev.map(c => {
+      if (c.id === commentId) {
+        const likedUsers = c.likedUsers || [];
+        const isLiked = likedUsers.includes(currentUser);
+        return { ...c, likedUsers: isLiked ? likedUsers.filter(u => u !== currentUser) : [...likedUsers, currentUser] };
+      }
+      return c;
+    }));
+    if (onToggleCommentLike) onToggleCommentLike(post.id, commentId);
   };
 
   const mentionCandidates = mentionQuery !== null ? Object.entries(accountsInfo).filter(([uname, data]) => 
@@ -739,17 +766,20 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
           <button onClick={() => { if (showComments) { setShowComments(false); } else { setShowComments(true); setTimeout(() => textareaRef.current?.focus(), 100); } }} className="text-slate-800 dark:text-slate-200 transition-transform active:scale-90 hover:text-slate-500">
             <MessageCircle size={26} />
           </button>
-          {comments.length > 0 && (
-            <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{comments.length}</span>
+          {localComments.length > 0 && (
+            <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{localComments.length}</span>
           )}
         </div>
       </div>
       {showComments && (
         <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-800 animate-in fade-in duration-200">
-          {displayComments.length > 0 && (
+          {localComments.length > 0 && (
             <div ref={commentsContainerRef} className="space-y-3 mb-3 max-h-60 overflow-y-auto pr-1">
-              {displayComments.map(comment => {
+              {localComments.map(comment => {
                 const cInfo = accountsInfo[comment.author];
+                const cLikedUsers = comment.likedUsers || [];
+                const isCLiked = cLikedUsers.includes(currentUser);
+                const cLikesCount = cLikedUsers.length;
                 return (
                   <div key={comment.id} className="flex gap-2.5">
                     <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 text-xs shrink-0 overflow-hidden mt-1">
@@ -768,9 +798,13 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                           </button>
                         )}
                       </div>
-                      <div className="pl-2 mt-1">
+                      <div className="pl-2 mt-1 flex items-center gap-4">
                         <button onClick={() => handleReply(comment.author)} className="text-[11px] font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
                           返信
+                        </button>
+                        <button onClick={() => handleCommentLike(comment.id)} className={`flex items-center gap-1 text-[11px] font-bold transition-colors ${isCLiked ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'}`}>
+                          <Heart size={12} fill={isCLiked ? "currentColor" : "none"} />
+                          {cLikesCount > 0 && cLikesCount}
                         </button>
                       </div>
                     </div>
@@ -1525,6 +1559,20 @@ export default function App() {
   const [targetFriendTab, setTargetFriendTab] = useState(null);
   const [showPushPrompt, setShowPushPrompt] = useState(false);
   const [pushPromptType, setPushPromptType] = useState('request');
+  const [osPermission, setOsPermission] = useState('default');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setOsPermission(Notification.permission);
+      if (navigator.permissions && navigator.permissions.query) {
+         navigator.permissions.query({ name: 'notifications' }).then(status => {
+            status.onchange = () => {
+               setOsPermission(Notification.permission);
+            };
+         }).catch(()=>{});
+      }
+    }
+  }, []);
 
   const sendPushNotification = async (targetUsername, title, body, type = 'general') => {
     if (!targetUsername || targetUsername === currentUser) return;
@@ -1601,6 +1649,35 @@ export default function App() {
         await setDoc(postRef, { comments: currentComments.filter(c => c.id !== commentId) }, { merge: true });
       }
     } catch (e) {}
+  };
+
+  const handleToggleCommentLike = async (postId, commentId) => {
+    if (!currentUser || !db) return;
+    try {
+      const postRef = doc(db, 'artifacts', appId, 'public', 'data', 'workouts', postId);
+      const postSnap = await getDoc(postRef);
+      if (postSnap.exists()) {
+        const postData = postSnap.data();
+        const currentComments = postData.comments || [];
+        let targetComment = null;
+        const updatedComments = currentComments.map(c => {
+          if (c.id === commentId) {
+            const likedUsers = c.likedUsers || [];
+            const isLiked = likedUsers.includes(currentUser);
+            const newLikedUsers = isLiked ? likedUsers.filter(u => u !== currentUser) : [...likedUsers, currentUser];
+            targetComment = { ...c, likedUsers: newLikedUsers };
+            return targetComment;
+          }
+          return c;
+        });
+        await setDoc(postRef, { comments: updatedComments }, { merge: true });
+        
+        if (targetComment && targetComment.likedUsers.includes(currentUser) && targetComment.author !== currentUser) {
+            const authorName = accountsInfo[currentUser]?.displayName || currentUser;
+            sendPushNotification(targetComment.author, 'WithFit', `${authorName}さんがあなたのコメントにナイスしました`, 'like');
+        }
+      }
+    } catch (e) { console.error(e); }
   };
 
   // セッション、基本データ、下書きの全ての読み込みが完了するまでローディングとする
@@ -2473,15 +2550,21 @@ export default function App() {
             <WithFitLogo className="text-indigo-500" /><span>With<span className="text-indigo-500">Fit</span></span>
           </h1>
           <div className="flex items-center gap-3">
+            {osPermission === 'denied' && (
+              <button onClick={() => { setPushPromptType('warning'); setShowPushPrompt(true); }} className="flex items-center gap-1 bg-rose-50 dark:bg-rose-950/50 px-2 py-1.5 rounded-full border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 transition-colors hover:bg-rose-100">
+                <Settings size={14} />
+                <span className="text-[10px] font-bold hidden sm:inline">通知オフ</span>
+              </button>
+            )}
             <button onClick={handleOpenNotifications} className="relative p-1.5 text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors">
               <Bell size={20} />
               {unreadNotificationCount > 0 && (
-                <div className="absolute -top-7 -right-2 bg-rose-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1.5 shadow-sm whitespace-nowrap z-50 pointer-events-none animate-in zoom-in duration-200">
+                <div className="absolute top-10 right-0 bg-rose-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1.5 shadow-sm whitespace-nowrap z-50 pointer-events-none animate-in zoom-in duration-200">
+                  <div className="absolute -top-1.5 right-3.5 w-0 h-0 border-l-[5px] border-l-transparent border-b-[6px] border-b-rose-500 border-r-[5px] border-r-transparent"></div>
                   {unreadLikes > 0 && <span className="flex items-center gap-0.5"><Heart size={10} fill="currentColor" /> {unreadLikes}</span>}
                   {unreadComments > 0 && <span className="flex items-center gap-0.5"><MessageCircle size={10} fill="currentColor" /> {unreadComments}</span>}
                   {unreadRequests > 0 && <span className="flex items-center gap-0.5"><UserPlus size={10} fill="currentColor" /> {unreadRequests}</span>}
                   {unreadLikes === 0 && unreadComments === 0 && unreadRequests === 0 && <span>{unreadNotificationCount}</span>}
-                  <div className="absolute -bottom-1 right-3.5 w-0 h-0 border-l-[5px] border-l-transparent border-t-[6px] border-t-rose-500 border-r-[5px] border-r-transparent"></div>
                 </div>
               )}
             </button>
@@ -2584,10 +2667,10 @@ export default function App() {
              <button onClick={handleLinkGoogle} className="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg shrink-0 transition-colors">連携</button>
           </div>
         )}
-        {currentTab === 'timeline' && <TimelineView posts={visiblePosts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />}
+        {currentTab === 'timeline' && <TimelineView posts={visiblePosts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} />}
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} currentUser={currentUser} myInfo={myInfo} setCurrentTab={setCurrentTab} onSendRequest={handleSendFriendRequest} />}
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} />}
-        {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />}
+        {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} />}
         {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onSendPartnerRequest={handleSendPartnerRequest} onAcceptPartnerRequest={handleAcceptPartnerRequest} onRejectPartnerRequest={handleRejectPartnerRequest} onRemovePartner={handleRemovePartner} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} posts={posts} targetFriendTab={targetFriendTab} setTargetFriendTab={setTargetFriendTab} onSendTestPush={async (targetUser, message) => {
           if (!db) return;
           const targetToken = accountsInfo[targetUser]?.fcmToken;
@@ -2615,7 +2698,7 @@ export default function App() {
       </main>
 
       {editingPost && <EditWorkoutModal post={editingPost} gyms={allGyms} exercises={exercises} onClose={() => setEditingPost(null)} onSave={handleUpdateWorkout} myPastPosts={posts.filter(p => p.author === currentUser)} />}
-      {selectedFriendUser && <FriendDetailModal friendUsername={selectedFriendUser} posts={posts} accountsInfo={accountsInfo} onClose={() => setSelectedFriendUser(null)} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />}
+      {selectedFriendUser && <FriendDetailModal friendUsername={selectedFriendUser} posts={posts} accountsInfo={accountsInfo} onClose={() => setSelectedFriendUser(null)} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} />}
       
       {focusedPost && (
         <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setFocusedPost(null)}>
@@ -2625,7 +2708,7 @@ export default function App() {
                 <button onClick={() => setFocusedPost(null)} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={20} /></button>
              </div>
              <div className="p-4 overflow-y-auto flex-1">
-               <WorkoutCard post={focusedPost} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onToggleLike={toggleLike} onImport={handleImportWorkout} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} />
+               <WorkoutCard post={focusedPost} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onToggleLike={toggleLike} onImport={handleImportWorkout} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} />
              </div>
           </div>
         </div>
@@ -2652,8 +2735,8 @@ export default function App() {
                 <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">通知が届かない状態です</h3>
                 <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">iPhone本体の設定で通知が拒否されています。<br/>iPhoneの「設定」アプリから通知を許可してください。</p>
                 <div className="w-full space-y-3">
-                  <button onClick={() => { setShowPushPrompt(false); alert('iPhoneのホーム画面から「設定」アプリを開き、本アプリの通知を許可してください。'); }} className="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3.5 rounded-xl shadow-md transition-colors">
-                    iPhoneの設定方法を確認する
+                  <button onClick={() => { setShowPushPrompt(false); alert('Webアプリ（PWA）の仕様上、ここから直接設定画面を開くことは技術的に不可能です。\nお手数ですが、iPhoneのホーム画面から「設定」アプリを開き、本アプリ（またはSafari）の通知を許可してください。'); }} className="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3.5 rounded-xl shadow-md transition-colors">
+                    本体設定からオンに設定してください
                   </button>
                   <button onClick={() => setShowPushPrompt(false)} className="w-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold py-3.5 rounded-xl transition-colors">
                     閉じる
@@ -3103,7 +3186,7 @@ function AdBanner() {
 }
 
 // --- タイムライン画面 ---
-function TimelineView({ posts, onToggleLike, onImport, currentUser, onDelete, onEdit, accountsInfo, onAddComment, onDeleteComment }) {
+function TimelineView({ posts, onToggleLike, onImport, currentUser, onDelete, onEdit, accountsInfo, onAddComment, onDeleteComment, onToggleCommentLike }) {
   const [displayLimit, setDisplayLimit] = useState(10);
   const displayedPosts = posts.slice(0, displayLimit);
 
@@ -3119,7 +3202,7 @@ function TimelineView({ posts, onToggleLike, onImport, currentUser, onDelete, on
         <>
           {displayedPosts.map((post, index) => (
             <React.Fragment key={post.id}>
-              <WorkoutCard post={post} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={onEdit} onDelete={onDelete} onToggleLike={onToggleLike} onImport={onImport} onAddComment={onAddComment} onDeleteComment={onDeleteComment} />
+              <WorkoutCard post={post} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={onEdit} onDelete={onDelete} onToggleLike={onToggleLike} onImport={onImport} onAddComment={onAddComment} onDeleteComment={onDeleteComment} onToggleCommentLike={onToggleCommentLike} />
               {(index + 1) % 5 === 0 && <AdBanner />}
             </React.Fragment>
           ))}
@@ -3290,7 +3373,7 @@ function BodyCompositionInfo({ info, dailyCalories = 0, dateLabel = '' }) {
 }
 
 // --- データ画面 (カレンダー・グラフ・レポート) ---
-function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport, targetUser, onToggleLike, onAddComment, onDeleteComment }) {
+function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport, targetUser, onToggleLike, onAddComment, onDeleteComment, onToggleCommentLike }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState(formatDateFromTimestamp(Date.now()));
   const displayUser = targetUser || currentUser;
@@ -3372,7 +3455,7 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
           <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-3">{selectedDateStr.replace(/-/g, '/')} の記録</h3>
 
           {selectedPosts.length > 0 ? (
-            selectedPosts.map(post => <WorkoutCard key={post.id} post={post} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={onEdit} onDelete={onDelete} onImport={onImport} onToggleLike={onToggleLike} onAddComment={onAddComment} onDeleteComment={onDeleteComment} />)
+            selectedPosts.map(post => <WorkoutCard key={post.id} post={post} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={onEdit} onDelete={onDelete} onImport={onImport} onToggleLike={onToggleLike} onAddComment={onAddComment} onDeleteComment={onDeleteComment} onToggleCommentLike={onToggleCommentLike} />)
           ) : (
              <div className="bg-slate-100 dark:bg-slate-900 p-4 rounded-xl text-center text-slate-400 dark:text-slate-500 text-sm font-bold border border-slate-200 dark:border-slate-800">記録はありません</div>
           )}
@@ -5152,14 +5235,14 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.22, 23:22, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 08:27, updated)</p>
       </div>
     </div>
   );
 }
 
 // --- フレンド詳細モーダル ---
-function FriendDetailModal({ friendUsername, posts, accountsInfo, onClose, onToggleLike, onImport, currentUser, onAddComment, onDeleteComment }) {
+function FriendDetailModal({ friendUsername, posts, accountsInfo, onClose, onToggleLike, onImport, currentUser, onAddComment, onDeleteComment, onToggleCommentLike }) {
   const friendInfo = accountsInfo[friendUsername] || {};
 
   return (
@@ -5183,7 +5266,7 @@ function FriendDetailModal({ friendUsername, posts, accountsInfo, onClose, onTog
               </div>
            )}
 
-           <DataView posts={posts} currentUser={currentUser} targetUser={friendUsername} accountsInfo={accountsInfo} onImport={onImport} onToggleLike={onToggleLike} onAddComment={onAddComment} onDeleteComment={onDeleteComment} />
+           <DataView posts={posts} currentUser={currentUser} targetUser={friendUsername} accountsInfo={accountsInfo} onImport={onImport} onToggleLike={onToggleLike} onAddComment={onAddComment} onDeleteComment={onDeleteComment} onToggleCommentLike={onToggleCommentLike} />
         </div>
       </div>
     </div>
