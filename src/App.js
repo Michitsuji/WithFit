@@ -1526,15 +1526,20 @@ export default function App() {
   const [showPushPrompt, setShowPushPrompt] = useState(false);
   const [pushPromptType, setPushPromptType] = useState('request');
 
-  const sendPushNotification = async (targetUsername, title, body) => {
+  const sendPushNotification = async (targetUsername, title, body, type = 'general') => {
     if (!targetUsername || targetUsername === currentUser) return;
-    const targetToken = accountsInfo[targetUsername]?.fcmToken;
-    if (!targetToken) return;
+    const targetUser = accountsInfo[targetUsername];
+    if (!targetUser || !targetUser.fcmToken) return;
+
+    if (type === 'post' && targetUser.notifyPost === false) return;
+    if (type === 'comment' && targetUser.notifyComment === false) return;
+    if (type === 'like' && targetUser.notifyLike === false) return;
+
     try {
       await fetch('/api/sendPush', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetToken, title, body })
+        body: JSON.stringify({ targetToken: targetUser.fcmToken, title, body })
       });
     } catch (e) { console.error('Push error:', e); }
   };
@@ -1580,7 +1585,7 @@ export default function App() {
         }
         
         targetUsers.forEach(userId => {
-          sendPushNotification(userId, 'WithFit', `${authorName}さんがコメントしました: 「${text.trim()}」`);
+          sendPushNotification(userId, 'WithFit', `${authorName}さんがコメントしました: 「${text.trim()}」`, 'comment');
         });
       }
     } catch (e) { console.error(e); }
@@ -1954,7 +1959,7 @@ export default function App() {
       const myFriends = myInfo.friends || [];
       const authorName = myInfo.displayName || currentUser;
       myFriends.forEach(friendId => {
-        sendPushNotification(friendId, 'WithFit', `${authorName}さんがトレーニングを完了しました！`);
+        sendPushNotification(friendId, 'WithFit', `${authorName}さんがトレーニングを完了しました！`, 'post');
       });
     } catch (e) { console.error("Post error:", e); }
   };
@@ -1996,7 +2001,7 @@ export default function App() {
          const targetPost = posts.find(p => p.id === postId);
          if (targetPost && targetPost.author !== currentUser) {
             const authorName = accountsInfo[currentUser]?.displayName || currentUser;
-            sendPushNotification(targetPost.author, 'WithFit', `${authorName}さんがいいねしました`);
+            sendPushNotification(targetPost.author, 'WithFit', `${authorName}さんがナイスしました`, 'like');
          }
       }
     } catch (e) {}
@@ -2695,6 +2700,10 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
   const [hideBodyMetrics, setHideBodyMetrics] = useState(userInfo?.hideBodyMetrics || false);
   const [enablePartnerFeature, setEnablePartnerFeature] = useState(userInfo?.enablePartnerFeature || false);
 
+  const [notifyPost, setNotifyPost] = useState(userInfo?.notifyPost !== false);
+  const [notifyComment, setNotifyComment] = useState(userInfo?.notifyComment !== false);
+  const [notifyLike, setNotifyLike] = useState(userInfo?.notifyLike !== false);
+
   const [cropImageSrc, setCropImageSrc] = useState(null);
   const [cropScale, setCropScale] = useState(1);
   const [cropPosition, setCropPosition] = useState({ x: 0, y: 0 });
@@ -2713,6 +2722,9 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
       setDisplayName(userInfo?.displayName || currentUser);
       setHideBodyMetrics(userInfo?.hideBodyMetrics || false);
       setEnablePartnerFeature(userInfo?.enablePartnerFeature || false);
+      setNotifyPost(userInfo?.notifyPost !== false);
+      setNotifyComment(userInfo?.notifyComment !== false);
+      setNotifyLike(userInfo?.notifyLike !== false);
       setCropImageSrc(null);
       setImageObj(null);
       if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -2798,7 +2810,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
   };
 
   const handleSave = () => {
-    onSave({ displayName: displayName.trim() || currentUser, photoUrl, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null, hideBodyMetrics, enablePartnerFeature });
+    onSave({ displayName: displayName.trim() || currentUser, photoUrl, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null, hideBodyMetrics, enablePartnerFeature, notifyPost, notifyComment, notifyLike });
   };
 
   if (cropImageSrc) {
@@ -2861,26 +2873,39 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
               <div className="bg-rose-50 border border-rose-200 p-3 rounded-xl flex flex-col gap-3">
                 <div className="flex items-start gap-2">
                   <Settings size={16} className="text-rose-500 shrink-0 mt-0.5" />
-                  <p className="text-xs text-rose-700 font-bold leading-relaxed">端末の設定で通知がオフになっています。<br/>iPhoneの「設定」アプリからSafari (または追加したアプリ) の通知を許可してください。</p>
+                  <p className="text-xs text-rose-700 font-bold leading-relaxed">端末の設定で通知がオフになっています。<br/>iPhoneの「設定」アプリからアプリの通知を許可してください。</p>
                 </div>
-                {isPushEnabled && (
-                  <button onClick={() => onTogglePush(true)} className="w-full bg-white border border-rose-200 text-rose-600 hover:bg-rose-100 font-bold py-2 rounded-lg text-xs transition-colors">
-                    アプリの通知設定をオフにする
-                  </button>
-                )}
+              </div>
+            ) : !isPushEnabled && osPermission === 'default' ? (
+              <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex flex-col gap-3">
+                <p className="text-xs text-amber-700 font-bold leading-relaxed">通知が許可されていません。<br/>後日表示されるポップアップから許可を行ってください。</p>
               </div>
             ) : (
-              <>
-                <button onClick={() => {
-                  onTogglePush(isPushEnabled);
-                  if (osPermission === 'default') setOsPermission('granted');
-                }} className={`w-full font-bold py-3 rounded-xl shadow-sm flex items-center justify-center gap-2 transition-colors ${isPushEnabled ? 'bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 dark:bg-slate-800 dark:border-slate-700' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}>
-                   <Bell size={18} className={isPushEnabled ? 'opacity-50' : ''} /> {isPushEnabled ? 'プッシュ通知をオフにする' : 'プッシュ通知をオンにする'}
-                </button>
-                {isPushEnabled && <p className="text-[10px] text-slate-400 font-bold text-center">通知はオンになっています</p>}
-              </>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-lg">
+                  <span className="text-sm font-bold text-slate-700 dark:text-slate-300">フレンドのトレーニング完了</span>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" checked={notifyPost} onChange={e => setNotifyPost(e.target.checked)} className="sr-only peer" />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-emerald-500"></div>
+                  </label>
+                </div>
+                <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-lg">
+                  <span className="text-sm font-bold text-slate-700 dark:text-slate-300">コメントの受信</span>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" checked={notifyComment} onChange={e => setNotifyComment(e.target.checked)} className="sr-only peer" />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-emerald-500"></div>
+                  </label>
+                </div>
+                <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-lg">
+                  <span className="text-sm font-bold text-slate-700 dark:text-slate-300">ナイス！の受信</span>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" checked={notifyLike} onChange={e => setNotifyLike(e.target.checked)} className="sr-only peer" />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-emerald-500"></div>
+                  </label>
+                </div>
+                <p className="text-[10px] text-slate-400 font-bold mt-2">※すべての通知を完全に停止する場合は、iPhoneの「設定」アプリから通知をオフにしてください。</p>
+              </div>
             )}
-            <p className="text-[10px] text-slate-400 font-bold mt-1">※iOSではホーム画面に追加したアプリからのみ通知を受け取れます。</p>
           </div>
         </div>
         <div className="flex flex-col items-center space-y-6">
@@ -5120,7 +5145,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.22, 22:48, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.22, 22:52, updated)</p>
       </div>
     </div>
   );
