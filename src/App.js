@@ -1834,6 +1834,7 @@ export default function App() {
     if (existingUser) {
       const username = existingUser[0];
       setCurrentUser(username);
+      localStorage.setItem('withfit_login_session', JSON.stringify({ userId: username, lastActive: Date.now() }));
       const joinedGyms = existingUser[1]?.joinedGyms || ['common'];
       try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { lastActive: Date.now(), isAppOnline: true, joinedGyms }, { merge: true }); } catch (e) {}
       return true;
@@ -1846,6 +1847,7 @@ export default function App() {
       if (legacyUser) {
          const username = legacyUser[0];
          setCurrentUser(username);
+         localStorage.setItem('withfit_login_session', JSON.stringify({ userId: username, lastActive: Date.now() }));
          const joinedGyms = legacyUser[1]?.joinedGyms || ['common'];
          try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { googleUid: googleUser.uid, lastActive: Date.now(), isAppOnline: true, joinedGyms }, { merge: true }); } catch (e) {}
          return true;
@@ -1860,6 +1862,7 @@ export default function App() {
       try { 
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { displayName: username, googleUid: googleUser.uid, friendCode: generateFriendCode(), isTraining: false, lastActive: Date.now(), isAppOnline: true, theme: 'light', friends: [], joinedGyms: ['common'] }, { merge: true }); 
         setCurrentUser(username); 
+        localStorage.setItem('withfit_login_session', JSON.stringify({ userId: username, lastActive: Date.now() }));
         return true;
       } catch (e) { return false; }
     }
@@ -5149,7 +5152,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.22, 23:06, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.22, 23:22, updated)</p>
       </div>
     </div>
   );
