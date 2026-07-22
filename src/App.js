@@ -3023,14 +3023,18 @@ function LoginScreen({ onLogin, onGoogleLogin, isOnline }) {
              onClick={() => { 
                const provider = new GoogleAuthProvider(); 
                provider.setCustomParameters({ prompt: 'select_account' }); 
-               signInWithPopup(getAuth(), provider).then((result) => { 
-                 onGoogleLogin(result.user); 
-               }).catch((err) => {
-                 console.error(err);
-                 if (err.code !== 'auth/popup-closed-by-user') {
-                   signInWithRedirect(getAuth(), provider);
-                 }
-               }); 
+               if (navigator.userAgent.includes('Edg')) {
+                 signInWithRedirect(getAuth(), provider);
+               } else {
+                 signInWithPopup(getAuth(), provider).then((result) => { 
+                   onGoogleLogin(result.user); 
+                 }).catch((err) => {
+                   console.error(err);
+                   if (err.code !== 'auth/popup-closed-by-user') {
+                     signInWithRedirect(getAuth(), provider);
+                   }
+                 }); 
+               }
              }} 
              className={`w-full font-bold py-3 rounded-xl shadow-sm flex items-center justify-center gap-2 transition-colors border ${agreed ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'}`}
            > 
@@ -5116,7 +5120,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.22, 22:44, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.22, 22:48, updated)</p>
       </div>
     </div>
   );
