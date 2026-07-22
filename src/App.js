@@ -352,11 +352,17 @@ function SimpleChart({ data, color, title }) {
 function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onToggleLike, onImport, onAddComment, onDeleteComment }) {
   const comments = post.comments || [];
   const [showComments, setShowComments] = useState(comments.length > 0);
-  const [showAllComments, setShowAllComments] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [mentionQuery, setMentionQuery] = useState(null);
   const textareaRef = useRef(null);
-  const displayComments = showAllComments ? comments : comments.slice(0, 2);
+  const commentsContainerRef = useRef(null);
+  const displayComments = comments;
+
+  useEffect(() => {
+    if (showComments && commentsContainerRef.current) {
+      commentsContainerRef.current.scrollTop = commentsContainerRef.current.scrollHeight;
+    }
+  }, [showComments, comments.length]);
 
   const handleReply = (username) => {
     setCommentText(prev => prev ? `${prev} @${username} ` : `@${username} `);
@@ -387,7 +393,6 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
       onAddComment(post.id, commentText);
       setCommentText('');
       setMentionQuery(null);
-      setShowAllComments(true);
     }
   };
 
@@ -739,18 +744,10 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
           )}
         </div>
       </div>
-      {comments.length > 2 && !showAllComments && (
-        <div className="pl-3 mb-2 flex flex-col gap-1">
-          <button onClick={() => setShowAllComments(true)} className="text-sm font-bold text-slate-500 hover:opacity-70 text-left">
-            コメント{comments.length}件をすべて見る
-          </button>
-        </div>
-      )}
-
       {showComments && (
         <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-800 animate-in fade-in duration-200">
           {displayComments.length > 0 && (
-            <div className="space-y-3 mb-3 max-h-60 overflow-y-auto pr-1">
+            <div ref={commentsContainerRef} className="space-y-3 mb-3 max-h-60 overflow-y-auto pr-1">
               {displayComments.map(comment => {
                 const cInfo = accountsInfo[comment.author];
                 return (
@@ -1558,10 +1555,33 @@ export default function App() {
         const currentComments = postData.comments || [];
         await setDoc(postRef, { comments: [...currentComments, newComment] }, { merge: true });
         
+        const authorName = accountsInfo[currentUser]?.displayName || currentUser;
+        const targetUsers = new Set();
+        
         if (postData.author !== currentUser) {
-          const authorName = accountsInfo[currentUser]?.displayName || currentUser;
-          sendPushNotification(postData.author, 'WithFit', `${authorName}さんがコメントしました: 「${text.trim()}」`);
+          targetUsers.add(postData.author);
         }
+        
+        currentComments.forEach(c => {
+          if (c.author !== currentUser) {
+            targetUsers.add(c.author);
+          }
+        });
+        
+        const mentions = text.match(/@([a-zA-Z0-9_ぁ-んァ-ヶ一-龠]+)/g);
+        if (mentions) {
+          mentions.forEach(m => {
+            const uname = m.substring(1);
+            const targetInfo = Object.entries(accountsInfo).find(([k, v]) => k === uname || v.displayName === uname);
+            if (targetInfo && targetInfo[0] !== currentUser) {
+              targetUsers.add(targetInfo[0]);
+            }
+          });
+        }
+        
+        targetUsers.forEach(userId => {
+          sendPushNotification(userId, 'WithFit', `${authorName}さんがコメントしました: 「${text.trim()}」`);
+        });
       }
     } catch (e) { console.error(e); }
   };
@@ -5086,7 +5106,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.22, 09:29, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.22, 22:33, updated)</p>
       </div>
     </div>
   );
