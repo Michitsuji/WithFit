@@ -750,7 +750,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
       {showComments && (
         <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-800 animate-in fade-in duration-200">
           {displayComments.length > 0 && (
-            <div className="space-y-3 mb-3">
+            <div className="space-y-3 mb-3 max-h-60 overflow-y-auto pr-1">
               {displayComments.map(comment => {
                 const cInfo = accountsInfo[comment.author];
                 return (
@@ -1528,7 +1528,6 @@ export default function App() {
   const [targetFriendTab, setTargetFriendTab] = useState(null);
   const [showPushPrompt, setShowPushPrompt] = useState(false);
   const [pushPromptType, setPushPromptType] = useState('request');
-  const [pushPromptType, setPushPromptType] = useState('request');
 
   const sendPushNotification = async (targetUsername, title, body) => {
     if (!targetUsername || targetUsername === currentUser) return;
@@ -1593,7 +1592,16 @@ export default function App() {
     if (currentUser && dataLoaded.accounts && typeof window !== 'undefined' && 'Notification' in window) {
       const myData = accountsInfo[currentUser];
       if (myData) {
-        if (!myData.fcmToken && Notification.permission === 'default') {
+        if (Notification.permission === 'granted' && !myData.fcmToken) {
+          const restoreToken = async () => {
+            try {
+              const messaging = getMessaging(app);
+              const token = await getToken(messaging, { vapidKey: 'BAty8GYk1zuoZVh-ZaSdcJsq_o-7vXJLXPNVNzlgsq9rd3wP-jQtclYEdu1MnnLN_0BnlmiKuoWH3X2YvOFl7aM' });
+              if (token) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { fcmToken: token }, { merge: true });
+            } catch(e){}
+          };
+          restoreToken();
+        } else if (!myData.fcmToken && Notification.permission === 'default') {
           setPushPromptType('request');
           const timer = setTimeout(() => setShowPushPrompt(true), 1500);
           return () => clearTimeout(timer);
@@ -2681,7 +2689,8 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
         setOsPermission(Notification.permission);
       }
     }
-  }, [isOpen, userInfo, currentUser]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -5077,7 +5086,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.22, 09:25, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.22, 09:29, updated)</p>
       </div>
     </div>
   );
