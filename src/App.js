@@ -2563,7 +2563,7 @@ export default function App() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 targetToken,
-                title: 'WithFit テスト通知',
+                title: '管理者からのメッセージ',
                 body: message
               })
             });
