@@ -1569,10 +1569,19 @@ export default function App() {
   useEffect(() => {
     const checkPermission = () => {
       if (typeof window !== 'undefined' && 'Notification' in window) {
-        setOsPermission(Notification.permission);
+        setOsPermission(prev => prev !== Notification.permission ? Notification.permission : prev);
       }
     };
     checkPermission();
+
+    let intervalId;
+    if (typeof window !== 'undefined') {
+       intervalId = setInterval(checkPermission, 1000);
+       window.addEventListener('focus', checkPermission);
+       window.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') checkPermission();
+       });
+    }
 
     if (typeof window !== 'undefined' && navigator.permissions && navigator.permissions.query) {
        navigator.permissions.query({ name: 'notifications' }).then(status => {
@@ -1582,15 +1591,12 @@ export default function App() {
        }).catch(()=>{});
     }
 
-    if (typeof window !== 'undefined') {
-       window.addEventListener('focus', checkPermission);
-       window.addEventListener('visibilitychange', () => {
-          if (document.visibilityState === 'visible') checkPermission();
-       });
-       return () => {
+    return () => {
+       if (typeof window !== 'undefined') {
           window.removeEventListener('focus', checkPermission);
-       };
-    }
+          clearInterval(intervalId);
+       }
+    };
   }, []);
 
   const sendPushNotification = async (targetUsername, title, body, type = 'general') => {
@@ -1652,7 +1658,13 @@ export default function App() {
         }
         
         targetUsers.forEach(userId => {
-          sendPushNotification(userId, 'WithFit', `${authorName}さんがコメントしました: 「${text.trim()}」`, 'comment');
+          const isPostAuthor = userId === postData.author;
+          const title = isPostAuthor ? '💬 コメント' : '💬 メンション / 返信';
+          const targetGymText = postData.gymName ? `（${postData.gymName}）` : '';
+          const body = isPostAuthor
+            ? `${authorName}さんがあなたの記録${targetGymText}にコメントしました: 「${text.trim()}」`
+            : `${authorName}さんがコメントであなたに返信しました: 「${text.trim()}」`;
+          sendPushNotification(userId, title, body, 'comment');
         });
       }
     } catch (e) { console.error(e); }
@@ -1693,7 +1705,8 @@ export default function App() {
         
         if (targetComment && targetComment.likedUsers.includes(currentUser) && targetComment.author !== currentUser) {
             const authorName = accountsInfo[currentUser]?.displayName || currentUser;
-            sendPushNotification(targetComment.author, 'WithFit', `${authorName}さんがあなたのコメントにナイスしました`, 'like');
+            const shortComment = targetComment.text.length > 15 ? targetComment.text.substring(0, 15) + '...' : targetComment.text;
+            sendPushNotification(targetComment.author, '👍 コメントにナイス！', `${authorName}さんがあなたのコメント「${shortComment}」にナイスしました！`, 'like');
         }
       }
     } catch (e) { console.error(e); }
@@ -2058,7 +2071,7 @@ export default function App() {
       const myFriends = myInfo.friends || [];
       const authorName = myInfo.displayName || currentUser;
       myFriends.forEach(friendId => {
-        sendPushNotification(friendId, 'WithFit', `${authorName}さんがトレーニングを完了しました！`, 'post');
+        sendPushNotification(friendId, '🔥 トレーニング完了', `${authorName}さんが${gymName || 'トレーニング'}での記録を完了しました！`, 'post');
       });
     } catch (e) { console.error("Post error:", e); }
   };
@@ -2100,7 +2113,8 @@ export default function App() {
          const targetPost = posts.find(p => p.id === postId);
          if (targetPost && targetPost.author !== currentUser) {
             const authorName = accountsInfo[currentUser]?.displayName || currentUser;
-            sendPushNotification(targetPost.author, 'WithFit', `${authorName}さんがナイスしました`, 'like');
+            const gymText = targetPost.gymName ? `（${targetPost.gymName}）` : '';
+            sendPushNotification(targetPost.author, '👍 ナイス！', `${authorName}さんがあなたのトレーニング記録${gymText}にナイスしました！`, 'like');
          }
       }
     } catch (e) {}
@@ -2270,7 +2284,7 @@ export default function App() {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', friendUsername), { friendRequests: [...targetRequests, currentUser] }, { merge: true });
       alert(`${accountsInfo[friendUsername]?.displayName || friendUsername}さんにフレンド申請を送信しました！`);
       const authorName = accountsInfo[currentUser]?.displayName || currentUser;
-      sendPushNotification(friendUsername, 'WithFit', `${authorName}さんからフレンド申請が届きました`);
+      sendPushNotification(friendUsername, '🤝 フレンド申請', `${authorName}さんからフレンド申請が届きました`);
     } catch (e) {}
   };
 
@@ -2289,7 +2303,7 @@ export default function App() {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', partnerUsername), { partnerRequests: [...new Set([...targetRequests, currentUser])] }, { merge: true });
       alert(`${accountsInfo[partnerUsername]?.displayName || partnerUsername}さんにパートナー申請を送信しました！`);
       const authorName = accountsInfo[currentUser]?.displayName || currentUser;
-      sendPushNotification(partnerUsername, 'WithFit', `${authorName}さんからパートナー申請が届きました`);
+      sendPushNotification(partnerUsername, '🤝 パートナー申請', `${authorName}さんからパートナー申請が届きました`);
     } catch (e) {}
   };
 
@@ -5254,7 +5268,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 08:33, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 08:42, updated)</p>
       </div>
     </div>
   );
