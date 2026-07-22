@@ -1528,6 +1528,19 @@ export default function App() {
   const [targetFriendTab, setTargetFriendTab] = useState(null);
   const [showPushPrompt, setShowPushPrompt] = useState(false);
 
+  const sendPushNotification = async (targetUsername, title, body) => {
+    if (!targetUsername || targetUsername === currentUser) return;
+    const targetToken = accountsInfo[targetUsername]?.fcmToken;
+    if (!targetToken) return;
+    try {
+      await fetch('/api/sendPush', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetToken, title, body })
+      });
+    } catch (e) { console.error('Push error:', e); }
+  };
+
   const handleAddComment = async (postId, text) => {
     if (!currentUser || !db || !text.trim()) return;
     const newComment = {
@@ -1540,8 +1553,14 @@ export default function App() {
       const postRef = doc(db, 'artifacts', appId, 'public', 'data', 'workouts', postId);
       const postSnap = await getDoc(postRef);
       if (postSnap.exists()) {
-        const currentComments = postSnap.data().comments || [];
+        const postData = postSnap.data();
+        const currentComments = postData.comments || [];
         await setDoc(postRef, { comments: [...currentComments, newComment] }, { merge: true });
+        
+        if (postData.author !== currentUser) {
+          const authorName = accountsInfo[currentUser]?.displayName || currentUser;
+          sendPushNotification(postData.author, 'WithFit', `${authorName}さんがコメントしました: 「${text.trim()}」`);
+        }
       }
     } catch (e) { console.error(e); }
   };
@@ -1883,6 +1902,12 @@ export default function App() {
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now() }, { merge: true });
       }
       setDraftWorkoutItems([]); setSelectedCategories([]); setCurrentTab('timeline');
+      
+      const myFriends = myInfo.friends || [];
+      const authorName = myInfo.displayName || currentUser;
+      myFriends.forEach(friendId => {
+        sendPushNotification(friendId, 'WithFit', `${authorName}さんがトレーニングを完了しました！`);
+      });
     } catch (e) { console.error("Post error:", e); }
   };
 
@@ -1916,7 +1941,17 @@ export default function App() {
     const newLikedUsers = isCurrentlyLiked 
       ? likedUsers.filter(u => u !== currentUser) 
       : [...new Set([...likedUsers, currentUser])];
-    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', postId), { likes: newLikedUsers.length, likedUsers: newLikedUsers }, { merge: true }); } catch (e) {}
+    try { 
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', postId), { likes: newLikedUsers.length, likedUsers: newLikedUsers }, { merge: true }); 
+      
+      if (!isCurrentlyLiked) {
+         const targetPost = posts.find(p => p.id === postId);
+         if (targetPost && targetPost.author !== currentUser) {
+            const authorName = accountsInfo[currentUser]?.displayName || currentUser;
+            sendPushNotification(targetPost.author, 'WithFit', `${authorName}さんがいいねしました`);
+         }
+      }
+    } catch (e) {}
   };
 
   const myInfo = accountsInfo[currentUser] || {};
@@ -2082,6 +2117,8 @@ export default function App() {
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', friendUsername), { friendRequests: [...targetRequests, currentUser] }, { merge: true });
       alert(`${accountsInfo[friendUsername]?.displayName || friendUsername}さんにフレンド申請を送信しました！`);
+      const authorName = accountsInfo[currentUser]?.displayName || currentUser;
+      sendPushNotification(friendUsername, 'WithFit', `${authorName}さんからフレンド申請が届きました`);
     } catch (e) {}
   };
 
@@ -2099,6 +2136,8 @@ export default function App() {
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', partnerUsername), { partnerRequests: [...new Set([...targetRequests, currentUser])] }, { merge: true });
       alert(`${accountsInfo[partnerUsername]?.displayName || partnerUsername}さんにパートナー申請を送信しました！`);
+      const authorName = accountsInfo[currentUser]?.displayName || currentUser;
+      sendPushNotification(partnerUsername, 'WithFit', `${authorName}さんからパートナー申請が届きました`);
     } catch (e) {}
   };
 
@@ -2574,6 +2613,7 @@ export default function App() {
 // --- プロフィール設定モーダル ---
 function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGoogle, onDeleteAccount, onTogglePush }) {
   const isPushEnabled = !!userInfo?.fcmToken;
+  const [osPermission, setOsPermission] = useState('default');
   const [isUploading, setIsUploading] = useState(false);
   const [goal, setGoal] = useState(userInfo?.goal || '');
   const [theme, setTheme] = useState(userInfo?.theme || 'light');
@@ -2607,6 +2647,9 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
       setEnablePartnerFeature(userInfo?.enablePartnerFeature || false);
       setCropImageSrc(null);
       setImageObj(null);
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        setOsPermission(Notification.permission);
+      }
     }
   }, [isOpen, userInfo, currentUser]);
 
@@ -2742,9 +2785,27 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
                 Googleアカウントと連携
              </button>
           )}
-          <button onClick={() => onTogglePush(isPushEnabled)} className={`w-full font-bold py-3 rounded-xl shadow-sm flex items-center justify-center gap-2 transition-colors ${isPushEnabled ? 'bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300' : 'bg-indigo-50 border border-indigo-200 text-indigo-600 hover:bg-indigo-100'}`}>
-             <Bell size={18} className={isPushEnabled ? 'opacity-50' : ''} /> {isPushEnabled ? 'プッシュ通知をオフにする' : 'プッシュ通知をオンにする'}
-          </button>
+          
+          <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
+            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5"><Bell size={16}/> プッシュ通知設定</h3>
+            {osPermission === 'denied' ? (
+              <div className="bg-rose-50 border border-rose-200 p-3 rounded-xl flex items-start gap-2">
+                <Settings size={16} className="text-rose-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-rose-700 font-bold leading-relaxed">端末の設定で通知がオフになっています。<br/>iPhoneの「設定」アプリからSafari (または追加したアプリ) の通知を許可してください。</p>
+              </div>
+            ) : (
+              <>
+                <button onClick={() => {
+                  onTogglePush(isPushEnabled);
+                  if (osPermission === 'default') setOsPermission('granted');
+                }} className={`w-full font-bold py-3 rounded-xl shadow-sm flex items-center justify-center gap-2 transition-colors ${isPushEnabled ? 'bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 dark:bg-slate-800 dark:border-slate-700' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}>
+                   <Bell size={18} className={isPushEnabled ? 'opacity-50' : ''} /> {isPushEnabled ? 'プッシュ通知をオフにする' : 'プッシュ通知をオンにする'}
+                </button>
+                {isPushEnabled && <p className="text-[10px] text-slate-400 font-bold text-center">通知はオンになっています</p>}
+              </>
+            )}
+            <p className="text-[10px] text-slate-400 font-bold mt-1">※iOSではホーム画面に追加したアプリからのみ通知を受け取れます。</p>
+          </div>
         </div>
         <div className="flex flex-col items-center space-y-6">
           <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800 border-4 border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center relative font-bold text-2xl text-slate-500">
@@ -4979,7 +5040,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.21, 23:41, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.22, 09:06, updated)</p>
       </div>
     </div>
   );
