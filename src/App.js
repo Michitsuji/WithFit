@@ -2929,7 +2929,8 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
             <div className="text-right text-xs text-slate-400 dark:text-slate-500 mt-1">{goal.length} / 100</div>
           </div>
           
-          <div>             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">通知設定</label>
+          <div>             
+            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">プッシュ通知設定</label>
           <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
             {osPermission === 'denied' ? (
               <div className="bg-rose-50 border border-rose-200 p-3 rounded-xl flex flex-col gap-3">
