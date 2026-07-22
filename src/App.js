@@ -867,17 +867,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
               </div>
             );
           })()}
-          <div className="relative">
-            {replyingToId && (
-              <div className="flex items-center justify-between bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-t-xl text-[11px] font-bold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 border-b-0">
-                <span>{(() => {
-                  const parentComment = localComments.find(c => c.id === replyingToId);
-                  const pUser = parentComment ? (accountsInfo[parentComment.author]?.displayName || parentComment.author) : '';
-                  return pUser ? `${pUser} に返信中...` : '返信中...';
-                })()}</span>
-                <button onClick={() => setReplyingToId(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={14}/></button>
-              </div>
-            )}
+          <div className="relative flex gap-2 items-end">
             {mentionQuery !== null && mentionCandidates.length > 0 && (
               <div className="absolute bottom-full left-0 w-full mb-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg max-h-40 overflow-y-auto z-10">
                 {mentionCandidates.map(([uname, data]) => (
@@ -890,20 +880,30 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                 ))}
               </div>
             )}
-            <div className="flex gap-2 items-end">
+            <div className="flex-1 flex flex-col min-w-0">
+              {replyingToId && (
+                <div className="flex items-center justify-between bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-t-2xl text-[11px] font-bold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 border-b-0">
+                  <span>{(() => {
+                    const parentComment = localComments.find(c => c.id === replyingToId);
+                    const pUser = parentComment ? (accountsInfo[parentComment.author]?.displayName || parentComment.author) : '';
+                    return pUser ? `${pUser} に返信中...` : '返信中...';
+                  })()}</span>
+                  <button onClick={() => setReplyingToId(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={14}/></button>
+                </div>
+              )}
               <textarea
                 ref={textareaRef}
                 value={commentText}
                 onChange={handleCommentChange}
                 placeholder={replyingToId ? "返信を入力..." : "コメントを追加... (@でメンション)"}
-                className={`flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 py-2 px-3 text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500 resize-none min-h-[40px] max-h-24 ${replyingToId ? 'rounded-b-2xl rounded-tr-none border-t-0' : 'rounded-2xl'}`}
+                className={`w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 py-2 px-3 text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500 resize-none min-h-[40px] max-h-24 ${replyingToId ? 'rounded-b-2xl border-t-0' : 'rounded-2xl'}`}
                 style={{ fontSize: '16px' }}
                 rows={1}
               />
-              <button onClick={submitComment} disabled={!commentText.trim()} className={`bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white p-2 flex items-center justify-center transition-colors h-10 w-10 shrink-0 ${replyingToId ? 'rounded-xl mb-0.5' : 'rounded-xl'}`}>
-                <Send size={16} />
-              </button>
             </div>
+            <button onClick={submitComment} disabled={!commentText.trim()} className={`bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white p-2 flex items-center justify-center transition-colors h-10 w-10 shrink-0 ${replyingToId ? 'rounded-xl mb-0.5' : 'rounded-xl'}`}>
+              <Send size={16} />
+            </button>
           </div>
         </div>
       )}
@@ -5351,7 +5351,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 08:57, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 08:59, updated)</p>
       </div>
     </div>
   );
