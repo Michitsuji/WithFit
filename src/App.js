@@ -370,7 +370,6 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
   }, [showComments, localComments.length]);
 
   const handleReply = (username, parentId = null) => {
-    setCommentText(prev => prev ? `${prev} @${username} ` : `@${username} `);
     if (parentId) setReplyingToId(parentId);
     if (textareaRef.current) textareaRef.current.focus();
   };
@@ -807,20 +806,20 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                   </div>
                   <div className="flex-1 group min-w-0">
                     <div className="flex items-end gap-2">
-                      <div className="bg-slate-50 dark:bg-slate-950/50 p-2.5 pr-8 rounded-2xl rounded-tl-none border border-slate-100 dark:border-slate-800 relative inline-block max-w-[85%]">
+                      <div className="bg-slate-50 dark:bg-slate-950/50 p-2.5 rounded-2xl rounded-tl-none border border-slate-100 dark:border-slate-800 relative inline-block max-w-[85%]">
                         <div className="flex items-baseline gap-2 mb-1">
                           {renderUsernameWithBadge(comment.author, cInfo?.displayName, accountsInfo, "font-bold text-xs text-slate-800 dark:text-slate-200")}
                           <span className="text-[10px] text-slate-400 shrink-0">{getRelativeTime(comment.timestamp)}</span>
                         </div>
                         <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words">{renderCommentText(comment.text)}</p>
+                      </div>
+                      <div className="flex flex-col items-center justify-end pb-1 shrink-0 gap-1.5">
                         {(comment.author === currentUser || post.author === currentUser) && onDeleteComment && (
-                          <button onClick={() => handleDeleteLocalComment(comment.id)} className="absolute top-2 right-2 p-1 text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Trash2 size={12} />
+                          <button onClick={() => handleDeleteLocalComment(comment.id)} className="p-1 text-slate-300 hover:text-rose-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                            <Trash2 size={14} />
                           </button>
                         )}
-                      </div>
-                      <div className="pb-2 shrink-0">
-                        <button onClick={() => handleCommentLike(comment.id)} className={`flex items-center gap-0.5 text-[11px] font-bold transition-colors ${isCLiked ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'}`}>
+                        <button onClick={() => handleCommentLike(comment.id)} className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition-colors ${isCLiked ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'}`}>
                           <Heart size={14} fill={isCLiked ? "currentColor" : "none"} className={isCLiked ? "animate-pulse" : ""} />
                           {cLikesCount > 0 && <span>{cLikesCount}</span>}
                         </button>
@@ -871,7 +870,11 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
           <div className="relative">
             {replyingToId && (
               <div className="flex items-center justify-between bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-t-xl text-[11px] font-bold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 border-b-0">
-                <span>返信中...</span>
+                <span>{(() => {
+                  const parentComment = localComments.find(c => c.id === replyingToId);
+                  const pUser = parentComment ? (accountsInfo[parentComment.author]?.displayName || parentComment.author) : '';
+                  return pUser ? `${pUser} に返信中...` : '返信中...';
+                })()}</span>
                 <button onClick={() => setReplyingToId(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={14}/></button>
               </div>
             )}
@@ -1714,13 +1717,36 @@ export default function App() {
           });
         }
         
+        let replyTargetUser = null;
+        if (parentId) {
+           const parentComment = currentComments.find(c => c.id === parentId);
+           if (parentComment && parentComment.author !== currentUser) {
+              replyTargetUser = parentComment.author;
+              targetUsers.add(replyTargetUser);
+           }
+        }
+
         targetUsers.forEach(userId => {
           const isPostAuthor = userId === postData.author;
-          const title = isPostAuthor ? '💬 コメント' : '💬 メンション / 返信';
+          const isReplyTarget = userId === replyTargetUser;
+          const isMentioned = mentions && mentions.some(m => {
+              const uname = m.substring(1);
+              const tInfo = Object.entries(accountsInfo).find(([k, v]) => k === uname || v.displayName === uname);
+              return tInfo && tInfo[0] === userId;
+          });
+
+          let title = '💬 コメント';
+          let body = '';
           const targetGymText = postData.gymName ? `（${postData.gymName}）` : '';
-          const body = isPostAuthor
-            ? `${authorName}さんがあなたの記録${targetGymText}にコメントしました: 「${text.trim()}」`
-            : `${authorName}さんがコメントであなたに返信しました: 「${text.trim()}」`;
+
+          if (isReplyTarget || isMentioned) {
+            title = '💬 メンション / 返信';
+            body = `${authorName}さんがコメントであなたに返信しました: 「${text.trim()}」`;
+          } else if (isPostAuthor) {
+            body = `${authorName}さんがあなたの記録${targetGymText}にコメントしました: 「${text.trim()}」`;
+          } else {
+            body = `${authorName}さんが${accountsInfo[postData.author]?.displayName || postData.author}さんの記録にコメントしました: 「${text.trim()}」`;
+          }
           sendPushNotification(userId, title, body, 'comment');
         });
       }
@@ -5325,7 +5351,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 08:52, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 08:57, updated)</p>
       </div>
     </div>
   );
