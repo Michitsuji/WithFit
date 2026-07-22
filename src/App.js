@@ -1612,6 +1612,10 @@ export default function App() {
     if (currentUser && dataLoaded.accounts && typeof window !== 'undefined' && 'Notification' in window) {
       const myData = accountsInfo[currentUser];
       if (myData) {
+        if (Notification.permission === 'denied' && myData.fcmToken) {
+          setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { fcmToken: deleteField() }, { merge: true }).catch(()=>{});
+        }
+
         if (Notification.permission === 'granted' && !myData.fcmToken) {
           const restoreToken = async () => {
             try {
@@ -1621,14 +1625,20 @@ export default function App() {
             } catch(e){}
           };
           restoreToken();
-        } else if (!myData.fcmToken && Notification.permission === 'default') {
-          setPushPromptType('request');
-          const timer = setTimeout(() => setShowPushPrompt(true), 1500);
-          return () => clearTimeout(timer);
-        } else if (myData.fcmToken && Notification.permission === 'denied') {
-          setPushPromptType('warning');
-          const timer = setTimeout(() => setShowPushPrompt(true), 1500);
-          return () => clearTimeout(timer);
+        } else {
+          const lastPrompt = Number(localStorage.getItem('withfit_push_prompt_time') || 0);
+          const daysSinceLastPrompt = (Date.now() - lastPrompt) / (1000 * 60 * 60 * 24);
+          if (daysSinceLastPrompt > 3) {
+            if (!myData.fcmToken && Notification.permission === 'default') {
+              setPushPromptType('request');
+              const timer = setTimeout(() => { setShowPushPrompt(true); localStorage.setItem('withfit_push_prompt_time', Date.now().toString()); }, 1500);
+              return () => clearTimeout(timer);
+            } else if (Notification.permission === 'denied') {
+              setPushPromptType('warning');
+              const timer = setTimeout(() => { setShowPushPrompt(true); localStorage.setItem('withfit_push_prompt_time', Date.now().toString()); }, 1500);
+              return () => clearTimeout(timer);
+            }
+          }
         }
       }
     }
@@ -5106,7 +5116,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.22, 22:42, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.22, 22:44, updated)</p>
       </div>
     </div>
   );
