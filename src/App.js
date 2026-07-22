@@ -354,6 +354,8 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
   const [showComments, setShowComments] = useState(localComments.length > 0);
   const [commentText, setCommentText] = useState('');
   const [mentionQuery, setMentionQuery] = useState(null);
+  const [replyingToId, setReplyingToId] = useState(null);
+  const [expandedThreads, setExpandedThreads] = useState({});
   const textareaRef = useRef(null);
   const commentsContainerRef = useRef(null);
 
@@ -367,9 +369,21 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
     }
   }, [showComments, localComments.length]);
 
-  const handleReply = (username) => {
+  const handleReply = (username, parentId = null) => {
     setCommentText(prev => prev ? `${prev} @${username} ` : `@${username} `);
+    if (parentId) setReplyingToId(parentId);
     if (textareaRef.current) textareaRef.current.focus();
+  };
+
+  const handleDeleteLocalComment = (commentId) => {
+    if (window.confirm("このコメントを削除しますか？")) {
+      setLocalComments(prev => prev.filter(c => c.id !== commentId && c.parentId !== commentId));
+      if (onDeleteComment) onDeleteComment(post.id, commentId);
+    }
+  };
+
+  const toggleThread = (threadId) => {
+    setExpandedThreads(prev => ({...prev, [threadId]: !prev[threadId]}));
   };
 
   const handleCommentChange = (e) => {
@@ -399,14 +413,16 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
       author: currentUser,
       text: commentText.trim(),
       timestamp: Date.now(),
-      likedUsers: []
+      likedUsers: [],
+      parentId: replyingToId || null
     };
     setLocalComments(prev => [...prev, newComment]);
 
     if (onAddComment) {
-      onAddComment(post.id, commentText);
+      onAddComment(post.id, commentText, replyingToId || null);
       setCommentText('');
       setMentionQuery(null);
+      setReplyingToId(null);
     }
   };
 
@@ -774,51 +790,91 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
       </div>
       {showComments && (
         <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-800 animate-in fade-in duration-200">
-          {localComments.length > 0 && (
-            <div ref={commentsContainerRef} className="space-y-3 mb-3 max-h-60 overflow-y-auto pr-1">
-              {localComments.map(comment => {
-                const cInfo = accountsInfo[comment.author];
-                const cLikedUsers = comment.likedUsers || [];
-                const isCLiked = cLikedUsers.includes(currentUser);
-                const cLikesCount = cLikedUsers.length;
-                return (
-                  <div key={comment.id} className="flex gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 text-xs shrink-0 overflow-hidden mt-1">
-                       {cInfo?.photoUrl ? <img src={cInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : cInfo?.displayName ? cInfo.displayName.charAt(0).toUpperCase() : comment.author.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 group min-w-0">
-                      <div className="flex items-end gap-2">
-                        <div className="bg-slate-50 dark:bg-slate-950/50 p-2.5 rounded-2xl rounded-tl-none border border-slate-100 dark:border-slate-800 relative inline-block max-w-[85%]">
-                          <div className="flex items-baseline gap-2 mb-1">
-                            {renderUsernameWithBadge(comment.author, cInfo?.displayName, accountsInfo, "font-bold text-xs text-slate-800 dark:text-slate-200")}
-                            <span className="text-[10px] text-slate-400 shrink-0">{getRelativeTime(comment.timestamp)}</span>
-                          </div>
-                          <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words">{renderCommentText(comment.text)}</p>
-                          {(comment.author === currentUser || post.author === currentUser) && onDeleteComment && (
-                            <button onClick={() => onDeleteComment(post.id, comment.id)} className="absolute top-2 right-2 p-1 text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Trash2 size={12} />
-                            </button>
-                          )}
+          {(() => {
+            const rootComments = localComments.filter(c => !c.parentId);
+            
+            const renderComment = (comment, isReply = false, rootId = null) => {
+              const cInfo = accountsInfo[comment.author];
+              const cLikedUsers = comment.likedUsers || [];
+              const isCLiked = cLikedUsers.includes(currentUser);
+              const cLikesCount = cLikedUsers.length;
+              const currentRootId = rootId || comment.id;
+
+              return (
+                <div key={comment.id} className="flex gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 text-xs shrink-0 overflow-hidden mt-1">
+                     {cInfo?.photoUrl ? <img src={cInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : cInfo?.displayName ? cInfo.displayName.charAt(0).toUpperCase() : comment.author.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 group min-w-0">
+                    <div className="flex items-end gap-2">
+                      <div className="bg-slate-50 dark:bg-slate-950/50 p-2.5 pr-8 rounded-2xl rounded-tl-none border border-slate-100 dark:border-slate-800 relative inline-block max-w-[85%]">
+                        <div className="flex items-baseline gap-2 mb-1">
+                          {renderUsernameWithBadge(comment.author, cInfo?.displayName, accountsInfo, "font-bold text-xs text-slate-800 dark:text-slate-200")}
+                          <span className="text-[10px] text-slate-400 shrink-0">{getRelativeTime(comment.timestamp)}</span>
                         </div>
-                        <div className="pb-2 shrink-0">
-                          <button onClick={() => handleCommentLike(comment.id)} className={`flex items-center gap-0.5 text-[11px] font-bold transition-colors ${isCLiked ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'}`}>
-                            <Heart size={14} fill={isCLiked ? "currentColor" : "none"} className={isCLiked ? "animate-pulse" : ""} />
-                            {cLikesCount > 0 && <span>{cLikesCount}</span>}
+                        <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words">{renderCommentText(comment.text)}</p>
+                        {(comment.author === currentUser || post.author === currentUser) && onDeleteComment && (
+                          <button onClick={() => handleDeleteLocalComment(comment.id)} className="absolute top-2 right-2 p-1 text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Trash2 size={12} />
                           </button>
-                        </div>
+                        )}
                       </div>
-                      <div className="pl-2 mt-1">
-                        <button onClick={() => handleReply(comment.author)} className="text-[11px] font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
-                          返信
+                      <div className="pb-2 shrink-0">
+                        <button onClick={() => handleCommentLike(comment.id)} className={`flex items-center gap-0.5 text-[11px] font-bold transition-colors ${isCLiked ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'}`}>
+                          <Heart size={14} fill={isCLiked ? "currentColor" : "none"} className={isCLiked ? "animate-pulse" : ""} />
+                          {cLikesCount > 0 && <span>{cLikesCount}</span>}
                         </button>
                       </div>
                     </div>
+                    <div className="pl-2 mt-1">
+                      <button onClick={() => handleReply(comment.author, currentRootId)} className="text-[11px] font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+                        返信
+                      </button>
+                    </div>
                   </div>
-                )
-              })}
-            </div>
-          )}
+                </div>
+              );
+            };
+
+            return rootComments.length > 0 && (
+              <div ref={commentsContainerRef} className="space-y-3 mb-3 max-h-60 overflow-y-auto pr-1">
+                {rootComments.map(rootComment => {
+                  const replies = localComments.filter(c => c.parentId === rootComment.id);
+                  const isExpanded = expandedThreads[rootComment.id];
+                  
+                  return (
+                    <div key={rootComment.id} className="space-y-3">
+                      {renderComment(rootComment, false, rootComment.id)}
+                      
+                      {replies.length > 0 && (
+                        <div className="ml-10 space-y-3 border-l-2 border-slate-100 dark:border-slate-800 pl-3">
+                          {!isExpanded ? (
+                            <button onClick={() => toggleThread(rootComment.id)} className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 hover:underline">
+                              <ArrowDown size={12}/> {replies.length}件の返信を表示
+                            </button>
+                          ) : (
+                            <>
+                              {replies.map(reply => renderComment(reply, true, rootComment.id))}
+                              <button onClick={() => toggleThread(rootComment.id)} className="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1 hover:underline mt-1">
+                                <ArrowUp size={12}/> 返信を閉じる
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
           <div className="relative">
+            {replyingToId && (
+              <div className="flex items-center justify-between bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-t-xl text-[11px] font-bold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800 border-b-0">
+                <span>返信中...</span>
+                <button onClick={() => setReplyingToId(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={14}/></button>
+              </div>
+            )}
             {mentionQuery !== null && mentionCandidates.length > 0 && (
               <div className="absolute bottom-full left-0 w-full mb-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg max-h-40 overflow-y-auto z-10">
                 {mentionCandidates.map(([uname, data]) => (
@@ -831,17 +887,17 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                 ))}
               </div>
             )}
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-end">
               <textarea
                 ref={textareaRef}
                 value={commentText}
                 onChange={handleCommentChange}
-                placeholder="コメントを追加... (@でメンション)"
-                className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl py-2 px-3 text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500 resize-none min-h-[40px] max-h-24"
+                placeholder={replyingToId ? "返信を入力..." : "コメントを追加... (@でメンション)"}
+                className={`flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 py-2 px-3 text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500 resize-none min-h-[40px] max-h-24 ${replyingToId ? 'rounded-b-2xl rounded-tr-none border-t-0' : 'rounded-2xl'}`}
                 style={{ fontSize: '16px' }}
                 rows={1}
               />
-              <button onClick={submitComment} disabled={!commentText.trim()} className="bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white p-2 rounded-xl flex items-center justify-center transition-colors h-10 w-10 shrink-0">
+              <button onClick={submitComment} disabled={!commentText.trim()} className={`bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white p-2 flex items-center justify-center transition-colors h-10 w-10 shrink-0 ${replyingToId ? 'rounded-xl mb-0.5' : 'rounded-xl'}`}>
                 <Send size={16} />
               </button>
             </div>
@@ -1617,13 +1673,14 @@ export default function App() {
     } catch (e) { console.error('Push error:', e); }
   };
 
-  const handleAddComment = async (postId, text) => {
+  const handleAddComment = async (postId, text, parentId = null) => {
     if (!currentUser || !db || !text.trim()) return;
     const newComment = {
       id: generateId(),
       author: currentUser,
       text: text.trim(),
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      parentId: parentId || null
     };
     try {
       const postRef = doc(db, 'artifacts', appId, 'public', 'data', 'workouts', postId);
@@ -5268,7 +5325,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 08:42, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 08:52, updated)</p>
       </div>
     </div>
   );
