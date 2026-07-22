@@ -1528,6 +1528,7 @@ export default function App() {
   const [targetFriendTab, setTargetFriendTab] = useState(null);
   const [showPushPrompt, setShowPushPrompt] = useState(false);
   const [pushPromptType, setPushPromptType] = useState('request');
+  const [pushPromptType, setPushPromptType] = useState('request');
 
   const sendPushNotification = async (targetUsername, title, body) => {
     if (!targetUsername || targetUsername === currentUser) return;
@@ -1846,7 +1847,8 @@ export default function App() {
   const handleLogout = async () => { 
     if (currentUser && db) {
       try {
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isAppOnline: false, lastActive: Date.now() }, { merge: true });
+        // ログアウト時に通知トークンを削除し、他のアカウントに通知が届かないようにする
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isAppOnline: false, lastActive: Date.now(), fcmToken: deleteField() }, { merge: true });
       } catch (e) {}
     }
     localStorage.removeItem('withfit_login_session');
@@ -5075,7 +5077,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.22, 09:17, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.22, 09:25, updated)</p>
       </div>
     </div>
   );
