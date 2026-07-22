@@ -423,8 +423,9 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
     if (onToggleCommentLike) onToggleCommentLike(post.id, commentId);
   };
 
+  const myFriendsList = accountsInfo[currentUser]?.friends || [];
   const mentionCandidates = mentionQuery !== null ? Object.entries(accountsInfo).filter(([uname, data]) => 
-    uname.includes(mentionQuery) || (data.displayName && data.displayName.includes(mentionQuery))
+    myFriendsList.includes(uname) && (uname.includes(mentionQuery) || (data.displayName && data.displayName.includes(mentionQuery)))
   ) : [];
 
   const renderCommentText = (text) => {
@@ -785,26 +786,30 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                     <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 text-xs shrink-0 overflow-hidden mt-1">
                        {cInfo?.photoUrl ? <img src={cInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : cInfo?.displayName ? cInfo.displayName.charAt(0).toUpperCase() : comment.author.charAt(0).toUpperCase()}
                     </div>
-                    <div className="flex-1 group">
-                      <div className="bg-slate-50 dark:bg-slate-950/50 p-2.5 rounded-2xl rounded-tl-none border border-slate-100 dark:border-slate-800 relative">
-                        <div className="flex items-baseline gap-2 mb-1">
-                          {renderUsernameWithBadge(comment.author, cInfo?.displayName, accountsInfo, "font-bold text-xs text-slate-800 dark:text-slate-200")}
-                          <span className="text-[10px] text-slate-400">{getRelativeTime(comment.timestamp)}</span>
+                    <div className="flex-1 group min-w-0">
+                      <div className="flex items-end gap-2">
+                        <div className="bg-slate-50 dark:bg-slate-950/50 p-2.5 rounded-2xl rounded-tl-none border border-slate-100 dark:border-slate-800 relative inline-block max-w-[85%]">
+                          <div className="flex items-baseline gap-2 mb-1">
+                            {renderUsernameWithBadge(comment.author, cInfo?.displayName, accountsInfo, "font-bold text-xs text-slate-800 dark:text-slate-200")}
+                            <span className="text-[10px] text-slate-400 shrink-0">{getRelativeTime(comment.timestamp)}</span>
+                          </div>
+                          <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words">{renderCommentText(comment.text)}</p>
+                          {(comment.author === currentUser || post.author === currentUser) && onDeleteComment && (
+                            <button onClick={() => onDeleteComment(post.id, comment.id)} className="absolute top-2 right-2 p-1 text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Trash2 size={12} />
+                            </button>
+                          )}
                         </div>
-                        <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{renderCommentText(comment.text)}</p>
-                        {(comment.author === currentUser || post.author === currentUser) && onDeleteComment && (
-                          <button onClick={() => onDeleteComment(post.id, comment.id)} className="absolute top-2 right-2 p-1 text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Trash2 size={12} />
+                        <div className="pb-2 shrink-0">
+                          <button onClick={() => handleCommentLike(comment.id)} className={`flex items-center gap-0.5 text-[11px] font-bold transition-colors ${isCLiked ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'}`}>
+                            <Heart size={14} fill={isCLiked ? "currentColor" : "none"} className={isCLiked ? "animate-pulse" : ""} />
+                            {cLikesCount > 0 && <span>{cLikesCount}</span>}
                           </button>
-                        )}
+                        </div>
                       </div>
-                      <div className="pl-2 mt-1 flex items-center gap-4">
+                      <div className="pl-2 mt-1">
                         <button onClick={() => handleReply(comment.author)} className="text-[11px] font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
                           返信
-                        </button>
-                        <button onClick={() => handleCommentLike(comment.id)} className={`flex items-center gap-1 text-[11px] font-bold transition-colors ${isCLiked ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'}`}>
-                          <Heart size={12} fill={isCLiked ? "currentColor" : "none"} />
-                          {cLikesCount > 0 && cLikesCount}
                         </button>
                       </div>
                     </div>
@@ -1562,15 +1567,29 @@ export default function App() {
   const [osPermission, setOsPermission] = useState('default');
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      setOsPermission(Notification.permission);
-      if (navigator.permissions && navigator.permissions.query) {
-         navigator.permissions.query({ name: 'notifications' }).then(status => {
-            status.onchange = () => {
-               setOsPermission(Notification.permission);
-            };
-         }).catch(()=>{});
+    const checkPermission = () => {
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        setOsPermission(Notification.permission);
       }
+    };
+    checkPermission();
+
+    if (typeof window !== 'undefined' && navigator.permissions && navigator.permissions.query) {
+       navigator.permissions.query({ name: 'notifications' }).then(status => {
+          status.onchange = () => {
+             checkPermission();
+          };
+       }).catch(()=>{});
+    }
+
+    if (typeof window !== 'undefined') {
+       window.addEventListener('focus', checkPermission);
+       window.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') checkPermission();
+       });
+       return () => {
+          window.removeEventListener('focus', checkPermission);
+       };
     }
   }, []);
 
@@ -5235,7 +5254,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 08:27, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 08:33, updated)</p>
       </div>
     </div>
   );
