@@ -1856,7 +1856,7 @@ export default function App() {
      if (timerState.y === 'top') {
         transformY = 80;
      } else {
-        transformY = screenH - cardH - 80;
+        transformY = screenH - cardH - 90;
      }
   }
   const isHidden = timerState.hidden;
@@ -2888,7 +2888,7 @@ export default function App() {
           }
         `}</style>
       )}
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20 shadow-sm flex flex-col transition-colors">
+      <header className="fixed top-0 left-0 right-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-30 shadow-sm flex flex-col transition-colors">
         <div className="p-4 flex justify-between items-center relative">
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-1">
             <WithFitLogo className="text-indigo-500" /><span>With<span className="text-indigo-500">Fit</span></span>
@@ -3072,7 +3072,7 @@ export default function App() {
         </div>
       )}
 
-      <main className="p-4 max-w-md mx-auto w-full pb-48">
+      <main className="pt-24 px-4 pb-48 max-w-md mx-auto w-full">
         {!myInfo?.googleUid && (
           <div className="bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 px-4 py-3 rounded-2xl border border-rose-200 dark:border-rose-900/60 font-bold text-xs mb-6 flex justify-between items-center shadow-sm">
              <div className="flex items-center gap-1.5 min-w-0">
@@ -6180,7 +6180,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 23:24, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 23:33, updated)</p>
       </div>
     </div>
   );
