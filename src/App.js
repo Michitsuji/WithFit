@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus, EyeOff, Bell, Download, CheckCircle, Handshake, MessageCircle, Send, Volume2, VolumeX, Music } from 'lucide-react';
+import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus, EyeOff, Bell, Download, CheckCircle, Handshake, MessageCircle, Send, Volume2, VolumeX, Music, ChevronDown, ChevronUp } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy, getDocs, where } from 'firebase/firestore';
@@ -1684,9 +1684,22 @@ export default function App() {
   const [restTimeLeft, setRestTimeLeft] = useState(0);
   const [showTimerMenu, setShowTimerMenu] = useState(false);
   const [selectedRestMinute, setSelectedRestMinute] = useState(1);
-  const [timerCardPos, setTimerCardPos] = useState({ x: 0, y: 0 });
+
+  const [timerState, setTimerState] = useState('bottom');
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isTimerDragging, setIsTimerDragging] = useState(false);
-  const timerDragInfo = useRef({ startX: 0, startY: 0, initX: 0, initY: 0 });
+  const timerDragInfo = useRef({ startX: 0, startY: 0, lastY: 0, velocityY: 0, startTime: 0, initRect: null });
+  const timerCardRef = useRef(null);
+  const [screenSize, setScreenSize] = useState({ w: 0, h: 0 });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+       setScreenSize({ w: window.innerWidth, h: window.innerHeight });
+       const handleResize = () => setScreenSize({ w: window.innerWidth, h: window.innerHeight });
+       window.addEventListener('resize', handleResize);
+       return () => window.removeEventListener('resize', handleResize);
+    }
+  }, []);
 
   const playSilent = () => {
     try {
@@ -1759,8 +1772,16 @@ export default function App() {
   const handleTimerTouchStart = (e) => {
     if (e.target.closest('button, select')) return;
     const touch = e.touches ? e.touches[0] : e;
-    timerDragInfo.current = { startX: touch.clientX, startY: touch.clientY, initX: timerCardPos.x, initY: timerCardPos.y };
+    timerDragInfo.current = { 
+      startX: touch.clientX, 
+      startY: touch.clientY, 
+      lastY: touch.clientY,
+      velocityY: 0,
+      startTime: Date.now(),
+      initRect: timerCardRef.current?.getBoundingClientRect()
+    };
     setIsTimerDragging(true);
+    setDragOffset({ x: 0, y: 0 });
   };
 
   const handleTimerTouchMove = (e) => {
@@ -1768,31 +1789,59 @@ export default function App() {
     const touch = e.touches ? e.touches[0] : e;
     const dx = touch.clientX - timerDragInfo.current.startX;
     const dy = touch.clientY - timerDragInfo.current.startY;
-    setTimerCardPos({ x: timerDragInfo.current.initX + dx, y: timerDragInfo.current.initY + dy });
+    
+    const dt = Date.now() - timerDragInfo.current.startTime;
+    timerDragInfo.current.velocityY = (touch.clientY - timerDragInfo.current.lastY) / (dt || 1);
+    timerDragInfo.current.lastY = touch.clientY;
+    timerDragInfo.current.startTime = Date.now();
+
+    setDragOffset({ x: dx, y: dy });
   };
 
   const handleTimerTouchEnd = () => {
     if (!isTimerDragging) return;
     setIsTimerDragging(false);
-    const { x, y } = timerCardPos;
-    let newX = 0;
-    let newY = 0;
-    const thresX = 80;
-    const thresY = 80;
 
-    if (Math.abs(x) > Math.abs(y)) {
-      if (x > thresX) newX = window.innerWidth / 2 + 50;
-      else if (x < -thresX) newX = -(window.innerWidth / 2 + 50);
+    const { velocityY, initRect } = timerDragInfo.current;
+    if (!initRect) return;
+    
+    const currentY = initRect.top + dragOffset.y;
+    const screenH = screenSize.h || window.innerHeight;
+
+    let nextState = 'bottom';
+    
+    if (velocityY < -0.5 || (velocityY <= 0.5 && currentY < screenH / 2)) {
+      if (currentY < 80 || velocityY < -1.5) nextState = 'hidden-top';
+      else nextState = 'top';
     } else {
-      if (y > thresY) newY = window.innerHeight / 2;
-      else if (y < -thresY) newY = -window.innerHeight / 3;
+      if (currentY > screenH - 150 || velocityY > 1.5) nextState = 'hidden-bottom';
+      else nextState = 'bottom';
     }
-    setTimerCardPos({ x: newX, y: newY });
+
+    setTimerState(nextState);
+    setDragOffset({ x: 0, y: 0 });
   };
 
   const restoreTimerCard = () => {
-    if (timerCardPos.x !== 0 || timerCardPos.y !== 0) setTimerCardPos({ x: 0, y: 0 });
+    if (timerState === 'hidden-top') setTimerState('top');
+    else if (timerState === 'hidden-bottom') setTimerState('bottom');
   };
+
+  let transformY = 0;
+  let transformX = 0;
+  
+  if (isTimerDragging && timerDragInfo.current.initRect) {
+     transformY = timerDragInfo.current.initRect.top + dragOffset.y;
+     transformX = dragOffset.x;
+  } else {
+     const screenH = screenSize.h || (typeof window !== 'undefined' ? window.innerHeight : 800);
+     const safeBottom = 24;
+     if (timerState === 'bottom') transformY = screenH - safeBottom - 105;
+     else if (timerState === 'top') transformY = 80;
+     else if (timerState === 'hidden-bottom') transformY = screenH - 24;
+     else if (timerState === 'hidden-top') transformY = -40;
+  }
+  const isHidden = timerState.includes('hidden');
 
   const cancelRestTimer = () => {
     setRestTimerStart(null);
@@ -2934,8 +2983,9 @@ export default function App() {
       </header>
 
       {myInfo?.isTraining && (
-        <div className="fixed left-0 right-0 z-40 px-4 max-w-md mx-auto pointer-events-none" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 95px)' }}>
+        <div className="fixed inset-0 z-40 pointer-events-none" style={{ perspective: 1000 }}>
           <div 
+            ref={timerCardRef}
             onClick={restoreTimerCard}
             onTouchStart={handleTimerTouchStart}
             onTouchMove={handleTimerTouchMove}
@@ -2945,40 +2995,59 @@ export default function App() {
             onMouseMove={handleTimerTouchMove}
             onMouseUp={handleTimerTouchEnd}
             onMouseLeave={handleTimerTouchEnd}
-            className={`bg-slate-900/90 backdrop-blur-md rounded-2xl p-3 shadow-xl text-white flex justify-between items-center pointer-events-auto border border-slate-700 ${isTimerDragging ? '' : 'transition-all duration-300'} ${(timerCardPos.x !== 0 || timerCardPos.y !== 0) && !isTimerDragging ? 'opacity-30' : 'opacity-100'}`}
-            style={{ transform: `translate(${timerCardPos.x}px, ${timerCardPos.y}px)`, cursor: isTimerDragging ? 'grabbing' : 'grab' }}
+            className={`absolute left-0 right-0 px-4 max-w-md mx-auto pointer-events-auto ${isTimerDragging ? '' : 'transition-transform duration-300'} ${isHidden && !isTimerDragging ? 'opacity-80' : 'opacity-100'}`}
+            style={{ 
+               transform: `translate3d(${transformX}px, ${transformY}px, 0)`,
+               transitionTimingFunction: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+               cursor: isTimerDragging ? 'grabbing' : 'grab'
+            }}
           >
-            <div className="flex flex-col items-start min-w-[70px] pointer-events-none">
-              <span className="text-[10px] text-slate-400 font-bold mb-0.5 flex items-center gap-1"><MapPin size={10}/> {allGyms.find(g => g.id === myInfo.currentGymId)?.name || 'トレーニング中'}</span>
-              <div className="text-lg font-mono font-bold text-emerald-400 flex items-center gap-1">
-                <Clock size={14} className="animate-pulse" /> 
-                <TimerDisplay startTime={myInfo.trainingStartTime} />
-              </div>
-            </div>
-            <div className="flex items-center">
-              {!restTimerStart ? (
-                <div className="relative flex items-center">
-                  <select 
-                    value={selectedRestMinute}
-                    onChange={(e) => setSelectedRestMinute(Number(e.target.value))} 
-                    className="appearance-none bg-slate-800/80 text-slate-200 font-bold text-sm py-2 pl-3 pr-7 rounded-l-xl border border-slate-600 focus:outline-none h-[40px]"
-                  >
-                    <option value={0}>UP</option>
-                    {[1,2,3,4,5].map(m => <option key={m} value={m}>{m}分</option>)}
-                  </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">▼</div>
-                </div>
-              ) : (
-                <div className="bg-slate-800/80 flex items-center justify-center h-[40px] px-3 rounded-l-xl border border-slate-600 border-r-0">
-                   <span className={`text-lg font-mono font-bold ${restDuration === 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatRestTime(restTimeLeft)}</span>
-                </div>
+            <div className="bg-slate-900/90 backdrop-blur-md rounded-2xl p-3 shadow-xl text-white flex justify-between items-center border border-slate-700 relative">
+              {timerState === 'hidden-top' && (
+                 <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-slate-900/90 text-slate-400 px-4 py-0.5 rounded-b-xl border border-t-0 border-slate-700 shadow-md">
+                   <ChevronDown size={16} />
+                 </div>
               )}
-              <button 
-                onClick={() => restTimerStart ? cancelRestTimer() : startRestTimer(selectedRestMinute)} 
-                className={`flex items-center justify-center h-[40px] px-4 rounded-r-xl border transition-colors ${restTimerStart ? 'bg-rose-500/20 border-rose-500 text-rose-400 hover:bg-rose-500/30' : 'bg-slate-700/80 border-slate-600 text-emerald-400 hover:bg-slate-600 border-l-0'}`}
-              >
-                 {restTimerStart ? <X size={18} /> : <Play size={18} fill="currentColor" />}
-              </button>
+              {timerState === 'hidden-bottom' && (
+                 <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-900/90 text-slate-400 px-4 py-0.5 rounded-t-xl border border-b-0 border-slate-700 shadow-md">
+                   <ChevronUp size={16} />
+                 </div>
+              )}
+
+              <div className={`flex justify-between items-center w-full transition-opacity duration-300 ${isHidden && !isTimerDragging ? 'opacity-0' : 'opacity-100'}`}>
+                <div className="flex flex-col items-start min-w-[70px] pointer-events-none">
+                  <span className="text-[10px] text-slate-400 font-bold mb-0.5 flex items-center gap-1"><MapPin size={10}/> {allGyms.find(g => g.id === myInfo.currentGymId)?.name || 'トレーニング中'}</span>
+                  <div className="text-lg font-mono font-bold text-emerald-400 flex items-center gap-1">
+                    <Clock size={14} className="animate-pulse" /> 
+                    <TimerDisplay startTime={myInfo.trainingStartTime} />
+                  </div>
+                </div>
+                <div className="flex items-center">
+                  {!restTimerStart ? (
+                    <div className="relative flex items-center">
+                      <select 
+                        value={selectedRestMinute}
+                        onChange={(e) => setSelectedRestMinute(Number(e.target.value))} 
+                        className="appearance-none bg-slate-800/80 text-slate-200 font-bold text-sm py-2 pl-3 pr-7 rounded-l-xl border border-slate-600 focus:outline-none h-[40px]"
+                      >
+                        <option value={0}>UP</option>
+                        {[1,2,3,4,5].map(m => <option key={m} value={m}>{m}分</option>)}
+                      </select>
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">▼</div>
+                    </div>
+                  ) : (
+                    <div className="bg-slate-800/80 flex items-center justify-center h-[40px] px-3 rounded-l-xl border border-slate-600 border-r-0">
+                       <span className={`text-lg font-mono font-bold ${restDuration === 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatRestTime(restTimeLeft)}</span>
+                    </div>
+                  )}
+                  <button 
+                    onClick={() => restTimerStart ? cancelRestTimer() : startRestTimer(selectedRestMinute)} 
+                    className={`flex items-center justify-center h-[40px] px-4 rounded-r-xl border transition-colors ${restTimerStart ? 'bg-rose-500/20 border-rose-500 text-rose-400 hover:bg-rose-500/30' : 'bg-slate-700/80 border-slate-600 text-emerald-400 hover:bg-slate-600 border-l-0'}`}
+                  >
+                     {restTimerStart ? <X size={18} /> : <Play size={18} fill="currentColor" />}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -6092,7 +6161,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 23:02, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 23:12, updated)</p>
       </div>
     </div>
   );
