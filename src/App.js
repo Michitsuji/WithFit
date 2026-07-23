@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus, EyeOff, Bell, Download, CheckCircle, Handshake, MessageCircle, Send, Volume2, VolumeX, Music, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus, EyeOff, Bell, Download, CheckCircle, Handshake, MessageCircle, Send, Volume2, VolumeX, Music, ChevronLeft, ChevronRight } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy, getDocs, where } from 'firebase/firestore';
@@ -1712,16 +1712,10 @@ export default function App() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-       alarmAudio.current = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
+       alarmAudio.current = new Audio('https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg');
        alarmAudio.current.loop = true;
     }
   }, []);
-
-  useEffect(() => {
-    if (alarmAudio.current) {
-       alarmAudio.current.volume = myInfo?.alarmVolume ?? 1.0;
-    }
-  }, [myInfo?.alarmVolume]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -3214,7 +3208,6 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
   const [notifyPost, setNotifyPost] = useState(userInfo?.notifyPost !== false);
   const [notifyComment, setNotifyComment] = useState(userInfo?.notifyComment !== false);
   const [notifyLike, setNotifyLike] = useState(userInfo?.notifyLike !== false);
-  const [alarmVolume, setAlarmVolume] = useState(userInfo?.alarmVolume ?? 1.0);
 
   const [cropImageSrc, setCropImageSrc] = useState(null);
   const [cropScale, setCropScale] = useState(1);
@@ -3322,7 +3315,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
   };
 
   const handleSave = () => {
-    onSave({ displayName: displayName.trim() || currentUser, photoUrl, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null, hideBodyMetrics, enablePartnerFeature, notifyPost, notifyComment, notifyLike, alarmVolume });
+    onSave({ displayName: displayName.trim() || currentUser, photoUrl, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null, hideBodyMetrics, enablePartnerFeature, notifyPost, notifyComment, notifyLike });
   };
 
   if (cropImageSrc) {
@@ -3441,23 +3434,6 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
             <div className="text-right text-xs text-slate-400 dark:text-slate-500 mt-1">{goal.length} / 100</div>
           </div>
           
-          <div>
-            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">タイマー音量</label>
-            <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex items-center gap-3">
-               <VolumeX size={18} className="text-slate-400 shrink-0" />
-               <input type="range" min="0" max="1" step="0.1" value={alarmVolume} onChange={e => {
-                  const val = Number(e.target.value);
-                  setAlarmVolume(val);
-                  if(typeof window !== 'undefined') {
-                     const testAudio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
-                     testAudio.volume = val;
-                     testAudio.play().catch(()=>{});
-                  }
-               }} className="flex-1 accent-emerald-500" />
-               <Volume2 size={18} className="text-emerald-500 shrink-0" />
-            </div>
-          </div>
-
           <div>             
             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">プッシュ通知設定</label>
           <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
@@ -5337,25 +5313,17 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
              </div>
           )}
 
-          <form onSubmit={handleAddGym} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm mb-6">
+          <div>
+             <input type="text" value={gymSearchQuery} onChange={e => setGymSearchQuery(e.target.value)} placeholder="ジムの名前で検索..." className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 shadow-sm" style={{ fontSize: '16px' }} />
+          </div>
+
+          <form onSubmit={handleAddGym} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm">
             <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">新しいジムグループを作成</h3>
             <div className="flex gap-2">
               <input type="text" value={newGymName} onChange={e => setNewGymName(e.target.value)} required placeholder="例: ビークイック八幡" className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/>
               <button type="submit" disabled={isAdding || !newGymName.trim()} className="bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold px-4 rounded-xl transition-colors disabled:opacity-50">作成</button>
             </div>
           </form>
-
-          <div className="relative mb-4">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search size={18} className="text-slate-400" />
-            </div>
-            <input type="text" value={gymSearchQuery} onChange={e => setGymSearchQuery(e.target.value)} placeholder="ジムの名前で検索..." className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-10 py-3 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 shadow-sm" style={{ fontSize: '16px' }} />
-            {gymSearchQuery && (
-              <button onClick={() => setGymSearchQuery('')} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                <X size={18} />
-              </button>
-            )}
-          </div>
 
           {joinedGymsList.length > 0 && (
             <div>
@@ -5469,6 +5437,9 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
             <div className="text-center py-8"><p className="text-slate-500 dark:text-slate-400 text-sm mb-4 font-bold">先に「参加中のジム」タブから所属するジムを決定してください。</p></div>
           ) : ( 
             <>
+              <div>
+                 <input type="text" value={exerciseSearchQuery} onChange={e => setExerciseSearchQuery(e.target.value)} placeholder="種目の名前で検索..." className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 shadow-sm" style={{ fontSize: '16px' }} />
+              </div>
               {editingExId ? (
                 <form onSubmit={handleUpdateExercise} className="bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-900 rounded-2xl p-4 shadow-sm relative animate-in slide-in-from-top-4">
                   <h3 className="text-sm font-bold text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2"><Edit2 size={16}/> 種目の編集</h3>
@@ -5573,18 +5544,6 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                   </div>
                 </form>
               )}
-
-              <div className="relative mb-4 mt-6">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search size={18} className="text-slate-400" />
-                </div>
-                <input type="text" value={exerciseSearchQuery} onChange={e => setExerciseSearchQuery(e.target.value)} placeholder="種目の名前で検索..." className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-10 py-3 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 shadow-sm" style={{ fontSize: '16px' }} />
-                {exerciseSearchQuery && (
-                  <button onClick={() => setExerciseSearchQuery('')} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                    <X size={18} />
-                  </button>
-                )}
-              </div>
 
               <div>
                 <div className="flex flex-col mb-3 ml-1 gap-2">
@@ -6230,7 +6189,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.24, 00:01, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 23:53, updated)</p>
       </div>
     </div>
   );
