@@ -1694,11 +1694,10 @@ export default function App() {
   const [pushPromptType, setPushPromptType] = useState('request');
   const [osPermission, setOsPermission] = useState('default');
 
-  const [timerActive, setTimerActive] = useState(false);
-  const [timerStartTs, setTimerStartTs] = useState(null);
-  const [timerEndTs, setTimerEndTs] = useState(null);
-  const [timerDisplaySec, setTimerDisplaySec] = useState(0);
-  const [isAlarming, setIsAlarming] = useState(false);
+  const [restDuration, setRestDuration] = useState(0);
+  const [restTimerStart, setRestTimerStart] = useState(null);
+  const [restTimeLeft, setRestTimeLeft] = useState(0);
+  const [showTimerMenu, setShowTimerMenu] = useState(false);
   const [selectedRestMinute, setSelectedRestMinute] = useState(1);
 
   const [timerState, setTimerState] = useState({ x: 'center', y: 'top', hidden: false });
@@ -1722,7 +1721,7 @@ export default function App() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-       alarmAudio.current = new Audio('https://actions.google.com/sounds/v1/alarms/medium_bell_ringing_near.ogg');
+       alarmAudio.current = new Audio('https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg');
        alarmAudio.current.loop = true;
        alarmAudio.current.volume = timerVolume;
     }
@@ -1892,6 +1891,7 @@ export default function App() {
 
   const cancelRestTimer = () => {
     stopAlarm();
+    setShowTimerMenu(false);
   };
 
   const formatRestTime = (seconds) => {
@@ -3073,12 +3073,12 @@ export default function App() {
                       {timerVolume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
                     </button>
                     {showVolumeSlider && (
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-800/95 backdrop-blur p-3 rounded-xl border border-slate-600 shadow-xl flex items-center justify-center z-50 w-32" onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()} onTouchStart={e=>e.stopPropagation()}>
-                         <input type="range" min="0" max="1" step="0.1" value={timerVolume} onChange={e => setTimerVolume(parseFloat(e.target.value))} className="w-full accent-emerald-500 cursor-pointer" />
+                      <div className={`absolute left-1/2 -translate-x-1/2 bg-slate-800/95 backdrop-blur p-3 rounded-xl border border-slate-600 shadow-xl flex items-center justify-center z-50 w-32 ${timerState.y === 'top' ? 'top-full mt-2' : 'bottom-full mb-2'}`} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()} onTouchStart={e=>e.stopPropagation()}>
+                         <input type="range" min="0" max="1" step="0.01" value={timerVolume} onChange={e => { const newVol = parseFloat(e.target.value); setTimerVolume(newVol); if (alarmAudio.current) alarmAudio.current.volume = newVol; }} className="w-full accent-emerald-500 cursor-pointer" />
                       </div>
                     )}
                   </div>
-                  {!timerActive ? (
+                  {!restTimerStart ? (
                     <div className="relative flex items-center">
                       <select 
                         value={selectedRestMinute}
@@ -3092,18 +3092,18 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="bg-slate-800/80 flex items-center justify-center h-[40px] px-3 rounded-l-xl border border-slate-600 border-r-0 min-w-[70px]">
-                       {isAlarming ? (
+                       {isAlarmRinging ? (
                           <span className="text-sm font-bold text-rose-400 animate-pulse flex items-center gap-1"><Bell size={14} /> TIME UP!</span>
                        ) : (
-                          <span className={`text-lg font-mono font-bold ${!timerEndTs ? 'text-emerald-400' : 'text-rose-400'}`}>{formatRestTime(timerDisplaySec)}</span>
+                          <span className={`text-lg font-mono font-bold ${restDuration === 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatRestTime(restTimeLeft)}</span>
                        )}
                     </div>
                   )}
                   <button 
-                    onClick={() => isAlarming ? stopAlarm() : timerActive ? cancelRestTimer() : startRestTimer(selectedRestMinute)} 
-                    className={`flex items-center justify-center h-[40px] px-4 rounded-r-xl border transition-colors ${timerActive ? 'bg-rose-500/20 border-rose-500 text-rose-400 hover:bg-rose-500/30' : 'bg-slate-700/80 border-slate-600 text-emerald-400 hover:bg-slate-600 border-l-0'}`}
+                    onClick={() => isAlarmRinging ? stopAlarm() : restTimerStart ? cancelRestTimer() : startRestTimer(selectedRestMinute)} 
+                    className={`flex items-center justify-center h-[40px] px-4 rounded-r-xl border transition-colors ${restTimerStart ? 'bg-rose-500/20 border-rose-500 text-rose-400 hover:bg-rose-500/30' : 'bg-slate-700/80 border-slate-600 text-emerald-400 hover:bg-slate-600 border-l-0'}`}
                   >
-                     {timerActive ? <X size={18} /> : <Play size={18} fill="currentColor" />}
+                     {restTimerStart ? <X size={18} /> : <Play size={18} fill="currentColor" />}
                   </button>
                 </div>
               </div>
@@ -6241,7 +6241,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.24, 00:12, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.24, 00:17, updated)</p>
       </div>
     </div>
   );
