@@ -1694,10 +1694,11 @@ export default function App() {
   const [pushPromptType, setPushPromptType] = useState('request');
   const [osPermission, setOsPermission] = useState('default');
 
-  const [restDuration, setRestDuration] = useState(0);
-  const [restTimerStart, setRestTimerStart] = useState(null);
-  const [restTimeLeft, setRestTimeLeft] = useState(0);
-  const [showTimerMenu, setShowTimerMenu] = useState(false);
+  const [timerActive, setTimerActive] = useState(false);
+  const [timerStartTs, setTimerStartTs] = useState(null);
+  const [timerEndTs, setTimerEndTs] = useState(null);
+  const [timerDisplaySec, setTimerDisplaySec] = useState(0);
+  const [isAlarming, setIsAlarming] = useState(false);
   const [selectedRestMinute, setSelectedRestMinute] = useState(1);
 
   const [timerState, setTimerState] = useState({ x: 'center', y: 'top', hidden: false });
@@ -1891,7 +1892,6 @@ export default function App() {
 
   const cancelRestTimer = () => {
     stopAlarm();
-    setShowTimerMenu(false);
   };
 
   const formatRestTime = (seconds) => {
@@ -3078,7 +3078,7 @@ export default function App() {
                       </div>
                     )}
                   </div>
-                  {!restTimerStart ? (
+                  {!timerActive ? (
                     <div className="relative flex items-center">
                       <select 
                         value={selectedRestMinute}
@@ -3092,18 +3092,18 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="bg-slate-800/80 flex items-center justify-center h-[40px] px-3 rounded-l-xl border border-slate-600 border-r-0 min-w-[70px]">
-                       {isAlarmRinging ? (
+                       {isAlarming ? (
                           <span className="text-sm font-bold text-rose-400 animate-pulse flex items-center gap-1"><Bell size={14} /> TIME UP!</span>
                        ) : (
-                          <span className={`text-lg font-mono font-bold ${restDuration === 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatRestTime(restTimeLeft)}</span>
+                          <span className={`text-lg font-mono font-bold ${!timerEndTs ? 'text-emerald-400' : 'text-rose-400'}`}>{formatRestTime(timerDisplaySec)}</span>
                        )}
                     </div>
                   )}
                   <button 
-                    onClick={() => isAlarmRinging ? stopAlarm() : restTimerStart ? cancelRestTimer() : startRestTimer(selectedRestMinute)} 
-                    className={`flex items-center justify-center h-[40px] px-4 rounded-r-xl border transition-colors ${restTimerStart ? 'bg-rose-500/20 border-rose-500 text-rose-400 hover:bg-rose-500/30' : 'bg-slate-700/80 border-slate-600 text-emerald-400 hover:bg-slate-600 border-l-0'}`}
+                    onClick={() => isAlarming ? stopAlarm() : timerActive ? cancelRestTimer() : startRestTimer(selectedRestMinute)} 
+                    className={`flex items-center justify-center h-[40px] px-4 rounded-r-xl border transition-colors ${timerActive ? 'bg-rose-500/20 border-rose-500 text-rose-400 hover:bg-rose-500/30' : 'bg-slate-700/80 border-slate-600 text-emerald-400 hover:bg-slate-600 border-l-0'}`}
                   >
-                     {restTimerStart ? <X size={18} /> : <Play size={18} fill="currentColor" />}
+                     {timerActive ? <X size={18} /> : <Play size={18} fill="currentColor" />}
                   </button>
                 </div>
               </div>
@@ -6241,7 +6241,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.24, 00:06, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.24, 00:12, updated)</p>
       </div>
     </div>
   );
