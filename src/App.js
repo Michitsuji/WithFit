@@ -580,7 +580,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
        const wNum = Number(weight);
        if (wNum > 0 && currentReps > 0) {
           const rm = Math.round((wNum * (1 + currentReps / 40)) * 10) / 10;
-          rmTextNode = <span className="text-[9px] text-slate-400 font-bold shrink-0 ml-1 text-right w-[42px]">1RM<br/>{rm}kg</span>;
+          rmTextNode = <div className="text-[10px] text-slate-400 font-bold w-full text-center mt-0.5">推定1RM: {rm}kg</div>;
        }
     }
 
@@ -590,8 +590,8 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
           {label}
         </span>
         {isLR ? (
-           <div className="flex-1 flex justify-between items-center px-1 min-w-0">
-             <div className="flex-1 flex justify-center items-center gap-1.5 sm:gap-2">
+           <div className="flex-1 flex flex-col justify-center items-center px-1 min-w-0">
+             <div className="flex justify-center items-center gap-1.5 sm:gap-2 w-full">
                <div className="flex flex-col items-end min-w-[50px] sm:min-w-[60px]">
                  <div className="flex items-baseline gap-0.5">
                    <span className="font-bold text-[15px] sm:text-base tracking-wide text-slate-800 dark:text-slate-100">{displayWeight}</span>
@@ -612,8 +612,8 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
              {rmTextNode}
            </div>
         ) : (
-           <div className="flex-1 flex justify-between items-center px-1 min-w-0">
-             <div className="flex-1 flex justify-center items-center gap-2 sm:gap-3">
+           <div className="flex-1 flex flex-col justify-center items-center px-1 min-w-0">
+             <div className="flex justify-center items-center gap-2 sm:gap-3 w-full">
                <div className="flex flex-col items-end min-w-[50px] sm:min-w-[60px]">
                  <div className="flex items-baseline gap-0.5">
                    <span className="font-bold text-[15px] sm:text-base tracking-wide text-slate-800 dark:text-slate-100">{displayWeight}</span>
@@ -6092,7 +6092,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 22:59, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 23:02, updated)</p>
       </div>
     </div>
   );
