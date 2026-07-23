@@ -314,8 +314,11 @@ function SimpleChart({ data, color, title }) {
   );
   const values = data.map(d => d.value).filter(v => !isNaN(v));
   if (values.length === 0) return null;
-  const min = Math.min(...values) * 0.98;
-  const max = Math.max(...values) * 1.02;
+  const minVal = Math.min(...values);
+  const maxVal = Math.max(...values);
+  const padding = (maxVal - minVal) === 0 ? (minVal === 0 ? 1 : minVal * 0.1) : (maxVal - minVal) * 0.2;
+  const min = Math.max(0, minVal - padding);
+  const max = maxVal + padding;
   const range = max - min === 0 ? 1 : max - min;
   const width = 300, height = 100;
   const points = data.map((d, i) => {
@@ -327,8 +330,18 @@ function SimpleChart({ data, color, title }) {
   return (
     <div className="w-full bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
       <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-6 flex items-center gap-2"><Activity size={16} className="text-slate-400"/> {title}</h4>
-      <div className="relative h-40 w-full pt-4 pl-2 pr-2">
-        <svg viewBox={`-10 -20 ${width + 20} ${height + 60}`} className="w-full h-full overflow-visible">
+      <div className="relative h-48 w-full pt-4 pl-8 pr-4">
+        <svg viewBox={`0 -10 ${width} ${height + 40}`} className="w-full h-full overflow-visible">
+          {[0, 0.5, 1].map(tick => {
+             const y = height - tick * height;
+             const val = (min + range * tick).toFixed(1);
+             return (
+               <g key={tick}>
+                 <line x1="0" y1={y} x2={width} y2={y} stroke="currentColor" className="text-slate-200 dark:text-slate-800" strokeWidth="1" strokeDasharray="4 4" />
+                 <text x="-8" y={y + 4} fontSize="10" fill="currentColor" textAnchor="end" className="text-slate-400">{val}</text>
+               </g>
+             );
+          })}
           <polyline points={points} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
           {data.map((d, i) => {
             const x = (i / (data.length - 1 || 1)) * width;
@@ -1635,6 +1648,88 @@ export default function App() {
   const [pushPromptType, setPushPromptType] = useState('request');
   const [osPermission, setOsPermission] = useState('default');
 
+  const [restDuration, setRestDuration] = useState(0);
+  const [restTimerStart, setRestTimerStart] = useState(null);
+  const [restTimeLeft, setRestTimeLeft] = useState(0);
+  const [showTimerMenu, setShowTimerMenu] = useState(false);
+
+  const playSilent = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.001);
+    } catch(e) {}
+  };
+
+  const playBeep = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const playTone = (freq, startTime, duration) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + startTime);
+        gain.gain.setValueAtTime(1, ctx.currentTime + startTime);
+        osc.start(ctx.currentTime + startTime);
+        osc.stop(ctx.currentTime + startTime + duration);
+      };
+      playTone(880, 0, 0.1);
+      playTone(880, 0.2, 0.1);
+      playTone(880, 0.4, 0.4);
+    } catch (e) {
+      console.warn('AudioContext not supported');
+    }
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate([200, 100, 200, 100, 400]);
+    }
+  };
+
+  useEffect(() => {
+    if (!restTimerStart || restDuration === 0) return;
+    const interval = setInterval(() => {
+       const elapsed = Math.floor((Date.now() - restTimerStart) / 1000);
+       const left = restDuration - elapsed;
+       if (left <= 0) {
+          setRestTimeLeft(0);
+          playBeep();
+          setRestTimerStart(null);
+          setRestDuration(0);
+          clearInterval(interval);
+       } else {
+          setRestTimeLeft(left);
+       }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [restTimerStart, restDuration]);
+
+  const startRestTimer = (minutes) => {
+    playSilent();
+    setRestDuration(minutes * 60);
+    setRestTimeLeft(minutes * 60);
+    setRestTimerStart(Date.now());
+    setShowTimerMenu(false);
+  };
+
+  const cancelRestTimer = () => {
+    setRestTimerStart(null);
+    setRestDuration(0);
+    setRestTimeLeft(0);
+    setShowTimerMenu(false);
+  };
+
+  const formatRestTime = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
   useEffect(() => {
     const checkPermission = () => {
       if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -2761,7 +2856,38 @@ export default function App() {
         )}
       </header>
 
-      <main className="p-4 max-w-md mx-auto w-full pb-40">
+      {myInfo?.isTraining && (
+        <div className="fixed top-[76px] left-0 right-0 z-40 px-4 max-w-md mx-auto pointer-events-none">
+          <div className="bg-slate-900/95 backdrop-blur-sm rounded-2xl p-4 shadow-lg text-white flex justify-between items-center pointer-events-auto border border-slate-700">
+            <div>
+              <div className="text-xs text-slate-400 font-bold mb-1 flex items-center gap-1"><MapPin size={12}/> {allGyms.find(g => g.id === myInfo.currentGymId)?.name || 'トレーニング中'}</div>
+              <div className="text-2xl text-emerald-400 flex items-center gap-2"><Clock size={20} className="animate-pulse" /> <TimerDisplay startTime={myInfo.trainingStartTime} /></div>
+            </div>
+            <div className="relative">
+              <button onClick={() => restTimerStart ? cancelRestTimer() : setShowTimerMenu(!showTimerMenu)} className={`flex flex-col items-center justify-center w-14 h-14 rounded-full border-2 transition-colors ${restTimerStart ? 'bg-rose-500/20 border-rose-500 text-rose-400' : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'}`}>
+                 <Clock size={18} className={restTimerStart ? 'animate-pulse' : ''} />
+                 <span className="text-[10px] font-bold mt-0.5">{restTimerStart ? formatRestTime(restTimeLeft) : 'レスト'}</span>
+              </button>
+              {showTimerMenu && !restTimerStart && (
+                 <div className="absolute top-full mt-2 right-0 bg-slate-800 border border-slate-700 rounded-xl p-2 shadow-xl flex flex-col gap-2 z-50 animate-in fade-in zoom-in-95">
+                   <div className="flex gap-2">
+                     {[1, 2, 3].map(min => (
+                       <button key={min} onClick={() => startRestTimer(min)} className="w-10 h-10 rounded-full bg-slate-700 text-white font-bold text-sm hover:bg-emerald-500 transition-colors">{min}分</button>
+                     ))}
+                   </div>
+                   <div className="flex gap-2 justify-center">
+                     {[4, 5].map(min => (
+                       <button key={min} onClick={() => startRestTimer(min)} className="w-10 h-10 rounded-full bg-slate-700 text-white font-bold text-sm hover:bg-emerald-500 transition-colors">{min}分</button>
+                     ))}
+                   </div>
+                 </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <main className={`p-4 max-w-md mx-auto w-full pb-40 ${myInfo?.isTraining ? 'pt-28' : ''}`}>
         {!myInfo?.googleUid && (
           <div className="bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 px-4 py-3 rounded-2xl border border-rose-200 dark:border-rose-900/60 font-bold text-xs mb-6 flex justify-between items-center shadow-sm">
              <div className="flex items-center gap-1.5 min-w-0">
@@ -3807,71 +3933,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const joinedGyms = myInfo.joinedGyms || ['common'];
   const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (gyms.filter(g => joinedGyms.includes(g.id) && g.id !== 'common')[0]?.id || ''));
   const [showReorderModal, setShowReorderModal] = useState(false);
-  const [restDuration, setRestDuration] = useState(0);
-  const [restTimerStart, setRestTimerStart] = useState(null);
-  const [restTimeLeft, setRestTimeLeft] = useState(0);
-  const [showTimerMenu, setShowTimerMenu] = useState(false);
   const [showProgramModal, setShowProgramModal] = useState(false);
-
-  const playBeep = () => {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const playTone = (freq, startTime, duration) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, ctx.currentTime + startTime);
-        gain.gain.setValueAtTime(1, ctx.currentTime + startTime);
-        osc.start(ctx.currentTime + startTime);
-        osc.stop(ctx.currentTime + startTime + duration);
-      };
-      playTone(880, 0, 0.1);
-      playTone(880, 0.2, 0.1);
-      playTone(880, 0.4, 0.4);
-    } catch (e) {
-      console.warn('AudioContext not supported');
-    }
-  };
-
-  useEffect(() => {
-    if (!restTimerStart || restDuration === 0) return;
-    const interval = setInterval(() => {
-       const elapsed = Math.floor((Date.now() - restTimerStart) / 1000);
-       const left = restDuration - elapsed;
-       if (left <= 0) {
-          setRestTimeLeft(0);
-          playBeep();
-          setRestTimerStart(null);
-          setRestDuration(0);
-          clearInterval(interval);
-       } else {
-          setRestTimeLeft(left);
-       }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [restTimerStart, restDuration]);
-
-  const startRestTimer = (minutes) => {
-    setRestDuration(minutes * 60);
-    setRestTimeLeft(minutes * 60);
-    setRestTimerStart(Date.now());
-    setShowTimerMenu(false);
-  };
-
-  const cancelRestTimer = () => {
-    setRestTimerStart(null);
-    setRestDuration(0);
-    setRestTimeLeft(0);
-    setShowTimerMenu(false);
-  };
-
-  const formatRestTime = (seconds) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bodyWeight, setBodyWeight] = useState('');
@@ -4302,35 +4364,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      {!isManual ? (
-        <div className="bg-slate-900 rounded-2xl p-4 shadow-lg text-white flex justify-between items-center sticky top-[72px] z-10">
-          <div>
-            <div className="text-xs text-slate-400 font-bold mb-1 flex items-center gap-1"><MapPin size={12}/> {gyms.find(g => g.id === selectedGymId)?.name || 'トレーニング中'}</div>
-            <div className="text-2xl text-emerald-400 flex items-center gap-2"><Clock size={20} className={!isSubmitting ? "animate-pulse" : ""} /> <TimerDisplay startTime={myInfo.trainingStartTime} isStopped={isSubmitting} /></div>
-            <div className="text-xs text-slate-400 font-bold mt-1">{formatTimeFromTimestamp(myInfo.trainingStartTime)} から開始</div>
-          </div>
-          <div className="relative">
-            <button onClick={() => restTimerStart ? cancelRestTimer() : setShowTimerMenu(!showTimerMenu)} className={`flex flex-col items-center justify-center w-16 h-16 rounded-full border-2 transition-colors ${restTimerStart ? 'bg-rose-500/20 border-rose-500 text-rose-400' : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'}`}>
-               <Clock size={20} className={restTimerStart ? 'animate-pulse' : ''} />
-               <span className="text-xs font-bold mt-1">{restTimerStart ? formatRestTime(restTimeLeft) : 'レスト'}</span>
-            </button>
-            {showTimerMenu && !restTimerStart && (
-               <div className="absolute top-full mt-2 right-0 bg-slate-800 border border-slate-700 rounded-xl p-2 shadow-xl flex flex-col gap-2 z-50 animate-in fade-in zoom-in-95">
-                 <div className="flex gap-2">
-                   {[1, 2, 3].map(min => (
-                     <button key={min} onClick={() => startRestTimer(min)} className="w-10 h-10 rounded-full bg-slate-700 text-white font-bold text-sm hover:bg-emerald-500 transition-colors">{min}分</button>
-                   ))}
-                 </div>
-                 <div className="flex gap-2 justify-center">
-                   {[4, 5].map(min => (
-                     <button key={min} onClick={() => startRestTimer(min)} className="w-10 h-10 rounded-full bg-slate-700 text-white font-bold text-sm hover:bg-emerald-500 transition-colors">{min}分</button>
-                   ))}
-                 </div>
-               </div>
-            )}
-          </div>
-        </div>
-      ) : (
+      {isManual && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-4">
            <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2"><CalendarIcon size={18} className="text-emerald-500"/> 過去の記録</h3>
            <div>
@@ -4737,14 +4771,25 @@ function ExerciseChartModal({ exercise, posts, accountsInfo, onClose, currentUse
      });
      
      if (min === Infinity) return <div className="p-4 text-center text-slate-500 font-bold">データがありません</div>;
-     if (min === max) { min -= 10; max += 10; }
-     
-     const range = max - min;
+     const padding = (max - min) === 0 ? (min === 0 ? 1 : min * 0.1) : (max - min) * 0.2;
+     min = Math.max(0, min - padding);
+     max = max + padding;
+     const range = max - min === 0 ? 1 : max - min;
      const colors = ['#10b981', '#6366f1', '#f43f5e', '#f59e0b', '#06b6d4'];
 
      return (
        <div className="relative w-full overflow-x-auto pb-6">
-         <svg viewBox={`-10 -20 ${width + 40} ${height + 40}`} className="w-full min-w-[300px] h-48 overflow-visible">
+         <svg viewBox={`0 -10 ${width} ${height + 40}`} className="w-full min-w-[300px] h-48 overflow-visible pl-6">
+           {[0, 0.5, 1].map(tick => {
+             const y = height - tick * height;
+             const val = Math.round(min + range * tick);
+             return (
+               <g key={tick}>
+                 <line x1="0" y1={y} x2={width} y2={y} stroke="currentColor" className="text-slate-200 dark:text-slate-800" strokeWidth="1" strokeDasharray="4 4" />
+                 <text x="-8" y={y + 4} fontSize="10" fill="currentColor" textAnchor="end" className="text-slate-400">{val}</text>
+               </g>
+             );
+           })}
            {authors.map((author, aIdx) => {
               const color = author === currentUser ? '#10b981' : colors[(aIdx + 1) % colors.length];
               const pointsData = dates.map((d, i) => {
@@ -5950,7 +5995,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 15:19, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 16:48, updated)</p>
       </div>
     </div>
   );
