@@ -3587,7 +3587,26 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
 }
 
 // --- 記録入力画面 ---
+const PROG_INFO = {
+  HPS: {
+    name: 'HPSトレーニング', weeks: 6,
+    desc: 'Hypertrophy（筋肥大）、Power（瞬発力）、Strength（筋力）の異なる刺激を週3回行うプログラム。BIG3の停滞期打破に最適です。',
+    upRate: '約2.5% 〜 5%', mult: 1.025
+  },
+  SMOLOV: {
+    name: 'Smolov Jr. (スモロフJr)', weeks: 3,
+    desc: '3週間という短期間で一気に高頻度・高ボリュームをこなし、使用重量を伸ばす非常にハードなピーキングプログラムです。',
+    upRate: '約5% 〜 10%', mult: 1.05
+  },
+  WENDLER: {
+    name: '5/3/1 プログラム', weeks: 4,
+    desc: '1RMの90%を基準(TM)とし、少しずつ着実に筋力を伸ばす長期的なプログラム。最終セットは限界まで反復(AMRAP)します。',
+    upRate: '約1.5% 〜 2.5% (1サイクル)', mult: 1.02
+  }
+};
+
 function ProgramGeneratorModal({ isOpen, onClose, onGenerate, exercises }) {
+  const [progType, setProgType] = useState('HPS');
   const [exName, setExName] = useState('ベンチプレス');
   const [oneRM, setOneRM] = useState('');
 
@@ -3598,14 +3617,17 @@ function ProgramGeneratorModal({ isOpen, onClose, onGenerate, exercises }) {
   if (!uniqueExercises.includes('スクワット')) uniqueExercises.unshift('スクワット');
   if (!uniqueExercises.includes('デッドリフト')) uniqueExercises.unshift('デッドリフト');
 
+  const info = PROG_INFO[progType];
+  const targetWeight = oneRM && !isNaN(oneRM) ? Math.round(Number(oneRM) * info.mult) : '-';
+
   const handleGenerate = () => {
     if (!oneRM || isNaN(oneRM)) { alert('現在の1RM（最大重量）を入力してください'); return; }
-    onGenerate(exName, Number(oneRM));
+    onGenerate(progType, exName, Number(oneRM));
   };
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950/40">
           <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <Target size={18} className="text-indigo-500"/> プログラム自動作成
@@ -3617,16 +3639,28 @@ function ProgramGeneratorModal({ isOpen, onClose, onGenerate, exercises }) {
         <div className="p-5 space-y-5 overflow-y-auto">
           <div>
             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">プログラムの種類</label>
-            <select disabled className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-500 dark:text-slate-400 font-bold appearance-none text-sm">
-              <option value="HPS">HPSトレーニング (全6週)</option>
-            </select>
+            <div className="relative">
+              <select value={progType} onChange={e => setProgType(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-indigo-500 text-sm">
+                <option value="HPS">HPSトレーニング (全6週・週3回)</option>
+                <option value="SMOLOV">Smolov Jr. (全3週・週4回)</option>
+                <option value="WENDLER">5/3/1プログラム (全4週・週1回)</option>
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
+            </div>
           </div>
           <div className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900 rounded-xl p-4">
-            <h4 className="text-xs font-bold text-indigo-700 dark:text-indigo-400 mb-2">HPSプログラムとは？</h4>
+            <h4 className="text-xs font-bold text-indigo-700 dark:text-indigo-400 mb-2">{info.name} とは？</h4>
             <p className="text-xs text-indigo-600/80 dark:text-indigo-300/80 leading-relaxed font-bold">
-              Hypertrophy（筋肥大）、Power（瞬発力）、Strength（筋力）の3つの異なる刺激を週3回に分けて行うプログラムです。
-              BIG3の重量を伸ばすのに非常に効果的で、停滞期（プラトー）を打破したい方におすすめです。
+              {info.desc}
             </p>
+            <div className="mt-3 pt-3 border-t border-indigo-200/50 dark:border-indigo-800/50 flex flex-col gap-1">
+              <p className="text-[10px] font-bold text-indigo-700 dark:text-indigo-400 flex justify-between">
+                <span>期待される向上率:</span> <span>{info.upRate}</span>
+              </p>
+              <p className="text-[10px] font-bold text-indigo-700 dark:text-indigo-400 flex justify-between">
+                <span>完了時の目標重量:</span> <span>{targetWeight} kg</span>
+              </p>
+            </div>
           </div>
           <div>
             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">対象の種目</label>
@@ -3647,7 +3681,7 @@ function ProgramGeneratorModal({ isOpen, onClose, onGenerate, exercises }) {
         </div>
         <div className="p-4 border-t border-slate-200 dark:border-slate-800">
           <button onClick={handleGenerate} disabled={!oneRM} className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-bold py-3.5 rounded-xl shadow-md transition-colors">
-            6週間のプログラムを作成
+            {info.weeks}週間のプログラムを作成
           </button>
         </div>
       </div>
@@ -3657,13 +3691,14 @@ function ProgramGeneratorModal({ isOpen, onClose, onGenerate, exercises }) {
 
 function ActiveProgramDisplay({ program, onApply, onToggleComplete, onDelete }) {
   const [expandedWeek, setExpandedWeek] = useState(1);
+  const [showInfo, setShowInfo] = useState(false);
 
-  // 未完了の最初の週をデフォルトで開く
   useEffect(() => {
     if (!program || !program.schedule) return;
-    for (let w = 1; w <= 6; w++) {
+    const maxWeek = PROG_INFO[program.type]?.weeks || 6;
+    for (let w = 1; w <= maxWeek; w++) {
       const weekDays = program.schedule.filter(s => s.week === w);
-      if (weekDays.some(d => !d.completed)) {
+      if (weekDays.length > 0 && weekDays.some(d => !d.completed)) {
         setExpandedWeek(w);
         break;
       }
@@ -3672,21 +3707,42 @@ function ActiveProgramDisplay({ program, onApply, onToggleComplete, onDelete }) 
 
   if (!program) return null;
 
+  const info = PROG_INFO[program.type] || PROG_INFO.HPS;
+  const maxWeek = info.weeks;
   const weeks = [];
-  for (let i = 1; i <= 6; i++) {
+  for (let i = 1; i <= maxWeek; i++) {
     weeks.push(program.schedule.filter(s => s.week === i));
   }
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
-      <div className="p-4 bg-indigo-50 dark:bg-indigo-950/40 border-b border-indigo-100 dark:border-indigo-900/50 flex justify-between items-start">
-        <div>
-          <h3 className="font-bold text-indigo-900 dark:text-indigo-100 text-base">{program.exerciseName} <span className="text-xs font-normal opacity-80 ml-1">{program.type} (全6週)</span></h3>
-          <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mt-1">基準1RM: {program.oneRM} kg</p>
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden mb-4">
+      <div className="p-4 bg-indigo-50 dark:bg-indigo-950/40 border-b border-indigo-100 dark:border-indigo-900/50">
+        <div className="flex justify-between items-start">
+          <div>
+            <h3 className="font-bold text-indigo-900 dark:text-indigo-100 text-base">
+              {program.exerciseName} 
+              <span className="text-xs font-normal opacity-80 ml-1">{info.name}</span>
+            </h3>
+            <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mt-1.5">
+              基準1RM: {program.oneRM} kg <span className="mx-1">|</span> 目標: {Math.round(program.oneRM * info.mult)} kg
+            </p>
+          </div>
+          <div className="flex gap-1">
+            <button onClick={() => setShowInfo(!showInfo)} className={`p-1.5 rounded-full transition-colors ${showInfo ? 'bg-indigo-200 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-300' : 'text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900'}`} title="プログラムの説明">
+              <AlignLeft size={16} />
+            </button>
+            <button onClick={() => onDelete(program.id)} className="p-1.5 text-indigo-400 hover:text-rose-500 rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors" title="プログラムを終了">
+              <Trash2 size={16} />
+            </button>
+          </div>
         </div>
-        <button onClick={onDelete} className="text-indigo-400 hover:text-rose-500 p-1 transition-colors" title="プログラムを終了">
-          <Trash2 size={16} />
-        </button>
+        {showInfo && (
+          <div className="mt-3 pt-3 border-t border-indigo-200/50 dark:border-indigo-800/50 animate-in fade-in">
+            <p className="text-xs font-bold text-indigo-700/90 dark:text-indigo-300/90 leading-relaxed">
+              {info.desc}
+            </p>
+          </div>
+        )}
       </div>
       <div className="divide-y divide-slate-100 dark:divide-slate-800/50">
         {weeks.map((weekDays, idx) => {
@@ -3722,11 +3778,12 @@ function ActiveProgramDisplay({ program, onApply, onToggleComplete, onDelete }) 
                           <span className={`text-sm font-bold tracking-wide ${dayData.completed ? 'text-slate-400' : 'text-slate-800 dark:text-slate-100'}`}>
                             {dayData.weight}<span className="text-[10px] font-normal mx-0.5">kg</span> x {dayData.reps}<span className="text-[10px] font-normal mx-0.5">回</span> x {dayData.sets}<span className="text-[10px] font-normal ml-0.5">Set</span>
                           </span>
+                          {dayData.isAmrap && <div className="text-[10px] font-bold text-amber-500 mt-0.5">最終セット限界まで!</div>}
                         </div>
                       </div>
                       {!dayData.completed && (
                         <div className="flex justify-end mt-1">
-                          <button onClick={() => onApply(dayData)} className="text-[11px] font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors">
+                          <button onClick={() => onApply(program, dayData)} className="text-[11px] font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors">
                             <Plus size={12}/> メニューに追加
                           </button>
                         </div>
@@ -3784,91 +3841,121 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
 
   const round25 = (val) => Math.round(val / 2.5) * 2.5;
 
-  const handleGenerateProgram = async (exerciseName, oneRM) => {
-    const schedule = [];
-    const percents = [
-      { h: 0.7, p: 0.6, s: 0.8 },
-      { h: 0.725, p: 0.6, s: 0.825 },
-      { h: 0.75, p: 0.65, s: 0.85 },
-      { h: 0.775, p: 0.65, s: 0.875 },
-      { h: 0.8, p: 0.7, s: 0.9 },
-      { h: 0.6, p: 0.5, s: 1.025 } // 6週目はPR挑戦
-    ];
-    const schemes = [
-      { hR: 8, hS: 5, pR: 3, pS: 5, sR: 3, sS: 3 },
-      { hR: 8, hS: 5, pR: 3, pS: 5, sR: 3, sS: 3 },
-      { hR: 8, hS: 5, pR: 3, pS: 5, sR: 2, sS: 3 },
-      { hR: 8, hS: 5, pR: 3, pS: 5, sR: 2, sS: 3 },
-      { hR: 8, hS: 5, pR: 3, pS: 5, sR: 1, sS: 3 },
-      { hR: 5, hS: 3, pR: 3, pS: 3, sR: 1, sS: 1 } // ディロード & MAX
-    ];
+  const activeProgramsList = myInfo.activePrograms || (myInfo.activeProgram ? [myInfo.activeProgram] : []);
 
-    for (let w = 0; w < 6; w++) {
-      schedule.push({
-         id: generateId(), week: w + 1, day: 1, type: 'Hypertrophy',
-         weight: round25(oneRM * percents[w].h), reps: schemes[w].hR, sets: schemes[w].hS, completed: false
-      });
-      schedule.push({
-         id: generateId(), week: w + 1, day: 2, type: 'Power',
-         weight: round25(oneRM * percents[w].p), reps: schemes[w].pR, sets: schemes[w].pS, completed: false
-      });
-      schedule.push({
-         id: generateId(), week: w + 1, day: 3, type: 'Strength',
-         weight: round25(oneRM * percents[w].s), reps: schemes[w].sR, sets: schemes[w].sS, completed: false
-      });
+  const handleGenerateProgram = async (progType, exerciseName, oneRM) => {
+    let schedule = [];
+
+    if (progType === 'HPS') {
+      const percents = [
+        { h: 0.7, p: 0.6, s: 0.8 },
+        { h: 0.725, p: 0.6, s: 0.825 },
+        { h: 0.75, p: 0.65, s: 0.85 },
+        { h: 0.775, p: 0.65, s: 0.875 },
+        { h: 0.8, p: 0.7, s: 0.9 },
+        { h: 0.6, p: 0.5, s: 1.025 }
+      ];
+      const schemes = [
+        { hR: 8, hS: 5, pR: 3, pS: 5, sR: 3, sS: 3 },
+        { hR: 8, hS: 5, pR: 3, pS: 5, sR: 3, sS: 3 },
+        { hR: 8, hS: 5, pR: 3, pS: 5, sR: 2, sS: 3 },
+        { hR: 8, hS: 5, pR: 3, pS: 5, sR: 2, sS: 3 },
+        { hR: 8, hS: 5, pR: 3, pS: 5, sR: 1, sS: 3 },
+        { hR: 5, hS: 3, pR: 3, pS: 3, sR: 1, sS: 1 }
+      ];
+      for (let w = 0; w < 6; w++) {
+        schedule.push({ id: generateId(), week: w + 1, day: 1, type: 'Hypertrophy', weight: round25(oneRM * percents[w].h), reps: schemes[w].hR, sets: schemes[w].hS, completed: false });
+        schedule.push({ id: generateId(), week: w + 1, day: 2, type: 'Power', weight: round25(oneRM * percents[w].p), reps: schemes[w].pR, sets: schemes[w].pS, completed: false });
+        schedule.push({ id: generateId(), week: w + 1, day: 3, type: 'Strength', weight: round25(oneRM * percents[w].s), reps: schemes[w].sR, sets: schemes[w].sS, completed: false });
+      }
+    } else if (progType === 'SMOLOV') {
+      const base = [
+        { w: 0.7, r: 6, s: 6, t: 'Day 1' },
+        { w: 0.75, r: 5, s: 7, t: 'Day 2' },
+        { w: 0.8, r: 4, s: 8, t: 'Day 3' },
+        { w: 0.85, r: 3, s: 10, t: 'Day 4' }
+      ];
+      for (let w = 0; w < 3; w++) {
+        const addKg = w * 2.5; 
+        base.forEach((d, i) => {
+           schedule.push({ id: generateId(), week: w + 1, day: i + 1, type: d.t, weight: round25(oneRM * d.w) + addKg, reps: d.r, sets: d.s, completed: false });
+        });
+      }
+    } else if (progType === 'WENDLER') {
+      const tm = oneRM * 0.9;
+      const wData = [
+        { w: 0.85, r: '5+', s: 1, t: 'メインセット' },
+        { w: 0.90, r: '3+', s: 1, t: 'メインセット' },
+        { w: 0.95, r: '1+', s: 1, t: 'メインセット' },
+        { w: 0.60, r: '5', s: 1, t: 'ディロード' }
+      ];
+      for (let w = 0; w < 4; w++) {
+        schedule.push({ id: generateId(), week: w + 1, day: 1, type: wData[w].t, weight: round25(tm * wData[w].w), reps: wData[w].r, sets: wData[w].s, completed: false, isAmrap: w !== 3 });
+      }
     }
 
     const newProgram = {
-       id: generateId(), type: 'HPS', exerciseName, oneRM, schedule, createdAt: Date.now()
+       id: generateId(), type: progType, exerciseName, oneRM, schedule, createdAt: Date.now()
     };
 
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), {
-        activeProgram: newProgram
+        activePrograms: [...activeProgramsList, newProgram],
+        activeProgram: deleteField()
       }, { merge: true });
       setShowProgramModal(false);
     } catch (e) { console.error(e); }
   };
 
-  const handleApplyProgramToMenu = (dayData) => {
-    const targetEx = availableExercises.find(ex => ex.name === myInfo.activeProgram?.exerciseName) || { category: 'その他', weightType: 'total' };
+  const handleApplyProgramToMenu = (program, dayData) => {
+    const targetEx = availableExercises.find(ex => ex.name === program.exerciseName) || { category: 'その他', weightType: 'total' };
     
-    // カテゴリが未選択なら追加する
     if (!selectedCategories.includes(targetEx.category)) {
       setSelectedCategories(prev => [...prev, targetEx.category]);
     }
 
+    const cleanReps = dayData.reps.toString().replace('+', '');
     const sets = Array.from({ length: dayData.sets }).map(() => ({
-       id: generateId(), weight: dayData.weight.toString(), reps: dayData.reps.toString(), lReps: '', rReps: ''
+       id: generateId(), weight: dayData.weight.toString(), reps: cleanReps, lReps: '', rReps: ''
     }));
+    
+    const memoText = `${PROG_INFO[program.type]?.name} W${dayData.week} - ${dayData.type}${dayData.isAmrap ? ' (最終セット限界まで!)' : ''}`;
     
     const newItem = {
        id: generateId(),
-       exerciseName: myInfo.activeProgram?.exerciseName,
+       exerciseName: program.exerciseName,
        category: targetEx.category,
        weightType: targetEx.weightType,
        isSuperSet: false, isDropSet: false, isForcedReps: false, 
-       memo: `HPS ${dayData.week}週目 - ${dayData.type}`,
+       memo: memoText,
        sets
     };
     setWorkoutItems(prev => [...prev, newItem]);
     alert("今日のメニューに追加しました！そのまま「トレーニング開始」を押して記録できます。");
   };
 
-  const handleToggleProgramComplete = async (scheduleId) => {
-    if (!myInfo.activeProgram) return;
-    const updatedSchedule = myInfo.activeProgram.schedule.map(s => s.id === scheduleId ? { ...s, completed: !s.completed } : s);
+  const handleToggleProgramComplete = async (programId, scheduleId) => {
+    const updatedPrograms = activeProgramsList.map(p => {
+      if (p.id !== programId) return p;
+      return {
+        ...p,
+        schedule: p.schedule.map(s => s.id === scheduleId ? { ...s, completed: !s.completed } : s)
+      };
+    });
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), {
-        activeProgram: { ...myInfo.activeProgram, schedule: updatedSchedule }
+        activePrograms: updatedPrograms,
+        activeProgram: deleteField()
       }, { merge: true });
     } catch (e) {}
   };
 
-  const handleDeleteProgram = async () => {
-    if (!window.confirm("現在のプログラムを終了（削除）しますか？")) return;
+  const handleDeleteProgram = async (programId) => {
+    if (!window.confirm("このプログラムを終了（削除）しますか？")) return;
+    const updatedPrograms = activeProgramsList.filter(p => p.id !== programId);
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), {
+        activePrograms: updatedPrograms,
         activeProgram: deleteField()
       }, { merge: true });
     } catch (e) {}
@@ -4126,19 +4213,21 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
                <Target size={16} className="text-indigo-500" /> プログラム管理 (β版)
             </h3>
           </div>
-          {myInfo.activeProgram ? (
+          
+          {activeProgramsList.map(prog => (
             <ActiveProgramDisplay 
-              program={myInfo.activeProgram} 
+              key={prog.id}
+              program={prog} 
               onApply={handleApplyProgramToMenu} 
-              onToggleComplete={handleToggleProgramComplete} 
-              onDelete={handleDeleteProgram} 
+              onToggleComplete={(sId) => handleToggleProgramComplete(prog.id, sId)} 
+              onDelete={() => handleDeleteProgram(prog.id)} 
             />
-          ) : (
-            <button onClick={() => setShowProgramModal(true)} className="w-full py-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm">
-              <div className="bg-indigo-50 dark:bg-indigo-950/50 p-3 rounded-full"><Target size={24} className="text-indigo-500" /></div>
-              <span className="font-bold text-sm text-slate-700 dark:text-slate-300">HPSプログラムを作成</span>
-            </button>
-          )}
+          ))}
+
+          <button onClick={() => setShowProgramModal(true)} className="w-full py-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm">
+            <div className="bg-indigo-50 dark:bg-indigo-950/50 p-3 rounded-full"><Target size={24} className="text-indigo-500" /></div>
+            <span className="font-bold text-sm text-slate-700 dark:text-slate-300">新しいプログラムを作成</span>
+          </button>
         </div>
 
         <ProgramGeneratorModal 
@@ -5617,7 +5706,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 09:58, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 10:06, updated)</p>
       </div>
     </div>
   );
