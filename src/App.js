@@ -1668,22 +1668,37 @@ export default function App() {
     };
   }, []);
 
-  const sendPushNotification = async (targetUsername, title, body, type = 'general') => {
+  const sendNotification = async (targetUsername, title, body, type = 'general', relatedPostId = null) => {
     if (!targetUsername || targetUsername === currentUser) return;
     const targetUser = accountsInfo[targetUsername];
-    if (!targetUser || !targetUser.fcmToken) return;
+    if (!targetUser) return;
 
     if (type === 'post' && targetUser.notifyPost === false) return;
     if (type === 'comment' && targetUser.notifyComment === false) return;
     if (type === 'like' && targetUser.notifyLike === false) return;
 
     try {
-      await fetch('/api/sendPush', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetToken: targetUser.fcmToken, title, body })
+      const notifId = `notif_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notifications', notifId), {
+        targetUser: targetUsername,
+        fromUser: currentUser,
+        type,
+        title,
+        message: body,
+        postId: relatedPostId,
+        timestamp: Date.now()
       });
-    } catch (e) { console.error('Push error:', e); }
+    } catch (e) { console.error('Firestore notif error:', e); }
+
+    if (targetUser.fcmToken) {
+      try {
+        await fetch('/api/sendPush', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetToken: targetUser.fcmToken, title, body })
+        });
+      } catch (e) { console.error('Push error:', e); }
+    }
   };
 
   const handleAddComment = async (postId, text, parentId = null) => {
@@ -1744,14 +1759,15 @@ export default function App() {
           const targetGymText = postData.gymName ? `（${postData.gymName}）` : '';
 
           if (isReplyTarget || isMentioned) {
-            title = '💬 メンション / 返信';
+            title = '💬 返信';
             body = `${authorName}さんがコメントであなたに返信しました: 「${text.trim()}」`;
           } else if (isPostAuthor) {
-            body = `${authorName}さんがあなたの記録${targetGymText}にコメントしました: 「${text.trim()}」`;
-          } else {
-            body = `${authorName}さんが${accountsInfo[postData.author]?.displayName || postData.author}さんの記録にコメントしました: 「${text.trim()}」`;
+            title = '💬 コメント';
+            body = `${authorName}さんがあなたの投稿${targetGymText}にコメントしました: 「${text.trim()}」`;
           }
-          sendPushNotification(userId, title, body, 'comment');
+          if (body) {
+             sendNotification(userId, title, body, 'comment', postId);
+          }
         });
       }
     } catch (e) { console.error(e); }
@@ -1793,7 +1809,7 @@ export default function App() {
         if (targetComment && targetComment.likedUsers.includes(currentUser) && targetComment.author !== currentUser) {
             const authorName = accountsInfo[currentUser]?.displayName || currentUser;
             const shortComment = targetComment.text.length > 15 ? targetComment.text.substring(0, 15) + '...' : targetComment.text;
-            sendPushNotification(targetComment.author, '👍 コメントにナイス！', `${authorName}さんがあなたのコメント「${shortComment}」にナイスしました！`, 'like');
+            sendNotification(targetComment.author, '👍 コメントにナイス！', `${authorName}さんがあなたのコメント「${shortComment}」にナイスしました！`, 'like', postId);
         }
       }
     } catch (e) { console.error(e); }
@@ -2158,7 +2174,7 @@ export default function App() {
       const myFriends = myInfo.friends || [];
       const authorName = myInfo.displayName || currentUser;
       myFriends.forEach(friendId => {
-        sendPushNotification(friendId, '🔥 トレーニング完了', `${authorName}さんが${gymName || 'トレーニング'}での記録を完了しました！`, 'post');
+        sendNotification(friendId, '🔥 トレーニング完了', `${authorName}さんが${gymName || 'トレーニング'}でのトレーニングを完了しました！`, 'post', newDocId);
       });
     } catch (e) { console.error("Post error:", e); }
   };
@@ -2201,7 +2217,7 @@ export default function App() {
          if (targetPost && targetPost.author !== currentUser) {
             const authorName = accountsInfo[currentUser]?.displayName || currentUser;
             const gymText = targetPost.gymName ? `（${targetPost.gymName}）` : '';
-            sendPushNotification(targetPost.author, '👍 ナイス！', `${authorName}さんがあなたのトレーニング記録${gymText}にナイスしました！`, 'like');
+            sendNotification(targetPost.author, '👍 ナイス！', `${authorName}さんがあなたの投稿${gymText}にナイスしました！`, 'like', postId);
          }
       }
     } catch (e) {}
@@ -2210,59 +2226,19 @@ export default function App() {
   const myInfo = accountsInfo[currentUser] || {};
   const allGyms = useMemo(() => [{ id: 'common', name: 'フリーウェイト', createdAt: 0 }, ...gyms], [gyms]);
 
-  const notifications = useMemo(() => {
-     if (!currentUser) return [];
-     const notifs = [];
-     const myFriends = myInfo.friends || [];
-     
-     (myInfo.friendRequests || []).forEach(req => {
-        notifs.push({
-           id: `req_${req}`, type: 'friend_request', user: req,
-           message: 'さんからフレンド申請が届きました',
-           time: Date.now()
-        });
-     });
-
-     (myInfo.partnerRequests || []).forEach(req => {
-        notifs.push({
-           id: `preq_${req}`, type: 'partner_request', user: req,
-           message: 'さんからパートナー申請が届きました',
-           time: Date.now()
-        });
-     });
-
-     const yesterday = Date.now() - 24 * 60 * 60 * 1000;
-     posts.forEach(post => {
-        if (myFriends.includes(post.author) && post.timestamp > yesterday) {
-           notifs.push({
-              id: `post_${post.id}`, type: 'workout_complete', user: post.author, postId: post.id,
-              message: 'さんがトレーニングを完了しました',
-              time: post.timestamp
-           });
-        }
-        if (post.author === currentUser && post.likes > 0) {
-           const latestLiker = (post.likedUsers && post.likedUsers.length > 0) ? post.likedUsers[post.likedUsers.length - 1] : '誰か';
-           const otherCount = post.likes - 1;
-           notifs.push({
-              id: `like_${post.id}`, type: 'like', user: latestLiker, postId: post.id,
-              message: otherCount > 0 ? `さん他${otherCount}人がいいねしました` : 'さんがいいねしました',
-              time: post.timestamp
-           });
-        }
-        if (post.author === currentUser && post.comments && post.comments.length > 0) {
-           post.comments.forEach(comment => {
-              if (comment.author !== currentUser) {
-                 notifs.push({
-                    id: `comment_${post.id}_${comment.id}`, type: 'comment', user: comment.author, postId: post.id,
-                    message: 'さんがコメントしました',
-                    time: comment.timestamp
-                 });
-              }
-           });
-        }
-     });
-     return notifs.sort((a, b) => b.time - a.time).slice(0, 10);
-  }, [currentUser, myInfo.friendRequests, myInfo.friends, posts]);
+  const [notifications, setNotifications] = useState([]);
+  useEffect(() => {
+    if (!db || !currentUser) return;
+    const notifsRef = collection(db, 'artifacts', appId, 'public', 'data', 'notifications');
+    const q = query(notifsRef, where('targetUser', '==', currentUser));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const data = [];
+      snapshot.forEach(doc => data.push({ id: doc.id, ...doc.data() }));
+      data.sort((a, b) => b.timestamp - a.timestamp);
+      setNotifications(data.slice(0, 30));
+    });
+    return () => unsub();
+  }, [db, currentUser]);
 
   const handleImportWorkout = async (post, isManual) => {
     const gym = allGyms.find(g => g.name === post.gymName);
@@ -2314,11 +2290,11 @@ export default function App() {
     }
   };
 
-  const unreadNotifs = notifications.filter(n => n.time > (myInfo.lastNotificationCheck || 0));
+  const unreadNotifs = notifications.filter(n => n.timestamp > (myInfo.lastNotificationCheck || 0));
   const unreadNotificationCount = unreadNotifs.length;
   const unreadLikes = unreadNotifs.filter(n => n.type === 'like').length;
   const unreadComments = unreadNotifs.filter(n => n.type === 'comment').length;
-  const unreadRequests = unreadNotifs.filter(n => n.type === 'friend_request' || n.type === 'partner_request').length;
+  const unreadRequests = unreadNotifs.filter(n => n.type === 'request').length;
 
   const handleOpenNotifications = () => {
     setShowNotifications(!showNotifications);
@@ -2329,12 +2305,9 @@ export default function App() {
 
   const handleNotificationClick = (notif) => {
     setShowNotifications(false);
-    if (notif.type === 'friend_request') {
+    if (notif.type === 'request') {
        setCurrentTab('friends');
-       setTargetFriendTab('friends');
-    } else if (notif.type === 'partner_request') {
-       setCurrentTab('friends');
-       setTargetFriendTab('partner');
+       setTargetFriendTab(notif.title.includes('パートナー') ? 'partner' : 'friends');
     } else if (notif.postId) {
        const targetPost = posts.find(p => p.id === notif.postId);
        if (targetPost) setFocusedPost(targetPost);
@@ -2371,7 +2344,7 @@ export default function App() {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', friendUsername), { friendRequests: [...targetRequests, currentUser] }, { merge: true });
       alert(`${accountsInfo[friendUsername]?.displayName || friendUsername}さんにフレンド申請を送信しました！`);
       const authorName = accountsInfo[currentUser]?.displayName || currentUser;
-      sendPushNotification(friendUsername, '🤝 フレンド申請', `${authorName}さんからフレンド申請が届きました`);
+      sendNotification(friendUsername, '🤝 フレンド申請', `${authorName}さんからフレンド申請が届きました`, 'request');
     } catch (e) {}
   };
 
@@ -2390,7 +2363,7 @@ export default function App() {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', partnerUsername), { partnerRequests: [...new Set([...targetRequests, currentUser])] }, { merge: true });
       alert(`${accountsInfo[partnerUsername]?.displayName || partnerUsername}さんにパートナー申請を送信しました！`);
       const authorName = accountsInfo[currentUser]?.displayName || currentUser;
-      sendPushNotification(partnerUsername, '🤝 パートナー申請', `${authorName}さんからパートナー申請が届きました`);
+      sendNotification(partnerUsername, '🤝 パートナー申請', `${authorName}さんからパートナー申請が届きました`, 'request');
     } catch (e) {}
   };
 
@@ -2404,6 +2377,8 @@ export default function App() {
       if (currentRequesterPartner) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentRequesterPartner), { partnerId: null, enablePartner: false }, { merge: true });
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { partnerId: requesterUsername, enablePartner: true, partnerRequests: myRequests.filter(u => u !== requesterUsername) }, { merge: true });
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', requesterUsername), { partnerId: currentUser, enablePartner: true, partnerRequests: (accountsInfo[requesterUsername]?.partnerRequests || []).filter(u => u !== currentUser) }, { merge: true });
+      const authorName = accountsInfo[currentUser]?.displayName || currentUser;
+      sendNotification(requesterUsername, '🤝 パートナー承認', `${authorName}さんがあなたのパートナー申請を承認しました！`, 'request');
     } catch(e) {}
   };
 
@@ -2437,6 +2412,8 @@ export default function App() {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', requesterUsername), {
         friends: [...new Set([...requesterFriends, currentUser])]
       }, { merge: true });
+      const authorName = accountsInfo[currentUser]?.displayName || currentUser;
+      sendNotification(requesterUsername, '🤝 フレンド承認', `${authorName}さんがあなたのフレンド申請を承認しました！`, 'request');
     } catch(e) {}
   };
 
@@ -2738,12 +2715,12 @@ export default function App() {
                   <div className="text-center text-xs text-slate-400 p-4">通知はありません</div>
                ) : (
                   notifications.map(notif => {
-                     const isUnread = notif.time > (myInfo.lastNotificationCheck || 0);
+                     const isUnread = notif.timestamp > (myInfo.lastNotificationCheck || 0);
                      return (
                        <div key={notif.id} onClick={() => handleNotificationClick(notif)} className={`flex gap-3 items-center p-2 rounded-xl cursor-pointer transition-colors ${isUnread ? 'bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-100/50 dark:hover:bg-emerald-950/40' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                           <div className="relative shrink-0 mt-0.5">
                              <div className="w-9 h-9 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-xs overflow-hidden border border-slate-100 dark:border-slate-800">
-                                {accountsInfo[notif.user]?.photoUrl ? <img src={accountsInfo[notif.user].photoUrl} alt="" className="w-full h-full object-cover"/> : accountsInfo[notif.user]?.displayName ? accountsInfo[notif.user].displayName.charAt(0).toUpperCase() : notif.user.charAt(0).toUpperCase()}
+                                {accountsInfo[notif.fromUser]?.photoUrl ? <img src={accountsInfo[notif.fromUser].photoUrl} alt="" className="w-full h-full object-cover"/> : accountsInfo[notif.fromUser]?.displayName ? accountsInfo[notif.fromUser].displayName.charAt(0).toUpperCase() : notif.fromUser.charAt(0).toUpperCase()}
                              </div>
                              {notif.type === 'like' && (
                                 <div className="absolute -bottom-0.5 -right-0.5 bg-rose-500 text-white w-4 h-4 rounded-full flex items-center justify-center border-[1.5px] border-white dark:border-slate-900 shadow-sm">
@@ -2758,10 +2735,9 @@ export default function App() {
                           </div>
                           <div className="flex-1 min-w-0">
                              <p className="text-xs font-bold text-slate-800 dark:text-slate-200 break-words whitespace-pre-wrap">
-                                <span className="mr-1 inline-flex">{renderUsernameWithBadge(notif.user, accountsInfo[notif.user]?.displayName, accountsInfo, "text-emerald-600 dark:text-emerald-400")}</span>
                                 {notif.message}
                              </p>
-                             <p className="text-[10px] text-slate-400 mt-0.5">{getRelativeTime(notif.time)}</p>
+                             <p className="text-[10px] text-slate-400 mt-0.5">{getRelativeTime(notif.timestamp)}</p>
                           </div>
                           {isUnread && <div className="w-2 h-2 rounded-full bg-rose-500 shrink-0"></div>}
                        </div>
@@ -5352,7 +5328,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 09:16, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 09:32, updated)</p>
       </div>
     </div>
   );
