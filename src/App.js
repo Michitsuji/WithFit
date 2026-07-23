@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus, EyeOff, Bell, Download, CheckCircle, Handshake, MessageCircle, Send, Volume2, VolumeX, Music, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus, EyeOff, Bell, Download, CheckCircle, Handshake, MessageCircle, Send, Volume2, VolumeX, Music, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy, getDocs, where } from 'firebase/firestore';
@@ -1710,12 +1710,31 @@ export default function App() {
   const [isAlarmRinging, setIsAlarmRinging] = useState(false);
   const alarmAudio = useRef(null);
 
+  const [timerVolume, setTimerVolume] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('withfit_timer_volume');
+      return saved !== null ? parseFloat(saved) : 0.5;
+    }
+    return 0.5;
+  });
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
-       alarmAudio.current = new Audio('https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg');
+       alarmAudio.current = new Audio('https://actions.google.com/sounds/v1/alarms/medium_bell_ringing_near.ogg');
        alarmAudio.current.loop = true;
+       alarmAudio.current.volume = timerVolume;
     }
   }, []);
+
+  useEffect(() => {
+    if (alarmAudio.current) {
+      alarmAudio.current.volume = timerVolume;
+    }
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('withfit_timer_volume', timerVolume.toString());
+    }
+  }, [timerVolume]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -1751,8 +1770,15 @@ export default function App() {
 
   const startRestTimer = (minutes) => {
     if (alarmAudio.current) {
-        alarmAudio.current.load();
-        alarmAudio.current.play().then(() => alarmAudio.current.pause()).catch(() => {});
+        const currentVol = alarmAudio.current.volume;
+        alarmAudio.current.volume = 0;
+        alarmAudio.current.play().then(() => {
+            alarmAudio.current.pause();
+            alarmAudio.current.currentTime = 0;
+            alarmAudio.current.volume = currentVol;
+        }).catch(() => {
+            alarmAudio.current.volume = currentVol;
+        });
     }
     setRestDuration(minutes * 60);
     setRestTimeLeft(minutes === 0 ? 0 : minutes * 60);
@@ -3042,6 +3068,16 @@ export default function App() {
                   </div>
                 </div>
                 <div className="flex items-center">
+                  <div className="relative mr-2 pointer-events-auto">
+                    <button onClick={(e) => { e.stopPropagation(); setShowVolumeSlider(!showVolumeSlider); }} className="text-slate-400 hover:text-emerald-400 p-1 transition-colors">
+                      {timerVolume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                    </button>
+                    {showVolumeSlider && (
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-800/95 backdrop-blur p-3 rounded-xl border border-slate-600 shadow-xl flex items-center justify-center z-50 w-32" onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()} onTouchStart={e=>e.stopPropagation()}>
+                         <input type="range" min="0" max="1" step="0.1" value={timerVolume} onChange={e => setTimerVolume(parseFloat(e.target.value))} className="w-full accent-emerald-500 cursor-pointer" />
+                      </div>
+                    )}
+                  </div>
                   {!restTimerStart ? (
                     <div className="relative flex items-center">
                       <select 
@@ -5306,24 +5342,32 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
       {activeTab === 'gyms' && (
         <div className="space-y-6 animate-in fade-in">
           {myFriends.length === 0 && (
-             <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900 rounded-2xl p-5 flex flex-col items-center text-center shadow-sm">
+             <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900 rounded-2xl p-5 flex flex-col items-center text-center shadow-sm mb-6">
                 <Users className="text-indigo-400 mb-2" size={28} />
                 <p className="text-sm font-bold text-indigo-700 dark:text-indigo-300 mb-3">まずはフレンドを追加して、<br/>一緒にトレーニングを共有しましょう！</p>
                 <button onClick={() => setCurrentTab('friends')} className="bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-sm transition-colors flex items-center gap-2"><UserPlus size={16}/>フレンドを追加する</button>
              </div>
           )}
 
-          <div>
-             <input type="text" value={gymSearchQuery} onChange={e => setGymSearchQuery(e.target.value)} placeholder="ジムの名前で検索..." className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 shadow-sm" style={{ fontSize: '16px' }} />
-          </div>
-
-          <form onSubmit={handleAddGym} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm">
+          <form onSubmit={handleAddGym} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm mb-6">
             <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">新しいジムグループを作成</h3>
             <div className="flex gap-2">
               <input type="text" value={newGymName} onChange={e => setNewGymName(e.target.value)} required placeholder="例: ビークイック八幡" className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 focus:border-emerald-500 focus:outline-none text-base" style={{ fontSize: '16px' }}/>
               <button type="submit" disabled={isAdding || !newGymName.trim()} className="bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold px-4 rounded-xl transition-colors disabled:opacity-50">作成</button>
             </div>
           </form>
+
+          <div className="relative mb-6">
+             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+               <Search size={18} className="text-slate-400" />
+             </div>
+             <input type="text" value={gymSearchQuery} onChange={e => setGymSearchQuery(e.target.value)} placeholder="ジムの名前で検索..." className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-10 py-3 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 shadow-sm" style={{ fontSize: '16px' }} />
+             {gymSearchQuery && (
+               <button onClick={() => setGymSearchQuery('')} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+                 <X size={18} />
+               </button>
+             )}
+          </div>
 
           {joinedGymsList.length > 0 && (
             <div>
@@ -5437,9 +5481,6 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
             <div className="text-center py-8"><p className="text-slate-500 dark:text-slate-400 text-sm mb-4 font-bold">先に「参加中のジム」タブから所属するジムを決定してください。</p></div>
           ) : ( 
             <>
-              <div>
-                 <input type="text" value={exerciseSearchQuery} onChange={e => setExerciseSearchQuery(e.target.value)} placeholder="種目の名前で検索..." className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 shadow-sm" style={{ fontSize: '16px' }} />
-              </div>
               {editingExId ? (
                 <form onSubmit={handleUpdateExercise} className="bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-900 rounded-2xl p-4 shadow-sm relative animate-in slide-in-from-top-4">
                   <h3 className="text-sm font-bold text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2"><Edit2 size={16}/> 種目の編集</h3>
@@ -5548,6 +5589,17 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
               <div>
                 <div className="flex flex-col mb-3 ml-1 gap-2">
                   <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400">登録済みの種目</h3>
+                  <div className="relative mb-1">
+                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                       <Search size={18} className="text-slate-400" />
+                     </div>
+                     <input type="text" value={exerciseSearchQuery} onChange={e => setExerciseSearchQuery(e.target.value)} placeholder="種目の名前で検索..." className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-10 py-2.5 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 shadow-sm" style={{ fontSize: '16px' }} />
+                     {exerciseSearchQuery && (
+                       <button onClick={() => setExerciseSearchQuery('')} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+                         <X size={18} />
+                       </button>
+                     )}
+                  </div>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <select value={filterGymId} onChange={e => setFilterGymId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-xs">
@@ -6189,7 +6241,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 23:53, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.24, 00:06, updated)</p>
       </div>
     </div>
   );
