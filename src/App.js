@@ -3587,12 +3587,169 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
 }
 
 // --- 記録入力画面 ---
+function ProgramGeneratorModal({ isOpen, onClose, onGenerate, exercises }) {
+  const [exName, setExName] = useState('ベンチプレス');
+  const [oneRM, setOneRM] = useState('');
+
+  if (!isOpen) return null;
+
+  const uniqueExercises = Array.from(new Set(exercises.map(ex => ex.name).filter(Boolean)));
+  if (!uniqueExercises.includes('ベンチプレス')) uniqueExercises.unshift('ベンチプレス');
+  if (!uniqueExercises.includes('スクワット')) uniqueExercises.unshift('スクワット');
+  if (!uniqueExercises.includes('デッドリフト')) uniqueExercises.unshift('デッドリフト');
+
+  const handleGenerate = () => {
+    if (!oneRM || isNaN(oneRM)) { alert('現在の1RM（最大重量）を入力してください'); return; }
+    onGenerate(exName, Number(oneRM));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950/40">
+          <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <Target size={18} className="text-indigo-500"/> プログラム自動作成
+          </h3>
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-5 space-y-5 overflow-y-auto">
+          <div>
+            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">プログラムの種類</label>
+            <select disabled className="w-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-slate-500 dark:text-slate-400 font-bold appearance-none text-sm">
+              <option value="HPS">HPSトレーニング (全6週)</option>
+            </select>
+          </div>
+          <div className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900 rounded-xl p-4">
+            <h4 className="text-xs font-bold text-indigo-700 dark:text-indigo-400 mb-2">HPSプログラムとは？</h4>
+            <p className="text-xs text-indigo-600/80 dark:text-indigo-300/80 leading-relaxed font-bold">
+              Hypertrophy（筋肥大）、Power（瞬発力）、Strength（筋力）の3つの異なる刺激を週3回に分けて行うプログラムです。
+              BIG3の重量を伸ばすのに非常に効果的で、停滞期（プラトー）を打破したい方におすすめです。
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">対象の種目</label>
+            <div className="relative">
+              <select value={exName} onChange={e => setExName(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-indigo-500 text-sm">
+                {uniqueExercises.map(name => <option key={name} value={name}>{name}</option>)}
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">現在の1RM (MAX重量)</label>
+            <div className="relative">
+              <input type="number" inputMode="decimal" value={oneRM} onChange={e => setOneRM(e.target.value)} placeholder="例: 100" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-indigo-500 text-sm" />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">kg</span>
+            </div>
+          </div>
+        </div>
+        <div className="p-4 border-t border-slate-200 dark:border-slate-800">
+          <button onClick={handleGenerate} disabled={!oneRM} className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-bold py-3.5 rounded-xl shadow-md transition-colors">
+            6週間のプログラムを作成
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActiveProgramDisplay({ program, onApply, onToggleComplete, onDelete }) {
+  const [expandedWeek, setExpandedWeek] = useState(1);
+
+  // 未完了の最初の週をデフォルトで開く
+  useEffect(() => {
+    if (!program || !program.schedule) return;
+    for (let w = 1; w <= 6; w++) {
+      const weekDays = program.schedule.filter(s => s.week === w);
+      if (weekDays.some(d => !d.completed)) {
+        setExpandedWeek(w);
+        break;
+      }
+    }
+  }, [program]);
+
+  if (!program) return null;
+
+  const weeks = [];
+  for (let i = 1; i <= 6; i++) {
+    weeks.push(program.schedule.filter(s => s.week === i));
+  }
+
+  return (
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+      <div className="p-4 bg-indigo-50 dark:bg-indigo-950/40 border-b border-indigo-100 dark:border-indigo-900/50 flex justify-between items-start">
+        <div>
+          <h3 className="font-bold text-indigo-900 dark:text-indigo-100 text-base">{program.exerciseName} <span className="text-xs font-normal opacity-80 ml-1">{program.type} (全6週)</span></h3>
+          <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mt-1">基準1RM: {program.oneRM} kg</p>
+        </div>
+        <button onClick={onDelete} className="text-indigo-400 hover:text-rose-500 p-1 transition-colors" title="プログラムを終了">
+          <Trash2 size={16} />
+        </button>
+      </div>
+      <div className="divide-y divide-slate-100 dark:divide-slate-800/50">
+        {weeks.map((weekDays, idx) => {
+          const weekNum = idx + 1;
+          const isExpanded = expandedWeek === weekNum;
+          const isWeekCompleted = weekDays.every(d => d.completed);
+
+          return (
+            <div key={weekNum} className="flex flex-col">
+              <button onClick={() => setExpandedWeek(isExpanded ? null : weekNum)} className={`p-3 flex justify-between items-center transition-colors ${isExpanded ? 'bg-slate-50 dark:bg-slate-800/50' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm font-bold ${isWeekCompleted ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-200'}`}>第 {weekNum} 週</span>
+                  {isWeekCompleted && <CheckCircle size={14} className="text-emerald-500" />}
+                </div>
+                <div className="text-slate-400">
+                  {isExpanded ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
+                </div>
+              </button>
+              {isExpanded && (
+                <div className="p-3 pt-0 space-y-2 bg-slate-50 dark:bg-slate-800/50">
+                  {weekDays.map((dayData, dIdx) => (
+                    <div key={dayData.id} className={`bg-white dark:bg-slate-900 border ${dayData.completed ? 'border-emerald-200 dark:border-emerald-800/50 opacity-60' : 'border-slate-200 dark:border-slate-700'} rounded-xl p-3 flex flex-col gap-2 transition-all`}>
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => onToggleComplete(dayData.id)} className={`w-5 h-5 rounded-full flex items-center justify-center border-2 transition-colors ${dayData.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 dark:border-slate-600 text-transparent hover:border-emerald-400'}`}>
+                            <CheckCircle size={12} fill="currentColor" />
+                          </button>
+                          <span className={`text-xs font-bold ${dayData.completed ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-200'}`}>
+                            Day {dIdx + 1}: {dayData.type}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className={`text-sm font-bold tracking-wide ${dayData.completed ? 'text-slate-400' : 'text-slate-800 dark:text-slate-100'}`}>
+                            {dayData.weight}<span className="text-[10px] font-normal mx-0.5">kg</span> x {dayData.reps}<span className="text-[10px] font-normal mx-0.5">回</span> x {dayData.sets}<span className="text-[10px] font-normal ml-0.5">Set</span>
+                          </span>
+                        </div>
+                      </div>
+                      {!dayData.completed && (
+                        <div className="flex justify-end mt-1">
+                          <button onClick={() => onApply(dayData)} className="text-[11px] font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors">
+                            <Plus size={12}/> メニューに追加
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workoutItems, setWorkoutItems, selectedCategories, setSelectedCategories, posts, currentUser, isManual, setIsManual, onActiveExerciseChange, accountsInfo }) {
   const joinedGyms = myInfo.joinedGyms || ['common'];
   const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (gyms.filter(g => joinedGyms.includes(g.id) && g.id !== 'common')[0]?.id || ''));
   const [showReorderModal, setShowReorderModal] = useState(false);
   const [restTimerStart, setRestTimerStart] = useState(null);
   const [restTimeElapsed, setRestTimeElapsed] = useState(0);
+  const [showProgramModal, setShowProgramModal] = useState(false);
 
   useEffect(() => {
     if (!restTimerStart) return;
@@ -3624,6 +3781,98 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const [manualEndTime, setManualEndTime] = useState("13:00");
 
   const [isMetricsOnlyMode, setIsMetricsOnlyMode] = useState(false);
+
+  const round25 = (val) => Math.round(val / 2.5) * 2.5;
+
+  const handleGenerateProgram = async (exerciseName, oneRM) => {
+    const schedule = [];
+    const percents = [
+      { h: 0.7, p: 0.6, s: 0.8 },
+      { h: 0.725, p: 0.6, s: 0.825 },
+      { h: 0.75, p: 0.65, s: 0.85 },
+      { h: 0.775, p: 0.65, s: 0.875 },
+      { h: 0.8, p: 0.7, s: 0.9 },
+      { h: 0.6, p: 0.5, s: 1.025 } // 6週目はPR挑戦
+    ];
+    const schemes = [
+      { hR: 8, hS: 5, pR: 3, pS: 5, sR: 3, sS: 3 },
+      { hR: 8, hS: 5, pR: 3, pS: 5, sR: 3, sS: 3 },
+      { hR: 8, hS: 5, pR: 3, pS: 5, sR: 2, sS: 3 },
+      { hR: 8, hS: 5, pR: 3, pS: 5, sR: 2, sS: 3 },
+      { hR: 8, hS: 5, pR: 3, pS: 5, sR: 1, sS: 3 },
+      { hR: 5, hS: 3, pR: 3, pS: 3, sR: 1, sS: 1 } // ディロード & MAX
+    ];
+
+    for (let w = 0; w < 6; w++) {
+      schedule.push({
+         id: generateId(), week: w + 1, day: 1, type: 'Hypertrophy',
+         weight: round25(oneRM * percents[w].h), reps: schemes[w].hR, sets: schemes[w].hS, completed: false
+      });
+      schedule.push({
+         id: generateId(), week: w + 1, day: 2, type: 'Power',
+         weight: round25(oneRM * percents[w].p), reps: schemes[w].pR, sets: schemes[w].pS, completed: false
+      });
+      schedule.push({
+         id: generateId(), week: w + 1, day: 3, type: 'Strength',
+         weight: round25(oneRM * percents[w].s), reps: schemes[w].sR, sets: schemes[w].sS, completed: false
+      });
+    }
+
+    const newProgram = {
+       id: generateId(), type: 'HPS', exerciseName, oneRM, schedule, createdAt: Date.now()
+    };
+
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), {
+        activeProgram: newProgram
+      }, { merge: true });
+      setShowProgramModal(false);
+    } catch (e) { console.error(e); }
+  };
+
+  const handleApplyProgramToMenu = (dayData) => {
+    const targetEx = availableExercises.find(ex => ex.name === myInfo.activeProgram?.exerciseName) || { category: 'その他', weightType: 'total' };
+    
+    // カテゴリが未選択なら追加する
+    if (!selectedCategories.includes(targetEx.category)) {
+      setSelectedCategories(prev => [...prev, targetEx.category]);
+    }
+
+    const sets = Array.from({ length: dayData.sets }).map(() => ({
+       id: generateId(), weight: dayData.weight.toString(), reps: dayData.reps.toString(), lReps: '', rReps: ''
+    }));
+    
+    const newItem = {
+       id: generateId(),
+       exerciseName: myInfo.activeProgram?.exerciseName,
+       category: targetEx.category,
+       weightType: targetEx.weightType,
+       isSuperSet: false, isDropSet: false, isForcedReps: false, 
+       memo: `HPS ${dayData.week}週目 - ${dayData.type}`,
+       sets
+    };
+    setWorkoutItems(prev => [...prev, newItem]);
+    alert("今日のメニューに追加しました！そのまま「トレーニング開始」を押して記録できます。");
+  };
+
+  const handleToggleProgramComplete = async (scheduleId) => {
+    if (!myInfo.activeProgram) return;
+    const updatedSchedule = myInfo.activeProgram.schedule.map(s => s.id === scheduleId ? { ...s, completed: !s.completed } : s);
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), {
+        activeProgram: { ...myInfo.activeProgram, schedule: updatedSchedule }
+      }, { merge: true });
+    } catch (e) {}
+  };
+
+  const handleDeleteProgram = async () => {
+    if (!window.confirm("現在のプログラムを終了（削除）しますか？")) return;
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), {
+        activeProgram: deleteField()
+      }, { merge: true });
+    } catch (e) {}
+  };
 
   const isTraining = myInfo.isTraining;
   const myPastPosts = posts.filter(p => p.author === currentUser);
@@ -3869,6 +4118,35 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
           </div>
 
         </div>
+        
+        {/* プログラム作成機能 */}
+        <div className="mt-6 w-full">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+               <Target size={16} className="text-indigo-500" /> プログラム管理 (β版)
+            </h3>
+          </div>
+          {myInfo.activeProgram ? (
+            <ActiveProgramDisplay 
+              program={myInfo.activeProgram} 
+              onApply={handleApplyProgramToMenu} 
+              onToggleComplete={handleToggleProgramComplete} 
+              onDelete={handleDeleteProgram} 
+            />
+          ) : (
+            <button onClick={() => setShowProgramModal(true)} className="w-full py-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col items-center justify-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm">
+              <div className="bg-indigo-50 dark:bg-indigo-950/50 p-3 rounded-full"><Target size={24} className="text-indigo-500" /></div>
+              <span className="font-bold text-sm text-slate-700 dark:text-slate-300">HPSプログラムを作成</span>
+            </button>
+          )}
+        </div>
+
+        <ProgramGeneratorModal 
+          isOpen={showProgramModal} 
+          onClose={() => setShowProgramModal(false)} 
+          onGenerate={handleGenerateProgram} 
+          exercises={exercises} 
+        />
       </div>
     );
   }
@@ -5339,7 +5617,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 09:45, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 09:58, updated)</p>
       </div>
     </div>
   );
