@@ -2174,7 +2174,18 @@ export default function App() {
       const myFriends = myInfo.friends || [];
       const authorName = myInfo.displayName || currentUser;
       myFriends.forEach(friendId => {
-        sendNotification(friendId, '🔥 トレーニング完了', `${authorName}さんが${gymName || 'トレーニング'}でのトレーニングを完了しました！`, 'post', newDocId);
+        let title = '🔥 トレーニング完了';
+        let body = `${authorName}さんが${gymName || 'トレーニング'}でのトレーニングを完了しました！`;
+
+        if (!workoutItems || workoutItems.length === 0) {
+          title = '⚖️ 体組成を記録';
+          body = `${authorName}さんが体組成データを記録しました！`;
+        } else if (manualStart) {
+          title = '📅 過去の記録を追加';
+          body = `${authorName}さんが過去のトレーニング記録（${gymName || '不明なジム'}）を追加しました！`;
+        }
+
+        sendNotification(friendId, title, body, 'post', newDocId);
       });
     } catch (e) { console.error("Post error:", e); }
   };
@@ -5328,7 +5339,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 09:32, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 09:45, updated)</p>
       </div>
     </div>
   );
