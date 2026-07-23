@@ -370,7 +370,10 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
   }, [showComments, localComments.length]);
 
   const handleReply = (username, parentId = null) => {
-    if (parentId) setReplyingToId(parentId);
+    if (parentId) {
+      setReplyingToId(parentId);
+      setExpandedThreads(prev => ({...prev, [parentId]: true}));
+    }
     if (textareaRef.current) textareaRef.current.focus();
   };
 
@@ -419,6 +422,9 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 
     if (onAddComment) {
       onAddComment(post.id, commentText, replyingToId || null);
+      if (replyingToId) {
+        setExpandedThreads(prev => ({...prev, [replyingToId]: true}));
+      }
       setCommentText('');
       setMentionQuery(null);
       setReplyingToId(null);
@@ -805,7 +811,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                      {cInfo?.photoUrl ? <img src={cInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : cInfo?.displayName ? cInfo.displayName.charAt(0).toUpperCase() : comment.author.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 group min-w-0">
-                    <div className="flex items-end gap-2">
+                    <div className="flex items-stretch gap-2">
                       <div className="bg-slate-50 dark:bg-slate-950/50 p-2.5 rounded-2xl rounded-tl-none border border-slate-100 dark:border-slate-800 relative inline-block max-w-[85%]">
                         <div className="flex items-baseline gap-2 mb-1">
                           {renderUsernameWithBadge(comment.author, cInfo?.displayName, accountsInfo, "font-bold text-xs text-slate-800 dark:text-slate-200")}
@@ -813,16 +819,20 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                         </div>
                         <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words">{renderCommentText(comment.text)}</p>
                       </div>
-                      <div className="flex flex-col items-center justify-end pb-1 shrink-0 gap-1.5">
-                        {(comment.author === currentUser || post.author === currentUser) && onDeleteComment && (
-                          <button onClick={() => handleDeleteLocalComment(comment.id)} className="p-1 text-slate-300 hover:text-rose-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                            <Trash2 size={14} />
+                      <div className="flex flex-col justify-between py-1 shrink-0">
+                        <div>
+                          {(comment.author === currentUser || post.author === currentUser) && onDeleteComment && (
+                            <button onClick={() => handleDeleteLocalComment(comment.id)} className="p-1 text-slate-300 hover:text-rose-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity -mt-1">
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                        <div className="mt-auto">
+                          <button onClick={() => handleCommentLike(comment.id)} className={`flex items-center gap-1 text-[11px] font-bold transition-colors ${isCLiked ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'}`}>
+                            <Heart size={14} fill={isCLiked ? "currentColor" : "none"} className={isCLiked ? "animate-pulse" : ""} />
+                            {cLikesCount > 0 && <span>{cLikesCount}</span>}
                           </button>
-                        )}
-                        <button onClick={() => handleCommentLike(comment.id)} className={`flex flex-col items-center gap-0.5 text-[10px] font-bold transition-colors ${isCLiked ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'}`}>
-                          <Heart size={14} fill={isCLiked ? "currentColor" : "none"} className={isCLiked ? "animate-pulse" : ""} />
-                          {cLikesCount > 0 && <span>{cLikesCount}</span>}
-                        </button>
+                        </div>
                       </div>
                     </div>
                     <div className="pl-2 mt-1">
@@ -5351,7 +5361,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 08:59, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 09:04, updated)</p>
       </div>
     </div>
   );
