@@ -2853,6 +2853,46 @@ export default function App() {
         )}
       </header>
 
+      {myInfo?.isTraining && !isRecordManual && (
+        <>
+        <div className="bg-slate-900/95 backdrop-blur-md rounded-2xl p-4 shadow-[0_10px_30px_rgba(0,0,0,0.3)] text-white flex justify-between items-center fixed top-[72px] left-4 right-4 sm:left-1/2 sm:-translate-x-1/2 sm:w-full sm:max-w-[calc(448px-2rem)] z-[60] transition-all border border-slate-700/50">
+          <div>
+            <div className="text-xs text-slate-400 font-bold mb-1 flex items-center gap-1"><MapPin size={12}/> {gyms.find(g => g.id === myInfo.currentGymId)?.name || 'トレーニング中'}</div>
+            <div className="text-2xl text-emerald-400 flex items-center gap-2"><Clock size={20} className="animate-pulse" /> <TimerDisplay startTime={myInfo.trainingStartTime} /></div>
+            <div className="text-xs text-slate-400 font-bold mt-1">{formatTimeFromTimestamp(myInfo.trainingStartTime)} から開始</div>
+          </div>
+          <div className="relative">
+            {isAlarmRinging ? (
+              <button onClick={stopAlarm} className="flex flex-col items-center justify-center w-16 h-16 rounded-full border-2 border-rose-500 bg-rose-500 text-white shadow-[0_0_15px_rgba(244,63,94,0.6)] animate-pulse">
+                 <Bell size={20} />
+                 <span className="text-xs font-bold mt-1">止める</span>
+              </button>
+            ) : (
+              <button onClick={() => { if(!restTimerStart) initAudio(); restTimerStart ? cancelRestTimer() : setShowTimerMenu(!showTimerMenu); }} className={`flex flex-col items-center justify-center w-16 h-16 rounded-full border-2 transition-colors ${restTimerStart ? 'bg-rose-500/20 border-rose-500 text-rose-400' : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'}`}>
+                 <Clock size={20} className={restTimerStart ? 'animate-pulse' : ''} />
+                 <span className="text-xs font-bold mt-1">{restTimerStart ? formatRestTime(restTimeLeft) : 'レスト'}</span>
+              </button>
+            )}
+            {showTimerMenu && !restTimerStart && !isAlarmRinging && (
+               <div className="absolute top-full mt-2 right-0 bg-slate-800 border border-slate-700 rounded-xl p-2 shadow-xl flex flex-col gap-2 z-[70] animate-in fade-in zoom-in-95">
+                 <div className="flex gap-2">
+                   {[1, 2, 3].map(min => (
+                     <button key={min} onClick={() => startRestTimer(min)} className="w-10 h-10 rounded-full bg-slate-700 text-white font-bold text-sm hover:bg-emerald-500 transition-colors">{min}分</button>
+                   ))}
+                 </div>
+                 <div className="flex gap-2 justify-center">
+                   {[4, 5].map(min => (
+                     <button key={min} onClick={() => startRestTimer(min)} className="w-10 h-10 rounded-full bg-slate-700 text-white font-bold text-sm hover:bg-emerald-500 transition-colors">{min}分</button>
+                   ))}
+                 </div>
+               </div>
+            )}
+          </div>
+        </div>
+        <div className="h-24"></div>
+        </>
+      )}
+
       <main className="p-4 max-w-md mx-auto w-full pb-40">
         {myInfo?.isTraining && !isRecordManual && (
           <div className="bg-slate-900 rounded-2xl p-4 shadow-lg text-white flex justify-between items-center sticky top-[72px] z-40 mb-6">
@@ -5981,7 +6021,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 15:36, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 15:38, updated)</p>
       </div>
     </div>
   );
