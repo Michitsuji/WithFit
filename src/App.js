@@ -2635,12 +2635,9 @@ export default function App() {
           }
           .theme-pop .bg-white, .theme-pop .bg-slate-900 {
             background-color: #ffffff !important;
-            border-color: #fbcfe8 !important;
-            border-width: 2px !important;
           }
-          .theme-pop .border-slate-200, .theme-pop .border-slate-800 {
+          .theme-pop .border-slate-200, .theme-pop .border-slate-800, .theme-pop .border-slate-100 {
             border-color: #fbcfe8 !important;
-            border-width: 2px !important;
           }
           .theme-pop .text-emerald-500, .theme-pop .text-emerald-400, .theme-pop .text-emerald-600 {
             color: #ec4899 !important;
@@ -5361,7 +5358,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 09:04, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 09:12, updated)</p>
       </div>
     </div>
   );
