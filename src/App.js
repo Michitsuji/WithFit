@@ -338,7 +338,7 @@ function SimpleChart({ data, color, title }) {
               <g key={i}>
                 <circle cx={x} cy={y} r="5" fill="currentColor" className="text-white dark:text-slate-900" stroke={color} strokeWidth="2.5" />
                 <text x={x} y={y - 12} fontSize="12" fill={color} textAnchor="middle" className="font-bold tracking-tighter">{d.value}</text>
-                {dateStr && <text x={x} y={height + 25} fontSize="10" fill="currentColor" textAnchor="middle" className="font-bold text-slate-400 dark:text-slate-500">{dateStr}</text>}
+                {dateStr && (i % Math.ceil(data.length / 5) === 0 || i === data.length - 1) && <text x={x} y={height + 25} fontSize="10" fill="currentColor" textAnchor="middle" className="font-bold text-slate-400 dark:text-slate-500">{dateStr}</text>}
               </g>
             );
           })}
@@ -1639,7 +1639,9 @@ export default function App() {
   const [restTimerStart, setRestTimerStart] = useState(null);
   const [restTimeLeft, setRestTimeLeft] = useState(0);
   const [showTimerMenu, setShowTimerMenu] = useState(false);
+  const [isAlarmRinging, setIsAlarmRinging] = useState(false);
   const audioCtxRef = useRef(null);
+  const alarmIntervalRef = useRef(null);
 
   const initAudio = () => {
      if (!audioCtxRef.current) {
@@ -1659,15 +1661,16 @@ export default function App() {
            const gain = ctx.createGain();
            osc.connect(gain);
            gain.connect(ctx.destination);
-           osc.type = 'sine';
+           osc.type = 'square';
            osc.frequency.setValueAtTime(freq, ctx.currentTime + startTime);
-           gain.gain.setValueAtTime(1, ctx.currentTime + startTime);
+           gain.gain.setValueAtTime(0.1, ctx.currentTime + startTime);
            osc.start(ctx.currentTime + startTime);
            osc.stop(ctx.currentTime + startTime + duration);
         };
-        playTone(880, 0, 0.1);
-        playTone(880, 0.2, 0.1);
-        playTone(880, 0.4, 0.4);
+        playTone(1000, 0, 0.1);
+        playTone(1000, 0.15, 0.1);
+        playTone(1000, 0.3, 0.1);
+        playTone(1000, 0.45, 0.1);
      } catch (e) { console.warn(e); }
   };
 
@@ -1678,7 +1681,11 @@ export default function App() {
         const left = restDuration - elapsed;
         if (left <= 0) {
            setRestTimeLeft(0);
+           setIsAlarmRinging(true);
            playBeep();
+           if (!alarmIntervalRef.current) {
+               alarmIntervalRef.current = setInterval(playBeep, 1000);
+           }
            setRestTimerStart(null);
            setRestDuration(0);
            clearInterval(interval);
@@ -1689,8 +1696,17 @@ export default function App() {
      return () => clearInterval(interval);
   }, [restTimerStart, restDuration]);
 
+  const stopAlarm = () => {
+      setIsAlarmRinging(false);
+      if (alarmIntervalRef.current) {
+          clearInterval(alarmIntervalRef.current);
+          alarmIntervalRef.current = null;
+      }
+  };
+
   const startRestTimer = (minutes) => {
      initAudio();
+     stopAlarm();
      setRestDuration(minutes * 60);
      setRestTimeLeft(minutes * 60);
      setRestTimerStart(Date.now());
@@ -1702,6 +1718,7 @@ export default function App() {
      setRestDuration(0);
      setRestTimeLeft(0);
      setShowTimerMenu(false);
+     stopAlarm();
   };
 
   const formatRestTime = (seconds) => {
@@ -4736,7 +4753,7 @@ function ExerciseChartModal({ exercise, posts, accountsInfo, onClose, currentUse
   const renderMultiChart = () => {
      if (dates.length === 0) return <div className="p-4 text-center text-slate-500 font-bold">データがありません</div>;
      
-     const dynamicWidth = Math.max(300, dates.length * 45);
+     const width = 300;
      const height = 150;
      let min = Infinity, max = -Infinity;
      dates.forEach(d => {
@@ -4757,13 +4774,13 @@ function ExerciseChartModal({ exercise, posts, accountsInfo, onClose, currentUse
 
      return (
        <div className="relative w-full overflow-x-auto pb-6">
-         <svg viewBox={`-20 -20 ${dynamicWidth + 40} ${height + 60}`} style={{ width: dynamicWidth, height: height + 60 }} className="min-w-full overflow-visible">
+         <svg viewBox={`-20 -20 ${width + 40} ${height + 60}`} className="w-full h-48 overflow-visible">
            {authors.map((author, aIdx) => {
               const color = author === currentUser ? '#10b981' : colors[(aIdx + 1) % colors.length];
               const pointsData = dates.map((d, i) => {
                  const val = chartDataMap[d][author];
                  if (!val) return null;
-                 const x = (i / (dates.length - 1 || 1)) * dynamicWidth;
+                 const x = (i / (dates.length - 1 || 1)) * width;
                  const y = height - ((val - min) / range) * height;
                  return { x, y, val, d, author };
               }).filter(Boolean);
@@ -4784,10 +4801,11 @@ function ExerciseChartModal({ exercise, posts, accountsInfo, onClose, currentUse
               );
            })}
            {dates.map((d, i) => {
-              const x = (i / (dates.length - 1 || 1)) * dynamicWidth;
+              if (i % Math.ceil(dates.length / 5) !== 0 && i !== dates.length - 1) return null;
+              const x = (i / (dates.length - 1 || 1)) * width;
               const dateStr = d.substring(5).replace('-', '/');
               return (
-                 <text key={d} x={x} y={height + 25} fontSize="10" fill="#94a3b8" textAnchor="end" transform={`rotate(-45 ${x} ${height + 25})`} className="font-bold">{dateStr}</text>
+                 <text key={d} x={x} y={height + 25} fontSize="10" fill="#94a3b8" textAnchor="middle" className="font-bold">{dateStr}</text>
               );
            })}
          </svg>
@@ -5963,7 +5981,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 15:28, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 15:36, updated)</p>
       </div>
     </div>
   );
