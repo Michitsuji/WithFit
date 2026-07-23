@@ -574,48 +574,64 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
       labelColorClass = 'text-purple-500 dark:text-purple-400 pl-4';
     }
 
+    let rmTextNode = null;
+    if (!isCardio && weight && wType !== 'bodyWeight') {
+       const currentReps = isLR ? Math.max(Number(lReps)||0, Number(rReps)||0) : (Number(reps)||0);
+       const wNum = Number(weight);
+       if (wNum > 0 && currentReps > 0) {
+          const rm = Math.round((wNum * (1 + currentReps / 40)) * 10) / 10;
+          rmTextNode = <span className="text-[9px] text-slate-400 font-bold shrink-0 ml-1 text-right w-[42px]">1RM<br/>{rm}kg</span>;
+       }
+    }
+
     return (
       <div className={`flex justify-between items-center border-b border-slate-200/50 dark:border-slate-800/50 pb-1.5 pt-1.5 last:border-0 ${isDrop ? 'pl-5' : ''}`}>
         <span className={`font-bold w-12 text-xs shrink-0 flex items-center ${labelColorClass}`}>
           {label}
         </span>
         {isLR ? (
-           <div className="flex-1 flex justify-center items-center px-1 gap-1.5 sm:gap-2 min-w-0">
-             <div className="flex flex-col items-end min-w-[50px] sm:min-w-[60px]">
-               <div className="flex items-baseline gap-0.5">
-                 <span className="font-bold text-[15px] sm:text-base tracking-wide text-slate-800 dark:text-slate-100">{displayWeight}</span>
-                 {weightLabel && <span className="text-[10px] font-normal text-slate-400">{weightLabel}</span>}
+           <div className="flex-1 flex justify-between items-center px-1 min-w-0">
+             <div className="flex-1 flex justify-center items-center gap-1.5 sm:gap-2">
+               <div className="flex flex-col items-end min-w-[50px] sm:min-w-[60px]">
+                 <div className="flex items-baseline gap-0.5">
+                   <span className="font-bold text-[15px] sm:text-base tracking-wide text-slate-800 dark:text-slate-100">{displayWeight}</span>
+                   {weightLabel && <span className="text-[10px] font-normal text-slate-400">{weightLabel}</span>}
+                 </div>
+                 {prBadgeWeight}
                </div>
-               {prBadgeWeight}
-             </div>
-             <span className="text-slate-300 dark:text-slate-600 font-bold px-1">×</span>
-             <div className="flex flex-col items-start min-w-[70px] sm:min-w-[80px]">
-               <div className="flex items-baseline gap-0.5">
-                 <span className="font-bold text-sm text-slate-800 dark:text-slate-100">L:{lReps||0} R:{rReps||0}</span>
-                 <span className="text-[10px] font-normal text-slate-400">回</span>
-                 {forced}
+               <span className="text-slate-300 dark:text-slate-600 font-bold px-1">×</span>
+               <div className="flex flex-col items-start min-w-[70px] sm:min-w-[80px]">
+                 <div className="flex items-baseline gap-0.5">
+                   <span className="font-bold text-sm text-slate-800 dark:text-slate-100">L:{lReps||0} R:{rReps||0}</span>
+                   <span className="text-[10px] font-normal text-slate-400">回</span>
+                   {forced}
+                 </div>
+                 {prBadgeReps}
                </div>
-               {prBadgeReps}
              </div>
+             {rmTextNode}
            </div>
         ) : (
-           <div className="flex-1 flex justify-center items-center px-1 gap-2 sm:gap-3 min-w-0">
-             <div className="flex flex-col items-end min-w-[50px] sm:min-w-[60px]">
-               <div className="flex items-baseline gap-0.5">
-                 <span className="font-bold text-[15px] sm:text-base tracking-wide text-slate-800 dark:text-slate-100">{displayWeight}</span>
-                 {weightLabel && <span className="text-[10px] font-normal text-slate-400">{weightLabel}</span>}
+           <div className="flex-1 flex justify-between items-center px-1 min-w-0">
+             <div className="flex-1 flex justify-center items-center gap-2 sm:gap-3">
+               <div className="flex flex-col items-end min-w-[50px] sm:min-w-[60px]">
+                 <div className="flex items-baseline gap-0.5">
+                   <span className="font-bold text-[15px] sm:text-base tracking-wide text-slate-800 dark:text-slate-100">{displayWeight}</span>
+                   {weightLabel && <span className="text-[10px] font-normal text-slate-400">{weightLabel}</span>}
+                 </div>
+                 {prBadgeWeight}
                </div>
-               {prBadgeWeight}
-             </div>
-             <span className="text-slate-300 dark:text-slate-600 font-bold">×</span>
-             <div className="flex flex-col items-start min-w-[50px] sm:min-w-[60px]">
-               <div className="flex items-baseline gap-0.5">
-                 <span className="font-bold text-[15px] sm:text-base tracking-wide text-slate-800 dark:text-slate-100">{reps || 0}</span>
-                 <span className="text-[10px] font-normal text-slate-400">回</span>
-                 {forced}
+               <span className="text-slate-300 dark:text-slate-600 font-bold">×</span>
+               <div className="flex flex-col items-start min-w-[50px] sm:min-w-[60px]">
+                 <div className="flex items-baseline gap-0.5">
+                   <span className="font-bold text-[15px] sm:text-base tracking-wide text-slate-800 dark:text-slate-100">{reps || 0}</span>
+                   <span className="text-[10px] font-normal text-slate-400">回</span>
+                   {forced}
+                 </div>
+                 {prBadgeReps}
                </div>
-               {prBadgeReps}
              </div>
+             {rmTextNode}
            </div>
         )}
       </div>
@@ -1708,18 +1724,22 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!restTimerStart || restDuration === 0) return;
+    if (!restTimerStart) return;
     const interval = setInterval(() => {
        const elapsed = Math.floor((Date.now() - restTimerStart) / 1000);
-       const left = restDuration - elapsed;
-       if (left <= 0) {
-          setRestTimeLeft(0);
-          playBeep();
-          setRestTimerStart(null);
-          setRestDuration(0);
-          clearInterval(interval);
+       if (restDuration === 0) {
+          setRestTimeLeft(elapsed);
        } else {
-          setRestTimeLeft(left);
+          const left = restDuration - elapsed;
+          if (left <= 0) {
+             setRestTimeLeft(0);
+             playBeep();
+             setRestTimerStart(null);
+             setRestDuration(0);
+             clearInterval(interval);
+          } else {
+             setRestTimeLeft(left);
+          }
        }
     }, 1000);
     return () => clearInterval(interval);
@@ -1728,7 +1748,7 @@ export default function App() {
   const startRestTimer = (minutes) => {
     playSilent();
     setRestDuration(minutes * 60);
-    setRestTimeLeft(minutes * 60);
+    setRestTimeLeft(minutes === 0 ? 0 : minutes * 60);
     setRestTimerStart(Date.now());
     setShowTimerMenu(false);
   };
@@ -2873,8 +2893,8 @@ export default function App() {
       </header>
 
       {myInfo?.isTraining && (
-        <div className="fixed left-0 right-0 z-40 px-4 max-w-md mx-auto pointer-events-none" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 80px)' }}>
-          <div className="bg-slate-900/95 backdrop-blur-md rounded-2xl p-3 shadow-xl text-white flex justify-between items-center pointer-events-auto border border-slate-700">
+        <div className="fixed left-0 right-0 z-40 px-4 max-w-md mx-auto pointer-events-none" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 95px)' }}>
+          <div className="bg-slate-900/90 backdrop-blur-md rounded-2xl p-3 shadow-xl text-white flex justify-between items-center pointer-events-auto border border-slate-700">
             <div className="flex flex-col items-start min-w-[70px]">
               <span className="text-[10px] text-slate-400 font-bold mb-0.5 flex items-center gap-1"><MapPin size={10}/> {allGyms.find(g => g.id === myInfo.currentGymId)?.name || 'トレーニング中'}</span>
               <div className="text-lg font-mono font-bold text-emerald-400 flex items-center gap-1">
@@ -2888,20 +2908,21 @@ export default function App() {
                   <select 
                     value={selectedRestMinute}
                     onChange={(e) => setSelectedRestMinute(Number(e.target.value))} 
-                    className="appearance-none bg-slate-800 text-slate-200 font-bold text-sm py-2 pl-3 pr-7 rounded-l-xl border border-slate-600 focus:outline-none h-[40px]"
+                    className="appearance-none bg-slate-800/80 text-slate-200 font-bold text-sm py-2 pl-3 pr-7 rounded-l-xl border border-slate-600 focus:outline-none h-[40px]"
                   >
+                    <option value={0}>UP</option>
                     {[1,2,3,4,5].map(m => <option key={m} value={m}>{m}分</option>)}
                   </select>
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">▼</div>
                 </div>
               ) : (
-                <div className="bg-slate-800 flex items-center justify-center h-[40px] px-3 rounded-l-xl border border-slate-600 border-r-0">
-                   <span className="text-lg font-mono font-bold text-rose-400">{formatRestTime(restTimeLeft)}</span>
+                <div className="bg-slate-800/80 flex items-center justify-center h-[40px] px-3 rounded-l-xl border border-slate-600 border-r-0">
+                   <span className={`text-lg font-mono font-bold ${restDuration === 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatRestTime(restTimeLeft)}</span>
                 </div>
               )}
               <button 
                 onClick={() => restTimerStart ? cancelRestTimer() : startRestTimer(selectedRestMinute)} 
-                className={`flex items-center justify-center h-[40px] px-4 rounded-r-xl border transition-colors ${restTimerStart ? 'bg-rose-500/20 border-rose-500 text-rose-400 hover:bg-rose-500/30' : 'bg-slate-700 border-slate-600 text-emerald-400 hover:bg-slate-600 border-l-0'}`}
+                className={`flex items-center justify-center h-[40px] px-4 rounded-r-xl border transition-colors ${restTimerStart ? 'bg-rose-500/20 border-rose-500 text-rose-400 hover:bg-rose-500/30' : 'bg-slate-700/80 border-slate-600 text-emerald-400 hover:bg-slate-600 border-l-0'}`}
               >
                  {restTimerStart ? <X size={18} /> : <Play size={18} fill="currentColor" />}
               </button>
@@ -6018,7 +6039,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 22:50, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 22:56, updated)</p>
       </div>
     </div>
   );
