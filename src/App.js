@@ -1196,12 +1196,27 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
       );
     }
 
+    let rmText = null;
+    if (!isCardio && currentWeight && wType !== 'bodyWeight') {
+      const currentReps = isLR ? Math.max(Number(val('lReps'))||0, Number(val('rReps'))||0) : (Number(val('reps'))||0);
+      const wNum = Number(currentWeight);
+      if (wNum > 0 && currentReps > 0) {
+        const rm = Math.round((wNum * (1 + currentReps / 40)) * 10) / 10;
+        rmText = `推定1RM: ${rm}kg`;
+      }
+    }
+
     return (
       <div className="flex-1 flex flex-col min-w-0">
          {inputContent}
-         {prevRecordText && (
-            <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold px-1 mt-1 text-right">
-               {prevRecordText}
+         {(prevRecordText || rmText) && (
+            <div className="flex justify-between items-center mt-1 px-1">
+               <div className="text-[10px] text-slate-400 font-bold">
+                  {rmText}
+               </div>
+               <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold text-right ml-auto">
+                  {prevRecordText}
+               </div>
             </div>
          )}
       </div>
@@ -1652,6 +1667,7 @@ export default function App() {
   const [restTimerStart, setRestTimerStart] = useState(null);
   const [restTimeLeft, setRestTimeLeft] = useState(0);
   const [showTimerMenu, setShowTimerMenu] = useState(false);
+  const [selectedRestMinute, setSelectedRestMinute] = useState(1);
 
   const playSilent = () => {
     try {
@@ -2857,37 +2873,44 @@ export default function App() {
       </header>
 
       {myInfo?.isTraining && (
-        <div className="fixed top-[76px] left-0 right-0 z-40 px-4 max-w-md mx-auto pointer-events-none">
-          <div className="bg-slate-900/95 backdrop-blur-sm rounded-2xl p-4 shadow-lg text-white flex justify-between items-center pointer-events-auto border border-slate-700">
-            <div>
-              <div className="text-xs text-slate-400 font-bold mb-1 flex items-center gap-1"><MapPin size={12}/> {allGyms.find(g => g.id === myInfo.currentGymId)?.name || 'トレーニング中'}</div>
-              <div className="text-2xl text-emerald-400 flex items-center gap-2"><Clock size={20} className="animate-pulse" /> <TimerDisplay startTime={myInfo.trainingStartTime} /></div>
+        <div className="fixed left-0 right-0 z-40 px-4 max-w-md mx-auto pointer-events-none" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 80px)' }}>
+          <div className="bg-slate-900/95 backdrop-blur-md rounded-2xl p-3 shadow-xl text-white flex justify-between items-center pointer-events-auto border border-slate-700">
+            <div className="flex flex-col items-start min-w-[70px]">
+              <span className="text-[10px] text-slate-400 font-bold mb-0.5 flex items-center gap-1"><MapPin size={10}/> {allGyms.find(g => g.id === myInfo.currentGymId)?.name || 'トレーニング中'}</span>
+              <div className="text-lg font-mono font-bold text-emerald-400 flex items-center gap-1">
+                <Clock size={14} className="animate-pulse" /> 
+                <TimerDisplay startTime={myInfo.trainingStartTime} />
+              </div>
             </div>
-            <div className="relative">
-              <button onClick={() => restTimerStart ? cancelRestTimer() : setShowTimerMenu(!showTimerMenu)} className={`flex flex-col items-center justify-center w-14 h-14 rounded-full border-2 transition-colors ${restTimerStart ? 'bg-rose-500/20 border-rose-500 text-rose-400' : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'}`}>
-                 <Clock size={18} className={restTimerStart ? 'animate-pulse' : ''} />
-                 <span className="text-[10px] font-bold mt-0.5">{restTimerStart ? formatRestTime(restTimeLeft) : 'レスト'}</span>
-              </button>
-              {showTimerMenu && !restTimerStart && (
-                 <div className="absolute top-full mt-2 right-0 bg-slate-800 border border-slate-700 rounded-xl p-2 shadow-xl flex flex-col gap-2 z-50 animate-in fade-in zoom-in-95">
-                   <div className="flex gap-2">
-                     {[1, 2, 3].map(min => (
-                       <button key={min} onClick={() => startRestTimer(min)} className="w-10 h-10 rounded-full bg-slate-700 text-white font-bold text-sm hover:bg-emerald-500 transition-colors">{min}分</button>
-                     ))}
-                   </div>
-                   <div className="flex gap-2 justify-center">
-                     {[4, 5].map(min => (
-                       <button key={min} onClick={() => startRestTimer(min)} className="w-10 h-10 rounded-full bg-slate-700 text-white font-bold text-sm hover:bg-emerald-500 transition-colors">{min}分</button>
-                     ))}
-                   </div>
-                 </div>
+            <div className="flex items-center">
+              {!restTimerStart ? (
+                <div className="relative flex items-center">
+                  <select 
+                    value={selectedRestMinute}
+                    onChange={(e) => setSelectedRestMinute(Number(e.target.value))} 
+                    className="appearance-none bg-slate-800 text-slate-200 font-bold text-sm py-2 pl-3 pr-7 rounded-l-xl border border-slate-600 focus:outline-none h-[40px]"
+                  >
+                    {[1,2,3,4,5].map(m => <option key={m} value={m}>{m}分</option>)}
+                  </select>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">▼</div>
+                </div>
+              ) : (
+                <div className="bg-slate-800 flex items-center justify-center h-[40px] px-3 rounded-l-xl border border-slate-600 border-r-0">
+                   <span className="text-lg font-mono font-bold text-rose-400">{formatRestTime(restTimeLeft)}</span>
+                </div>
               )}
+              <button 
+                onClick={() => restTimerStart ? cancelRestTimer() : startRestTimer(selectedRestMinute)} 
+                className={`flex items-center justify-center h-[40px] px-4 rounded-r-xl border transition-colors ${restTimerStart ? 'bg-rose-500/20 border-rose-500 text-rose-400 hover:bg-rose-500/30' : 'bg-slate-700 border-slate-600 text-emerald-400 hover:bg-slate-600 border-l-0'}`}
+              >
+                 {restTimerStart ? <X size={18} /> : <Play size={18} fill="currentColor" />}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      <main className={`p-4 max-w-md mx-auto w-full pb-40 ${myInfo?.isTraining ? 'pt-28' : ''}`}>
+      <main className="p-4 max-w-md mx-auto w-full pb-48">
         {!myInfo?.googleUid && (
           <div className="bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 px-4 py-3 rounded-2xl border border-rose-200 dark:border-rose-900/60 font-bold text-xs mb-6 flex justify-between items-center shadow-sm">
              <div className="flex items-center gap-1.5 min-w-0">
@@ -5995,7 +6018,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 16:48, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 22:50, updated)</p>
       </div>
     </div>
   );
