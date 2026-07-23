@@ -1854,9 +1854,9 @@ export default function App() {
      }
      
      if (timerState.y === 'top') {
-        transformY = 32;
+        transformY = 60;
      } else {
-        transformY = screenH - cardH - 110;
+        transformY = screenH - cardH - 100;
      }
   }
   const isHidden = timerState.hidden;
