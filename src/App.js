@@ -398,7 +398,22 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
   };
 
   const toggleThread = (threadId) => {
-    setExpandedThreads(prev => ({...prev, [threadId]: !prev[threadId]}));
+    setExpandedThreads(prev => {
+      const willExpand = !prev[threadId];
+      if (willExpand) {
+        setTimeout(() => {
+          const threadEl = document.getElementById(`thread-${threadId}`);
+          const container = commentsContainerRef.current;
+          if (threadEl && container) {
+             const scrollTarget = threadEl.offsetTop + threadEl.offsetHeight - container.clientHeight + 40;
+             if (container.scrollTop < scrollTarget) {
+                 container.scrollTo({ top: scrollTarget, behavior: 'smooth' });
+             }
+          }
+        }, 100);
+      }
+      return {...prev, [threadId]: willExpand};
+    });
   };
 
   const handleCommentChange = (e) => {
@@ -875,7 +890,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
             };
 
             return rootComments.length > 0 && (
-              <div ref={commentsContainerRef} className="space-y-3 mb-3 max-h-60 overflow-y-auto pr-1">
+              <div ref={commentsContainerRef} className="space-y-3 mb-3 max-h-60 overflow-y-auto pr-1 relative">
                 {rootComments.map(rootComment => {
                   const replies = localComments.filter(c => c.parentId === rootComment.id);
                   const isExpanded = expandedThreads[rootComment.id];
@@ -885,7 +900,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                       {renderComment(rootComment, false, rootComment.id)}
                       
                       {replies.length > 0 && (
-                        <div className="ml-10 space-y-3 border-l-2 border-slate-100 dark:border-slate-800 pl-3">
+                        <div id={`thread-${rootComment.id}`} className="ml-10 space-y-3 border-l-2 border-slate-100 dark:border-slate-800 pl-3">
                           {!isExpanded ? (
                             <button onClick={() => toggleThread(rootComment.id)} className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 hover:underline">
                               <ArrowDown size={12}/> {replies.length}件の返信を表示
@@ -1692,6 +1707,16 @@ export default function App() {
   const timerCardRef = useRef(null);
   const [screenSize, setScreenSize] = useState({ w: 0, h: 0 });
 
+  const [isAlarmRinging, setIsAlarmRinging] = useState(false);
+  const alarmAudio = useRef(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+       alarmAudio.current = new Audio('https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg');
+       alarmAudio.current.loop = true;
+    }
+  }, []);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
        setScreenSize({ w: window.innerWidth, h: window.innerHeight });
@@ -1701,46 +1726,9 @@ export default function App() {
     }
   }, []);
 
-  const playSilent = () => {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      gain.gain.value = 0;
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.001);
-    } catch(e) {}
-  };
-
-  const playBeep = () => {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const playTone = (freq, startTime, duration) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, ctx.currentTime + startTime);
-        gain.gain.setValueAtTime(1, ctx.currentTime + startTime);
-        osc.start(ctx.currentTime + startTime);
-        osc.stop(ctx.currentTime + startTime + duration);
-      };
-      playTone(880, 0, 0.1);
-      playTone(880, 0.2, 0.1);
-      playTone(880, 0.4, 0.4);
-    } catch (e) {
-      console.warn('AudioContext not supported');
-    }
-    if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate([200, 100, 200, 100, 400]);
-    }
-  };
-
   useEffect(() => {
     if (!restTimerStart) return;
+    if (isAlarmRinging) return;
     const interval = setInterval(() => {
        const elapsed = Math.floor((Date.now() - restTimerStart) / 1000);
        if (restDuration === 0) {
@@ -1749,9 +1737,9 @@ export default function App() {
           const left = restDuration - elapsed;
           if (left <= 0) {
              setRestTimeLeft(0);
-             playBeep();
-             setRestTimerStart(null);
-             setRestDuration(0);
+             setIsAlarmRinging(true);
+             if (alarmAudio.current) alarmAudio.current.play().catch(e=>console.log(e));
+             if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
              clearInterval(interval);
           } else {
              setRestTimeLeft(left);
@@ -1759,14 +1747,28 @@ export default function App() {
        }
     }, 1000);
     return () => clearInterval(interval);
-  }, [restTimerStart, restDuration]);
+  }, [restTimerStart, restDuration, isAlarmRinging]);
 
   const startRestTimer = (minutes) => {
-    playSilent();
+    if (alarmAudio.current) {
+        alarmAudio.current.load();
+        alarmAudio.current.play().then(() => alarmAudio.current.pause()).catch(() => {});
+    }
     setRestDuration(minutes * 60);
     setRestTimeLeft(minutes === 0 ? 0 : minutes * 60);
     setRestTimerStart(Date.now());
     setShowTimerMenu(false);
+  };
+
+  const stopAlarm = () => {
+    setIsAlarmRinging(false);
+    if (alarmAudio.current) {
+       alarmAudio.current.pause();
+       alarmAudio.current.currentTime = 0;
+    }
+    setRestTimerStart(null);
+    setRestDuration(0);
+    setRestTimeLeft(0);
   };
 
   const handleTimerTouchStart = (e) => {
@@ -1862,9 +1864,7 @@ export default function App() {
   const isHidden = timerState.hidden;
 
   const cancelRestTimer = () => {
-    setRestTimerStart(null);
-    setRestDuration(0);
-    setRestTimeLeft(0);
+    stopAlarm();
     setShowTimerMenu(false);
   };
 
@@ -3055,12 +3055,16 @@ export default function App() {
                       <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">▼</div>
                     </div>
                   ) : (
-                    <div className="bg-slate-800/80 flex items-center justify-center h-[40px] px-3 rounded-l-xl border border-slate-600 border-r-0">
-                       <span className={`text-lg font-mono font-bold ${restDuration === 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatRestTime(restTimeLeft)}</span>
+                    <div className="bg-slate-800/80 flex items-center justify-center h-[40px] px-3 rounded-l-xl border border-slate-600 border-r-0 min-w-[70px]">
+                       {isAlarmRinging ? (
+                          <span className="text-sm font-bold text-rose-400 animate-pulse flex items-center gap-1"><Bell size={14} /> TIME UP!</span>
+                       ) : (
+                          <span className={`text-lg font-mono font-bold ${restDuration === 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatRestTime(restTimeLeft)}</span>
+                       )}
                     </div>
                   )}
                   <button 
-                    onClick={() => restTimerStart ? cancelRestTimer() : startRestTimer(selectedRestMinute)} 
+                    onClick={() => isAlarmRinging ? stopAlarm() : restTimerStart ? cancelRestTimer() : startRestTimer(selectedRestMinute)} 
                     className={`flex items-center justify-center h-[40px] px-4 rounded-r-xl border transition-colors ${restTimerStart ? 'bg-rose-500/20 border-rose-500 text-rose-400 hover:bg-rose-500/30' : 'bg-slate-700/80 border-slate-600 text-emerald-400 hover:bg-slate-600 border-l-0'}`}
                   >
                      {restTimerStart ? <X size={18} /> : <Play size={18} fill="currentColor" />}
@@ -5073,6 +5077,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
   const [editExFreeWeightType, setEditExFreeWeightType] = useState('barbell');
   
   const [selectedExerciseForChart, setSelectedExerciseForChart] = useState(null);
+  const [exerciseSearchQuery, setExerciseSearchQuery] = useState('');
 
   const handleAddGym = async (e) => {
     e.preventDefault();
@@ -5432,6 +5437,9 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
             <div className="text-center py-8"><p className="text-slate-500 dark:text-slate-400 text-sm mb-4 font-bold">先に「参加中のジム」タブから所属するジムを決定してください。</p></div>
           ) : ( 
             <>
+              <div>
+                 <input type="text" value={exerciseSearchQuery} onChange={e => setExerciseSearchQuery(e.target.value)} placeholder="種目の名前で検索..." className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 shadow-sm" style={{ fontSize: '16px' }} />
+              </div>
               {editingExId ? (
                 <form onSubmit={handleUpdateExercise} className="bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-900 rounded-2xl p-4 shadow-sm relative animate-in slide-in-from-top-4">
                   <h3 className="text-sm font-bold text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2"><Edit2 size={16}/> 種目の編集</h3>
@@ -5564,6 +5572,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                     const gymExercises = exercises.filter(ex => {
                       if (ex.gymId !== gym.id) return false;
                       if (filterCategory !== 'all' && ex.category !== filterCategory) return false;
+                      if (exerciseSearchQuery && !ex.name.toLowerCase().includes(exerciseSearchQuery.toLowerCase())) return false;
                       if (ex.gymId === 'common') {
                          if (ex.author && ex.author !== currentUser && ex.author !== MASTER_USER) return false;
                       } else {
@@ -6180,7 +6189,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 23:45, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 23:53, updated)</p>
       </div>
     </div>
   );
