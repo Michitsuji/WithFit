@@ -3807,23 +3807,64 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const joinedGyms = myInfo.joinedGyms || ['common'];
   const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (gyms.filter(g => joinedGyms.includes(g.id) && g.id !== 'common')[0]?.id || ''));
   const [showReorderModal, setShowReorderModal] = useState(false);
+  const [restDuration, setRestDuration] = useState(0);
   const [restTimerStart, setRestTimerStart] = useState(null);
-  const [restTimeElapsed, setRestTimeElapsed] = useState(0);
+  const [restTimeLeft, setRestTimeLeft] = useState(0);
+  const [showTimerMenu, setShowTimerMenu] = useState(false);
   const [showProgramModal, setShowProgramModal] = useState(false);
 
-  useEffect(() => {
-    if (!restTimerStart) return;
-    const interval = setInterval(() => setRestTimeElapsed(Math.floor((Date.now() - restTimerStart) / 1000)), 1000);
-    return () => clearInterval(interval);
-  }, [restTimerStart]);
-
-  const toggleRestTimer = () => {
-    if (restTimerStart) {
-      setRestTimerStart(null);
-      setRestTimeElapsed(0);
-    } else {
-      setRestTimerStart(Date.now());
+  const playBeep = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const playTone = (freq, startTime, duration) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + startTime);
+        gain.gain.setValueAtTime(1, ctx.currentTime + startTime);
+        osc.start(ctx.currentTime + startTime);
+        osc.stop(ctx.currentTime + startTime + duration);
+      };
+      playTone(880, 0, 0.1);
+      playTone(880, 0.2, 0.1);
+      playTone(880, 0.4, 0.4);
+    } catch (e) {
+      console.warn('AudioContext not supported');
     }
+  };
+
+  useEffect(() => {
+    if (!restTimerStart || restDuration === 0) return;
+    const interval = setInterval(() => {
+       const elapsed = Math.floor((Date.now() - restTimerStart) / 1000);
+       const left = restDuration - elapsed;
+       if (left <= 0) {
+          setRestTimeLeft(0);
+          playBeep();
+          setRestTimerStart(null);
+          setRestDuration(0);
+          clearInterval(interval);
+       } else {
+          setRestTimeLeft(left);
+       }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [restTimerStart, restDuration]);
+
+  const startRestTimer = (minutes) => {
+    setRestDuration(minutes * 60);
+    setRestTimeLeft(minutes * 60);
+    setRestTimerStart(Date.now());
+    setShowTimerMenu(false);
+  };
+
+  const cancelRestTimer = () => {
+    setRestTimerStart(null);
+    setRestDuration(0);
+    setRestTimeLeft(0);
+    setShowTimerMenu(false);
   };
 
   const formatRestTime = (seconds) => {
@@ -3995,7 +4036,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
 
   const updateItem = (itemId, data) => { setWorkoutItems(prev => prev.map(item => item.id === itemId ? { ...item, ...data } : item)); };
   
-  const addExerciseItem = (defaultName = '') => {
+  const addExerciseItem = (insertAfterIndex = null, defaultName = '') => {
     const defaultEx = availableExercises.find(ex => ex.name === defaultName);
     const isCardio = defaultEx ? defaultEx.weightType === 'cardio' : false;
     const newItem = { 
@@ -4006,7 +4047,20 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
       isSuperSet: false, isDropSet: false, isForcedReps: false, memo: '',
       sets: [ isCardio ? { id: generateId(), distance: '', time: '', calories: '' } : { id: generateId(), weight: '', reps: '', lReps: '', rReps: '' } ] 
     };
-    setWorkoutItems([...workoutItems, newItem]);
+    if (insertAfterIndex !== null) {
+      const newItems = [...workoutItems];
+      newItems.splice(insertAfterIndex + 1, 0, newItem);
+      setWorkoutItems(newItems);
+      setTimeout(() => {
+         const container = document.getElementById('workout-items-container');
+         if (container) {
+            const cardWidth = container.children[0].offsetWidth;
+            container.scrollTo({ left: (insertAfterIndex + 1) * (cardWidth + 12), behavior: 'smooth' });
+         }
+      }, 100);
+    } else {
+      setWorkoutItems([...workoutItems, newItem]);
+    }
   };
 
   const removeExerciseItem = (itemId) => setWorkoutItems(workoutItems.filter(item => item.id !== itemId));
@@ -4249,16 +4303,32 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {!isManual ? (
-        <div className="bg-slate-900 rounded-2xl p-4 shadow-lg text-white flex justify-between items-center sticky top-20 z-10">
+        <div className="bg-slate-900 rounded-2xl p-4 shadow-lg text-white flex justify-between items-center sticky top-[72px] z-10">
           <div>
             <div className="text-xs text-slate-400 font-bold mb-1 flex items-center gap-1"><MapPin size={12}/> {gyms.find(g => g.id === selectedGymId)?.name || 'トレーニング中'}</div>
             <div className="text-2xl text-emerald-400 flex items-center gap-2"><Clock size={20} className={!isSubmitting ? "animate-pulse" : ""} /> <TimerDisplay startTime={myInfo.trainingStartTime} isStopped={isSubmitting} /></div>
             <div className="text-xs text-slate-400 font-bold mt-1">{formatTimeFromTimestamp(myInfo.trainingStartTime)} から開始</div>
           </div>
-          <button onClick={toggleRestTimer} className={`flex flex-col items-center justify-center w-16 h-16 rounded-full border-2 transition-colors ${restTimerStart ? 'bg-rose-500/20 border-rose-500 text-rose-400' : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'}`}>
-             <Clock size={20} className={restTimerStart ? 'animate-pulse' : ''} />
-             <span className="text-xs font-bold mt-1">{restTimerStart ? formatRestTime(restTimeElapsed) : 'レスト'}</span>
-          </button>
+          <div className="relative">
+            <button onClick={() => restTimerStart ? cancelRestTimer() : setShowTimerMenu(!showTimerMenu)} className={`flex flex-col items-center justify-center w-16 h-16 rounded-full border-2 transition-colors ${restTimerStart ? 'bg-rose-500/20 border-rose-500 text-rose-400' : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'}`}>
+               <Clock size={20} className={restTimerStart ? 'animate-pulse' : ''} />
+               <span className="text-xs font-bold mt-1">{restTimerStart ? formatRestTime(restTimeLeft) : 'レスト'}</span>
+            </button>
+            {showTimerMenu && !restTimerStart && (
+               <div className="absolute top-full mt-2 right-0 bg-slate-800 border border-slate-700 rounded-xl p-2 shadow-xl flex flex-col gap-2 z-50 animate-in fade-in zoom-in-95">
+                 <div className="flex gap-2">
+                   {[1, 2, 3].map(min => (
+                     <button key={min} onClick={() => startRestTimer(min)} className="w-10 h-10 rounded-full bg-slate-700 text-white font-bold text-sm hover:bg-emerald-500 transition-colors">{min}分</button>
+                   ))}
+                 </div>
+                 <div className="flex gap-2 justify-center">
+                   {[4, 5].map(min => (
+                     <button key={min} onClick={() => startRestTimer(min)} className="w-10 h-10 rounded-full bg-slate-700 text-white font-bold text-sm hover:bg-emerald-500 transition-colors">{min}分</button>
+                   ))}
+                 </div>
+               </div>
+            )}
+          </div>
         </div>
       ) : (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-4">
@@ -4318,8 +4388,16 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
           .hide-scrollbar::-webkit-scrollbar { display: none; }
           .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         `}</style>
-      <div className="flex overflow-x-auto gap-3 sm:gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start snap-x snap-mandatory">
-        {workoutItems.map((item, index) => (
+      <div id="workout-items-container" className="flex overflow-x-auto gap-3 sm:gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start snap-x snap-mandatory">
+        {workoutItems.length === 0 ? (
+          <div className="snap-center shrink-0 w-[88%] sm:w-[320px] flex flex-col justify-center h-full min-h-[200px]">
+            <button onClick={() => addExerciseItem(null)} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
+              <div className="bg-white dark:bg-slate-800 p-3 rounded-full shadow-sm"><ListPlus size={24} className="text-emerald-500" /></div>
+              <span>種目を追加</span>
+            </button>
+          </div>
+        ) : (
+          workoutItems.map((item, index) => (
              <div key={item.id} className="snap-center shrink-0 w-[88%] sm:w-[320px] relative">
                 <WorkoutItemForm 
                   item={item} 
@@ -4340,15 +4418,13 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
                   isAnyDragging={false}
                   dragHandleProps={{}}
                 />
+                <button onClick={() => addExerciseItem(index)} className="w-full py-3 bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 rounded-xl text-sm font-bold flex flex-col items-center justify-center gap-1 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm -mt-2">
+                  <ListPlus size={16} className="text-emerald-500" />
+                  <span>この次に種目を追加</span>
+                </button>
              </div>
-        ))}
-
-        <div className="snap-center shrink-0 w-[88%] sm:w-[320px] flex flex-col justify-center h-full min-h-[200px]">
-          <button onClick={() => addExerciseItem()} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
-            <div className="bg-white dark:bg-slate-800 p-3 rounded-full shadow-sm"><ListPlus size={24} className="text-emerald-500" /></div>
-            <span>次の種目を追加</span>
-          </button>
-        </div>
+          ))
+        )}
       </div>
 
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm mt-6">
@@ -4413,9 +4489,23 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
 
   const updateItem = (itemId, data) => setWorkoutItems(prev => prev.map(item => item.id === itemId ? { ...item, ...data } : item));
   
-  const addExerciseItem = () => {
+  const addExerciseItem = (insertAfterIndex = null) => {
     const defaultEx = availableExercises.length > 0 ? availableExercises[0] : { name: '', weightType: 'total', category: 'その他' };
-    setWorkoutItems([...workoutItems, { id: generateId(), exerciseName: defaultEx.name, weightType: defaultEx.weightType || 'total', category: defaultEx.category || 'その他', isSuperSet: false, isDropSet: false, isForcedReps: false, memo: '', sets: [{ id: generateId(), weight: '', reps: '', lReps: '', rReps: '' }] }]);
+    const newItem = { id: generateId(), exerciseName: defaultEx.name, weightType: defaultEx.weightType || 'total', category: defaultEx.category || 'その他', isSuperSet: false, isDropSet: false, isForcedReps: false, memo: '', sets: [{ id: generateId(), weight: '', reps: '', lReps: '', rReps: '' }] };
+    if (insertAfterIndex !== null) {
+      const newItems = [...workoutItems];
+      newItems.splice(insertAfterIndex + 1, 0, newItem);
+      setWorkoutItems(newItems);
+      setTimeout(() => {
+         const container = document.getElementById('edit-workout-items-container');
+         if (container) {
+            const cardWidth = container.children[0].offsetWidth;
+            container.scrollTo({ left: (insertAfterIndex + 1) * (cardWidth + 12), behavior: 'smooth' });
+         }
+      }, 100);
+    } else {
+      setWorkoutItems([...workoutItems, newItem]);
+    }
   };
   const removeExerciseItem = (itemId) => setWorkoutItems(workoutItems.filter(item => item.id !== itemId));
   const moveItemUp = (index) => {
@@ -4535,8 +4625,16 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
             .hide-scrollbar::-webkit-scrollbar { display: none; }
             .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
           `}</style>
-          <div className="flex overflow-x-auto gap-3 sm:gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start snap-x snap-mandatory">
-            {workoutItems.map((item, index) => (
+          <div id="edit-workout-items-container" className="flex overflow-x-auto gap-3 sm:gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start snap-x snap-mandatory">
+            {workoutItems.length === 0 ? (
+              <div className="snap-center shrink-0 w-[88%] sm:w-[320px] flex flex-col justify-center h-full min-h-[200px]">
+                <button onClick={() => addExerciseItem(null)} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
+                  <div className="bg-white dark:bg-slate-800 p-3 rounded-full shadow-sm"><ListPlus size={24} className="text-emerald-500" /></div>
+                  <span>種目を追加</span>
+                </button>
+              </div>
+            ) : (
+              workoutItems.map((item, index) => (
                  <div key={item.id} className="snap-center shrink-0 w-[88%] sm:w-[320px] relative">
                     <WorkoutItemForm 
                       item={item} 
@@ -4556,15 +4654,13 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
                       isAnyDragging={false}
                       dragHandleProps={{}}
                     />
+                    <button onClick={() => addExerciseItem(index)} className="w-full py-3 bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 rounded-xl text-sm font-bold flex flex-col items-center justify-center gap-1 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm -mt-2">
+                      <ListPlus size={16} className="text-emerald-500" />
+                      <span>この次に種目を追加</span>
+                    </button>
                  </div>
-            ))}
-
-            <div className="snap-center shrink-0 w-[88%] sm:w-[320px] flex flex-col justify-center h-full min-h-[200px]">
-              <button onClick={addExerciseItem} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
-                <div className="bg-white dark:bg-slate-800 p-3 rounded-full shadow-sm"><ListPlus size={24} className="text-emerald-500" /></div>
-                <span>次の種目を追加</span>
-              </button>
-            </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -4581,6 +4677,136 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
           onSave={(newItems) => { setWorkoutItems(newItems); setShowReorderModal(false); }}
         />
       )}
+    </div>
+  );
+}
+
+// --- 種目成長率チャートモーダル ---
+function ExerciseChartModal({ exercise, posts, accountsInfo, onClose, currentUser }) {
+  if (!exercise) return null;
+  
+  const calc1RM = (weight, reps) => {
+    if (!weight || isNaN(weight) || weight <= 0) return 0;
+    if (!reps || isNaN(reps) || reps <= 0) return weight;
+    return weight * (1 + reps / 40);
+  };
+
+  const chartDataMap = {};
+  
+  posts.forEach(p => {
+    const dStr = p.date.substring(0, 10);
+    if (!chartDataMap[dStr]) chartDataMap[dStr] = {};
+    
+    let maxRM = 0;
+    p.items?.forEach(item => {
+       if (item.exerciseName === exercise.name) {
+          item.sets?.forEach(set => {
+             const w = Number(set.weight) || 0;
+             const r = Number(set.reps) || Math.max(Number(set.lReps)||0, Number(set.rReps)||0);
+             const rm = calc1RM(w, r);
+             if (rm > maxRM) maxRM = rm;
+          });
+       }
+    });
+    
+    if (maxRM > 0) {
+       if (!chartDataMap[dStr][p.author] || maxRM > chartDataMap[dStr][p.author]) {
+          chartDataMap[dStr][p.author] = Math.round(maxRM * 10) / 10;
+       }
+    }
+  });
+
+  const dates = Object.keys(chartDataMap).sort();
+  const authorsSet = new Set();
+  dates.forEach(d => Object.keys(chartDataMap[d]).forEach(a => authorsSet.add(a)));
+  const authors = Array.from(authorsSet);
+
+  const renderMultiChart = () => {
+     if (dates.length === 0) return <div className="p-4 text-center text-slate-500 font-bold">データがありません</div>;
+     
+     const width = 300, height = 150;
+     let min = Infinity, max = -Infinity;
+     dates.forEach(d => {
+       authors.forEach(a => {
+         const v = chartDataMap[d][a];
+         if (v) {
+           if (v < min) min = v;
+           if (v > max) max = v;
+         }
+       });
+     });
+     
+     if (min === Infinity) return <div className="p-4 text-center text-slate-500 font-bold">データがありません</div>;
+     if (min === max) { min -= 10; max += 10; }
+     
+     const range = max - min;
+     const colors = ['#10b981', '#6366f1', '#f43f5e', '#f59e0b', '#06b6d4'];
+
+     return (
+       <div className="relative w-full overflow-x-auto pb-6">
+         <svg viewBox={`-10 -20 ${width + 40} ${height + 40}`} className="w-full min-w-[300px] h-48 overflow-visible">
+           {authors.map((author, aIdx) => {
+              const color = author === currentUser ? '#10b981' : colors[(aIdx + 1) % colors.length];
+              const pointsData = dates.map((d, i) => {
+                 const val = chartDataMap[d][author];
+                 if (!val) return null;
+                 const x = (i / (dates.length - 1 || 1)) * width;
+                 const y = height - ((val - min) / range) * height;
+                 return { x, y, val, d, author };
+              }).filter(Boolean);
+
+              if (pointsData.length === 0) return null;
+              const pointsStr = pointsData.map(p => `${p.x},${p.y}`).join(' ');
+
+              return (
+                 <g key={author}>
+                   <polyline points={pointsStr} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                   {pointsData.map((p, i) => (
+                     <g key={i}>
+                       <circle cx={p.x} cy={p.y} r="4" fill="white" stroke={color} strokeWidth="2" />
+                       <text x={p.x} y={p.y - 10} fontSize="10" fill={color} textAnchor="middle" className="font-bold">{p.val}</text>
+                     </g>
+                   ))}
+                 </g>
+              );
+           })}
+           {dates.map((d, i) => {
+              const x = (i / (dates.length - 1 || 1)) * width;
+              const dateStr = d.substring(5).replace('-', '/');
+              return (
+                 <text key={d} x={x} y={height + 20} fontSize="9" fill="#94a3b8" textAnchor="middle" className="font-bold">{dateStr}</text>
+              );
+           })}
+         </svg>
+         <div className="flex flex-wrap gap-3 mt-4 justify-center">
+            {authors.map((author, aIdx) => {
+               const color = author === currentUser ? '#10b981' : colors[(aIdx + 1) % colors.length];
+               const displayName = accountsInfo[author]?.displayName || author;
+               return (
+                  <div key={author} className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">
+                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}></div>
+                     {displayName}
+                  </div>
+               );
+            })}
+         </div>
+       </div>
+     );
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-in fade-in" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+          <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2"><TrendingDown className="transform rotate-180 text-emerald-500" size={18}/> 成長率 (推定1RM)</h3>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20}/></button>
+        </div>
+        <div className="p-4">
+           <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-4 text-center">{exercise.name}</h4>
+           {renderMultiChart()}
+           <p className="text-[10px] text-slate-400 font-bold mt-4 text-center">※推定1RM = 重量 × (1 + 回数 ÷ 40) で計算しています。</p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -4615,6 +4841,8 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
   const [editExCategory, setEditExCategory] = useState('胸');
   const [editingExGymId, setEditingExGymId] = useState('');
   const [editExFreeWeightType, setEditExFreeWeightType] = useState('barbell');
+  
+  const [selectedExerciseForChart, setSelectedExerciseForChart] = useState(null);
 
   const handleAddGym = async (e) => {
     e.preventDefault();
@@ -5125,7 +5353,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                           {gymExercises.map(ex => {
                             const isMuted = mutedExercises.includes(ex.name);
                             return (
-                              <div key={ex.id} className={`p-3 flex justify-between items-center group transition-opacity ${isMuted ? 'opacity-40' : 'opacity-100'}`}>
+                              <div key={ex.id} onClick={() => setSelectedExerciseForChart(ex)} className={`p-3 flex justify-between items-center group transition-opacity cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 ${isMuted ? 'opacity-40' : 'opacity-100'}`}>
                                 <div>
                                   <p className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2">
                                     {ex.name}
@@ -5140,13 +5368,13 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                                   </div>
                                 </div>
                                 <div className="flex gap-1">
-                                  <button onClick={() => handleMuteExercise(ex.name)} className={`p-2 rounded-lg transition-colors border ${isMuted ? 'text-indigo-400 bg-indigo-50 border-indigo-100 hover:bg-indigo-100 dark:bg-indigo-950/30 dark:border-indigo-900' : 'text-slate-400 bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-800 hover:bg-slate-100'}`} title={isMuted ? '表示する' : '非表示にする'}>
+                                  <button onClick={(e) => { e.stopPropagation(); handleMuteExercise(ex.name); }} className={`p-2 rounded-lg transition-colors border ${isMuted ? 'text-indigo-400 bg-indigo-50 border-indigo-100 hover:bg-indigo-100 dark:bg-indigo-950/30 dark:border-indigo-900' : 'text-slate-400 bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-800 hover:bg-slate-100'}`} title={isMuted ? '表示する' : '非表示にする'}>
                                     <EyeOff size={16}/>
                                   </button>
                                   {((ex.gymId === 'common' && isAdmin) || ex.author === currentUser || (ex.gymId !== 'common' && gym.owner === currentUser)) && (
                                     <>
-                                      <button onClick={() => startEdit(ex)} className="p-2 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 bg-slate-50 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-100 dark:border-slate-800"><Edit2 size={16} /></button>
-                                      <button onClick={() => { if(window.confirm(`${ex.name}を削除しますか？`)) handleDeleteExercise(ex.id); }} className="p-2 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 bg-slate-50 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-100 dark:border-slate-800"><Trash2 size={16} /></button>
+                                      <button onClick={(e) => { e.stopPropagation(); startEdit(ex); }} className="p-2 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 bg-slate-50 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-100 dark:border-slate-800"><Edit2 size={16} /></button>
+                                      <button onClick={(e) => { e.stopPropagation(); if(window.confirm(`${ex.name}を削除しますか？`)) handleDeleteExercise(ex.id); }} className="p-2 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 bg-slate-50 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-100 dark:border-slate-800"><Trash2 size={16} /></button>
                                     </>
                                   )}
                                 </div>
@@ -5162,6 +5390,16 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
             </>
           )}
         </div>
+      )}
+      
+      {selectedExerciseForChart && (
+        <ExerciseChartModal
+          exercise={selectedExerciseForChart}
+          posts={posts}
+          accountsInfo={accountsInfo}
+          currentUser={currentUser}
+          onClose={() => setSelectedExerciseForChart(null)}
+        />
       )}
     </div>
   );
@@ -5712,7 +5950,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 10:17, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 15:19, updated)</p>
       </div>
     </div>
   );
