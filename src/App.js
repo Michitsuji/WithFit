@@ -1684,6 +1684,9 @@ export default function App() {
   const [restTimeLeft, setRestTimeLeft] = useState(0);
   const [showTimerMenu, setShowTimerMenu] = useState(false);
   const [selectedRestMinute, setSelectedRestMinute] = useState(1);
+  const [timerCardPos, setTimerCardPos] = useState({ x: 0, y: 0 });
+  const [isTimerDragging, setIsTimerDragging] = useState(false);
+  const timerDragInfo = useRef({ startX: 0, startY: 0, initX: 0, initY: 0 });
 
   const playSilent = () => {
     try {
@@ -1751,6 +1754,44 @@ export default function App() {
     setRestTimeLeft(minutes === 0 ? 0 : minutes * 60);
     setRestTimerStart(Date.now());
     setShowTimerMenu(false);
+  };
+
+  const handleTimerTouchStart = (e) => {
+    if (e.target.closest('button, select')) return;
+    const touch = e.touches ? e.touches[0] : e;
+    timerDragInfo.current = { startX: touch.clientX, startY: touch.clientY, initX: timerCardPos.x, initY: timerCardPos.y };
+    setIsTimerDragging(true);
+  };
+
+  const handleTimerTouchMove = (e) => {
+    if (!isTimerDragging) return;
+    const touch = e.touches ? e.touches[0] : e;
+    const dx = touch.clientX - timerDragInfo.current.startX;
+    const dy = touch.clientY - timerDragInfo.current.startY;
+    setTimerCardPos({ x: timerDragInfo.current.initX + dx, y: timerDragInfo.current.initY + dy });
+  };
+
+  const handleTimerTouchEnd = () => {
+    if (!isTimerDragging) return;
+    setIsTimerDragging(false);
+    const { x, y } = timerCardPos;
+    let newX = 0;
+    let newY = 0;
+    const thresX = 80;
+    const thresY = 80;
+
+    if (Math.abs(x) > Math.abs(y)) {
+      if (x > thresX) newX = window.innerWidth / 2 + 50;
+      else if (x < -thresX) newX = -(window.innerWidth / 2 + 50);
+    } else {
+      if (y > thresY) newY = window.innerHeight / 2;
+      else if (y < -thresY) newY = -window.innerHeight / 3;
+    }
+    setTimerCardPos({ x: newX, y: newY });
+  };
+
+  const restoreTimerCard = () => {
+    if (timerCardPos.x !== 0 || timerCardPos.y !== 0) setTimerCardPos({ x: 0, y: 0 });
   };
 
   const cancelRestTimer = () => {
@@ -2894,8 +2935,20 @@ export default function App() {
 
       {myInfo?.isTraining && (
         <div className="fixed left-0 right-0 z-40 px-4 max-w-md mx-auto pointer-events-none" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 95px)' }}>
-          <div className="bg-slate-900/90 backdrop-blur-md rounded-2xl p-3 shadow-xl text-white flex justify-between items-center pointer-events-auto border border-slate-700">
-            <div className="flex flex-col items-start min-w-[70px]">
+          <div 
+            onClick={restoreTimerCard}
+            onTouchStart={handleTimerTouchStart}
+            onTouchMove={handleTimerTouchMove}
+            onTouchEnd={handleTimerTouchEnd}
+            onTouchCancel={handleTimerTouchEnd}
+            onMouseDown={handleTimerTouchStart}
+            onMouseMove={handleTimerTouchMove}
+            onMouseUp={handleTimerTouchEnd}
+            onMouseLeave={handleTimerTouchEnd}
+            className={`bg-slate-900/90 backdrop-blur-md rounded-2xl p-3 shadow-xl text-white flex justify-between items-center pointer-events-auto border border-slate-700 ${isTimerDragging ? '' : 'transition-all duration-300'} ${(timerCardPos.x !== 0 || timerCardPos.y !== 0) && !isTimerDragging ? 'opacity-30' : 'opacity-100'}`}
+            style={{ transform: `translate(${timerCardPos.x}px, ${timerCardPos.y}px)`, cursor: isTimerDragging ? 'grabbing' : 'grab' }}
+          >
+            <div className="flex flex-col items-start min-w-[70px] pointer-events-none">
               <span className="text-[10px] text-slate-400 font-bold mb-0.5 flex items-center gap-1"><MapPin size={10}/> {allGyms.find(g => g.id === myInfo.currentGymId)?.name || 'トレーニング中'}</span>
               <div className="text-lg font-mono font-bold text-emerald-400 flex items-center gap-1">
                 <Clock size={14} className="animate-pulse" /> 
@@ -6039,7 +6092,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 22:56, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 22:59, updated)</p>
       </div>
     </div>
   );
