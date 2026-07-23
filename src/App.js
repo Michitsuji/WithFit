@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus, EyeOff, Bell, Download, CheckCircle, Handshake, MessageCircle, Send, Volume2, VolumeX, Music, ChevronDown, ChevronUp } from 'lucide-react';
+import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus, EyeOff, Bell, Download, CheckCircle, Handshake, MessageCircle, Send, Volume2, VolumeX, Music, ChevronLeft, ChevronRight } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy, getDocs, where } from 'firebase/firestore';
@@ -1685,10 +1685,10 @@ export default function App() {
   const [showTimerMenu, setShowTimerMenu] = useState(false);
   const [selectedRestMinute, setSelectedRestMinute] = useState(1);
 
-  const [timerState, setTimerState] = useState('bottom');
+  const [timerState, setTimerState] = useState({ x: 'center', y: 'bottom', hidden: false });
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isTimerDragging, setIsTimerDragging] = useState(false);
-  const timerDragInfo = useRef({ startX: 0, startY: 0, lastY: 0, velocityY: 0, startTime: 0, initRect: null });
+  const timerDragInfo = useRef({ startX: 0, startY: 0, lastX: 0, velocityX: 0, startTime: 0, initRect: null });
   const timerCardRef = useRef(null);
   const [screenSize, setScreenSize] = useState({ w: 0, h: 0 });
 
@@ -1775,8 +1775,8 @@ export default function App() {
     timerDragInfo.current = { 
       startX: touch.clientX, 
       startY: touch.clientY, 
-      lastY: touch.clientY,
-      velocityY: 0,
+      lastX: touch.clientX,
+      velocityX: 0,
       startTime: Date.now(),
       initRect: timerCardRef.current?.getBoundingClientRect()
     };
@@ -1791,8 +1791,8 @@ export default function App() {
     const dy = touch.clientY - timerDragInfo.current.startY;
     
     const dt = Date.now() - timerDragInfo.current.startTime;
-    timerDragInfo.current.velocityY = (touch.clientY - timerDragInfo.current.lastY) / (dt || 1);
-    timerDragInfo.current.lastY = touch.clientY;
+    timerDragInfo.current.velocityX = (touch.clientX - timerDragInfo.current.lastX) / (dt || 1);
+    timerDragInfo.current.lastX = touch.clientX;
     timerDragInfo.current.startTime = Date.now();
 
     setDragOffset({ x: dx, y: dy });
@@ -1802,46 +1802,64 @@ export default function App() {
     if (!isTimerDragging) return;
     setIsTimerDragging(false);
 
-    const { velocityY, initRect } = timerDragInfo.current;
+    const { velocityX, initRect } = timerDragInfo.current;
     if (!initRect) return;
     
+    const currentX = initRect.left + dragOffset.x;
     const currentY = initRect.top + dragOffset.y;
+    const screenW = screenSize.w || window.innerWidth;
     const screenH = screenSize.h || window.innerHeight;
 
-    let nextState = 'bottom';
-    
-    if (velocityY < -0.5 || (velocityY <= 0.5 && currentY < screenH / 2)) {
-      if (currentY < 80 || velocityY < -1.5) nextState = 'hidden-top';
-      else nextState = 'top';
-    } else {
-      if (currentY > screenH - 150 || velocityY > 1.5) nextState = 'hidden-bottom';
-      else nextState = 'bottom';
+    const isLeft = currentX + initRect.width / 2 < screenW / 2;
+    const isTop = currentY + initRect.height / 2 < screenH / 2;
+
+    let nextX = isLeft ? 'left' : 'right';
+    let nextY = isTop ? 'top' : 'bottom';
+    let nextHidden = false;
+
+    if (velocityX < -1.0 || (isLeft && currentX < -initRect.width / 4)) {
+       nextX = 'left';
+       nextHidden = true;
+    } else if (velocityX > 1.0 || (!isLeft && currentX + initRect.width > screenW + initRect.width / 4)) {
+       nextX = 'right';
+       nextHidden = true;
     }
 
-    setTimerState(nextState);
+    setTimerState({ x: nextX, y: nextY, hidden: nextHidden });
     setDragOffset({ x: 0, y: 0 });
   };
 
   const restoreTimerCard = () => {
-    if (timerState === 'hidden-top') setTimerState('top');
-    else if (timerState === 'hidden-bottom') setTimerState('bottom');
+    if (timerState.hidden) setTimerState(prev => ({ ...prev, hidden: false }));
   };
 
   let transformY = 0;
   let transformX = 0;
   
   if (isTimerDragging && timerDragInfo.current.initRect) {
+     transformX = timerDragInfo.current.initRect.left + dragOffset.x;
      transformY = timerDragInfo.current.initRect.top + dragOffset.y;
-     transformX = dragOffset.x;
   } else {
+     const screenW = screenSize.w || (typeof window !== 'undefined' ? window.innerWidth : 400);
      const screenH = screenSize.h || (typeof window !== 'undefined' ? window.innerHeight : 800);
-     const safeBottom = 24;
-     if (timerState === 'bottom') transformY = screenH - safeBottom - 105;
-     else if (timerState === 'top') transformY = 80;
-     else if (timerState === 'hidden-bottom') transformY = screenH - 24;
-     else if (timerState === 'hidden-top') transformY = -40;
+     const cardW = timerCardRef.current?.offsetWidth || Math.min(screenW - 32, 448);
+     const cardH = timerCardRef.current?.offsetHeight || 64;
+     
+     if (timerState.hidden) {
+        transformX = timerState.x === 'left' ? -cardW + 28 : screenW - 28;
+     } else {
+        if (timerState.x === 'center') transformX = (screenW - cardW) / 2;
+        else if (timerState.x === 'left') transformX = 16;
+        else transformX = screenW - cardW - 16;
+     }
+     
+     if (timerState.y === 'top') {
+        transformY = 0;
+     } else {
+        transformY = screenH - cardH - 85;
+     }
   }
-  const isHidden = timerState.includes('hidden');
+  const isHidden = timerState.hidden;
 
   const cancelRestTimer = () => {
     setRestTimerStart(null);
@@ -2983,7 +3001,7 @@ export default function App() {
       </header>
 
       {myInfo?.isTraining && (
-        <div className="fixed inset-0 z-40 pointer-events-none" style={{ perspective: 1000 }}>
+        <div className="fixed inset-0 z-[25] pointer-events-none overflow-hidden" style={{ perspective: 1000 }}>
           <div 
             ref={timerCardRef}
             onClick={restoreTimerCard}
@@ -2995,22 +3013,23 @@ export default function App() {
             onMouseMove={handleTimerTouchMove}
             onMouseUp={handleTimerTouchEnd}
             onMouseLeave={handleTimerTouchEnd}
-            className={`absolute left-0 right-0 px-4 max-w-md mx-auto pointer-events-auto ${isTimerDragging ? '' : 'transition-transform duration-300'} ${isHidden && !isTimerDragging ? 'opacity-80' : 'opacity-100'}`}
+            className={`absolute top-0 left-0 w-[calc(100%-32px)] max-w-md pointer-events-auto ${isTimerDragging ? '' : 'transition-transform duration-300'} ${isHidden && !isTimerDragging ? 'opacity-90' : 'opacity-100'}`}
             style={{ 
                transform: `translate3d(${transformX}px, ${transformY}px, 0)`,
                transitionTimingFunction: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
-               cursor: isTimerDragging ? 'grabbing' : 'grab'
+               cursor: isTimerDragging ? 'grabbing' : 'grab',
+               touchAction: 'none'
             }}
           >
-            <div className="bg-slate-900/90 backdrop-blur-md rounded-2xl p-3 shadow-xl text-white flex justify-between items-center border border-slate-700 relative">
-              {timerState === 'hidden-top' && (
-                 <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-slate-900/90 text-slate-400 px-4 py-0.5 rounded-b-xl border border-t-0 border-slate-700 shadow-md">
-                   <ChevronDown size={16} />
+            <div className="bg-slate-900/90 backdrop-blur-md rounded-2xl p-3 shadow-xl text-white flex justify-between items-center border border-slate-700 relative w-full">
+              {isHidden && timerState.x === 'left' && (
+                 <div className="absolute top-1/2 -translate-y-1/2 -right-6 bg-slate-900/90 text-slate-400 py-3 px-1 rounded-r-xl border border-l-0 border-slate-700 shadow-md flex items-center justify-center">
+                   <ChevronRight size={18} />
                  </div>
               )}
-              {timerState === 'hidden-bottom' && (
-                 <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-900/90 text-slate-400 px-4 py-0.5 rounded-t-xl border border-b-0 border-slate-700 shadow-md">
-                   <ChevronUp size={16} />
+              {isHidden && timerState.x === 'right' && (
+                 <div className="absolute top-1/2 -translate-y-1/2 -left-6 bg-slate-900/90 text-slate-400 py-3 px-1 rounded-l-xl border border-r-0 border-slate-700 shadow-md flex items-center justify-center">
+                   <ChevronLeft size={18} />
                  </div>
               )}
 
@@ -6161,7 +6180,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 23:12, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 23:20, updated)</p>
       </div>
     </div>
   );
