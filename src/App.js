@@ -3612,10 +3612,7 @@ function ProgramGeneratorModal({ isOpen, onClose, onGenerate, exercises }) {
 
   if (!isOpen) return null;
 
-  const uniqueExercises = Array.from(new Set(exercises.map(ex => ex.name).filter(Boolean)));
-  if (!uniqueExercises.includes('ベンチプレス')) uniqueExercises.unshift('ベンチプレス');
-  if (!uniqueExercises.includes('スクワット')) uniqueExercises.unshift('スクワット');
-  if (!uniqueExercises.includes('デッドリフト')) uniqueExercises.unshift('デッドリフト');
+  const big3Exercises = ['ベンチプレス', 'スクワット', 'デッドリフト'];
 
   const info = PROG_INFO[progType];
   const targetWeight = oneRM && !isNaN(oneRM) ? Math.round(Number(oneRM) * info.mult) : '-';
@@ -3666,7 +3663,7 @@ function ProgramGeneratorModal({ isOpen, onClose, onGenerate, exercises }) {
             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">対象の種目</label>
             <div className="relative">
               <select value={exName} onChange={e => setExName(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-indigo-500 text-sm">
-                {uniqueExercises.map(name => <option key={name} value={name}>{name}</option>)}
+                {big3Exercises.map(name => <option key={name} value={name}>{name}</option>)}
               </select>
               <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
             </div>
@@ -3690,20 +3687,18 @@ function ProgramGeneratorModal({ isOpen, onClose, onGenerate, exercises }) {
 }
 
 function ActiveProgramDisplay({ program, onApply, onToggleComplete, onDelete }) {
-  const [expandedWeek, setExpandedWeek] = useState(1);
-  const [showInfo, setShowInfo] = useState(false);
-
-  useEffect(() => {
-    if (!program || !program.schedule) return;
+  const [expandedWeek, setExpandedWeek] = useState(() => {
+    if (!program || !program.schedule) return 1;
     const maxWeek = PROG_INFO[program.type]?.weeks || 6;
     for (let w = 1; w <= maxWeek; w++) {
       const weekDays = program.schedule.filter(s => s.week === w);
       if (weekDays.length > 0 && weekDays.some(d => !d.completed)) {
-        setExpandedWeek(w);
-        break;
+        return w;
       }
     }
-  }, [program]);
+    return 1;
+  });
+  const [showInfo, setShowInfo] = useState(false);
 
   if (!program) return null;
 
@@ -3781,6 +3776,14 @@ function ActiveProgramDisplay({ program, onApply, onToggleComplete, onDelete }) 
                           {dayData.isAmrap && <div className="text-[10px] font-bold text-amber-500 mt-0.5">最終セット限界まで!</div>}
                         </div>
                       </div>
+                      {dayData.advice && !dayData.completed && (
+                        <div className="mt-1 bg-indigo-50/50 dark:bg-indigo-950/20 p-2 rounded-lg border border-indigo-100/50 dark:border-indigo-900/30">
+                          <p className="text-[10px] font-bold text-indigo-700/80 dark:text-indigo-400/80 leading-relaxed flex gap-1 items-start">
+                            <Zap size={12} className="shrink-0 mt-0.5 text-amber-500" />
+                            <span>{dayData.advice}</span>
+                          </p>
+                        </div>
+                      )}
                       {!dayData.completed && (
                         <div className="flex justify-end mt-1">
                           <button onClick={() => onApply(program, dayData)} className="text-[11px] font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors">
@@ -3863,34 +3866,37 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
         { hR: 8, hS: 5, pR: 3, pS: 5, sR: 1, sS: 3 },
         { hR: 5, hS: 3, pR: 3, pS: 3, sR: 1, sS: 1 }
       ];
+      const hAdvice = '丁寧なフォームでコントロールし、筋肉への負荷を意識。下ろす動作（ネガティブ）をゆっくりと。';
+      const pAdvice = '挙上スピードをできるだけ爆発的に！重量は軽いですが全力で素早く挙げます（ボトムで止めない）。';
+      const sAdvice = '高重量の日。セット間の休憩を長め（3〜5分）に取り、神経系を鍛える意識で全力挙上。';
       for (let w = 0; w < 6; w++) {
-        schedule.push({ id: generateId(), week: w + 1, day: 1, type: 'Hypertrophy', weight: round25(oneRM * percents[w].h), reps: schemes[w].hR, sets: schemes[w].hS, completed: false });
-        schedule.push({ id: generateId(), week: w + 1, day: 2, type: 'Power', weight: round25(oneRM * percents[w].p), reps: schemes[w].pR, sets: schemes[w].pS, completed: false });
-        schedule.push({ id: generateId(), week: w + 1, day: 3, type: 'Strength', weight: round25(oneRM * percents[w].s), reps: schemes[w].sR, sets: schemes[w].sS, completed: false });
+        schedule.push({ id: generateId(), week: w + 1, day: 1, type: 'Hypertrophy', weight: round25(oneRM * percents[w].h), reps: schemes[w].hR, sets: schemes[w].hS, advice: hAdvice, completed: false });
+        schedule.push({ id: generateId(), week: w + 1, day: 2, type: 'Power', weight: round25(oneRM * percents[w].p), reps: schemes[w].pR, sets: schemes[w].pS, advice: pAdvice, completed: false });
+        schedule.push({ id: generateId(), week: w + 1, day: 3, type: 'Strength', weight: round25(oneRM * percents[w].s), reps: schemes[w].sR, sets: schemes[w].sS, advice: sAdvice, completed: false });
       }
     } else if (progType === 'SMOLOV') {
       const base = [
-        { w: 0.7, r: 6, s: 6, t: 'Day 1' },
-        { w: 0.75, r: 5, s: 7, t: 'Day 2' },
-        { w: 0.8, r: 4, s: 8, t: 'Day 3' },
-        { w: 0.85, r: 3, s: 10, t: 'Day 4' }
+        { w: 0.7, r: 6, s: 6, t: 'Day 1', a: '初日。まだ余裕がある重量ですが、全セットのフォームを統一する意識で。' },
+        { w: 0.75, r: 5, s: 7, t: 'Day 2', a: 'セット数が多いです。休憩をしっかり取り、後半のフォーム崩れに注意。' },
+        { w: 0.8, r: 4, s: 8, t: 'Day 3', a: '疲労が溜まってくる頃。無理に挙げ急がず、1レップずつ丁寧に。' },
+        { w: 0.85, r: 3, s: 10, t: 'Day 4', a: '今週の山場。10セットと過酷ですが、気合いで乗り切りましょう！' }
       ];
       for (let w = 0; w < 3; w++) {
         const addKg = w * 2.5; 
         base.forEach((d, i) => {
-           schedule.push({ id: generateId(), week: w + 1, day: i + 1, type: d.t, weight: round25(oneRM * d.w) + addKg, reps: d.r, sets: d.s, completed: false });
+           schedule.push({ id: generateId(), week: w + 1, day: i + 1, type: d.t, weight: round25(oneRM * d.w) + addKg, reps: d.r, sets: d.s, advice: d.a, completed: false });
         });
       }
     } else if (progType === 'WENDLER') {
       const tm = oneRM * 0.9;
       const wData = [
-        { w: 0.85, r: '5+', s: 1, t: 'メインセット' },
-        { w: 0.90, r: '3+', s: 1, t: 'メインセット' },
-        { w: 0.95, r: '1+', s: 1, t: 'メインセット' },
-        { w: 0.60, r: '5', s: 1, t: 'ディロード' }
+        { w: 0.85, r: '5+', s: 1, t: 'メインセット', a: '最終セットはフォームが崩れない範囲で限界まで反復（AMRAP）！' },
+        { w: 0.90, r: '3+', s: 1, t: 'メインセット', a: '最終セットは限界まで。先週の記録を超える意識で。' },
+        { w: 0.95, r: '1+', s: 1, t: 'メインセット', a: '自己ベスト更新のつもりで、限界まで反復！' },
+        { w: 0.60, r: '5', s: 1, t: 'ディロード', a: '疲労を抜くための軽い週。フォームの確認に集中し、追い込みすぎないこと。' }
       ];
       for (let w = 0; w < 4; w++) {
-        schedule.push({ id: generateId(), week: w + 1, day: 1, type: wData[w].t, weight: round25(tm * wData[w].w), reps: wData[w].r, sets: wData[w].s, completed: false, isAmrap: w !== 3 });
+        schedule.push({ id: generateId(), week: w + 1, day: 1, type: wData[w].t, weight: round25(tm * wData[w].w), reps: wData[w].r, sets: wData[w].s, advice: wData[w].a, completed: false, isAmrap: w !== 3 });
       }
     }
 
@@ -5706,7 +5712,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 10:06, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.23, 10:17, updated)</p>
       </div>
     </div>
   );
