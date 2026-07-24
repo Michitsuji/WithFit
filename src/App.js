@@ -1730,17 +1730,18 @@ export default function App() {
   const [timerVolume, setTimerVolume] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('withfit_timer_volume');
-      return saved !== null ? parseFloat(saved) : 0.5;
+      return saved !== null ? parseFloat(saved) : 1.0;
     }
-    return 0.5;
+    return 1.0;
   });
-  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-       alarmAudio.current = new Audio('https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg');
+       // ご自身で用意される音楽ファイル名（パス）に合わせて変更してください
+       alarmAudio.current = new Audio('alarm.mp3');
        alarmAudio.current.loop = true;
        alarmAudio.current.volume = timerVolume;
+       alarmAudio.current.muted = timerVolume === 0;
     }
   }, []);
 
@@ -3098,14 +3099,16 @@ export default function App() {
                 </div>
                 <div className="flex items-center">
                   <div className="relative mr-2 pointer-events-auto">
-                    <button onClick={(e) => { e.stopPropagation(); setShowVolumeSlider(!showVolumeSlider); }} className="text-slate-400 hover:text-emerald-400 p-1 transition-colors">
+                    <button 
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        const newVol = timerVolume === 0 ? 1 : 0; 
+                        setTimerVolume(newVol); 
+                      }} 
+                      className="text-slate-400 hover:text-emerald-400 p-1 transition-colors"
+                    >
                       {timerVolume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
                     </button>
-                    {showVolumeSlider && (
-                      <div className={`absolute left-1/2 -translate-x-1/2 bg-slate-800/95 backdrop-blur p-3 rounded-xl border border-slate-600 shadow-xl flex items-center justify-center z-50 w-32 ${timerState.y === 'top' ? 'top-full mt-2' : 'bottom-full mb-2'}`} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()} onTouchStart={e=>e.stopPropagation()}>
-                         <input type="range" min="0" max="1" step="0.01" value={timerVolume} onChange={e => { const newVol = parseFloat(e.target.value); setTimerVolume(newVol); if (alarmAudio.current) { alarmAudio.current.volume = newVol; alarmAudio.current.muted = newVol === 0; } }} className="w-full accent-emerald-500 cursor-pointer" />
-                      </div>
-                    )}
                   </div>
                   {!restTimerStart ? (
                     <div className="relative flex items-center">
@@ -6271,7 +6274,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.24, 22:33, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.24, 22:38, updated)</p>
       </div>
     </div>
   );
