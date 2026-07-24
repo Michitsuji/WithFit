@@ -3600,7 +3600,12 @@ function UserProfileModal({ isOpen, onClose, targetUser, accountsInfo, currentUs
               </div>
               <div className="text-center w-full">
                 <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{userInfo.displayName || targetUser}</div>
-                {userInfo.goal && <div className="mt-2 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-800 break-words">{userInfo.goal}</div>}
+                {userInfo.goal && (
+                  <div className="mt-3">
+                    <div className="text-[10px] font-bold text-slate-400 mb-1">目標</div>
+                    <div className="text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-800 break-words">{userInfo.goal}</div>
+                  </div>
+                )}
               </div>
               <button onClick={() => setView('friends')} className="mt-4 flex items-center justify-center gap-2 w-full bg-slate-100 dark:bg-slate-800 px-4 py-3 rounded-xl text-slate-700 dark:text-slate-300 font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
                 <Users size={18} /> フレンド: {friends.length}人
@@ -6364,7 +6369,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.24, 23:24, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.24, 23:33, updated)</p>
       </div>
     </div>
   );
