@@ -1635,6 +1635,23 @@ function useAutoScrollDisable() {
 export default function App() {
   useAutoScrollDisable();
 
+  useEffect(() => {
+    const handleNativeMessage = (event) => {
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (data.type === 'PUSH_TOKEN' && currentUser) {
+          setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { fcmToken: data.token }, { merge: true });
+        }
+      } catch (e) {}
+    };
+    window.addEventListener('message', handleNativeMessage);
+    document.addEventListener('message', handleNativeMessage);
+    return () => {
+      window.removeEventListener('message', handleNativeMessage);
+      document.removeEventListener('message', handleNativeMessage);
+    };
+  }, [currentUser]);
+
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [currentUser, setCurrentUser] = useState(null); 
   const [currentTab, setCurrentTab] = useState('timeline');
@@ -1759,6 +1776,7 @@ export default function App() {
              setIsAlarmRinging(true);
              if (alarmAudio.current) alarmAudio.current.play().catch(e=>console.log(e));
              if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 400]);
+             if (typeof window !== 'undefined' && window.ReactNativeWebView) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'VIBRATE' })); }
              clearInterval(interval);
           } else {
              setRestTimeLeft(left);
@@ -2731,6 +2749,11 @@ export default function App() {
         console.error('Push toggle error:', error);
       }
     } else {
+      if (typeof window !== 'undefined' && window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'REQUEST_PUSH_PERMISSION' }));
+        setShowPushPrompt(false);
+        return;
+      }
       try {
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
@@ -3593,7 +3616,8 @@ function LoginScreen({ onLogin, onGoogleLogin, isOnline }) {
              onClick={() => { 
                const provider = new GoogleAuthProvider(); 
                provider.setCustomParameters({ prompt: 'select_account' }); 
-               if (navigator.userAgent.includes('Edg')) {
+               const isWebView = typeof window !== 'undefined' && window.ReactNativeWebView;
+               if (navigator.userAgent.includes('Edg') || isWebView) {
                  signInWithRedirect(getAuth(), provider);
                } else {
                  signInWithPopup(getAuth(), provider).then((result) => { 
@@ -6241,7 +6265,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.24, 00:17, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.24, 22:10, updated)</p>
       </div>
     </div>
   );
