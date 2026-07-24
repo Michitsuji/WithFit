@@ -362,7 +362,7 @@ function SimpleChart({ data, color, title }) {
 }
 
 // --- 共通コンポーネント：ワークアウトカード ---
-function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onToggleLike, onImport, onAddComment, onDeleteComment, onToggleCommentLike }) {
+function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onToggleLike, onImport, onAddComment, onDeleteComment, onToggleCommentLike, onUserClick }) {
   const [localComments, setLocalComments] = useState(post.comments || []);
   const [showComments, setShowComments] = useState(localComments.length > 0);
   const [commentText, setCommentText] = useState('');
@@ -658,7 +658,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
       <div className={`absolute top-0 left-0 w-1.5 h-full ${isMyPost ? 'bg-slate-300 dark:bg-slate-600' : ''}`} style={!isMyPost ? { backgroundColor: customBgStyle.backgroundColor } : {}}></div>
       <div className="flex justify-between items-start mb-4 pl-3">
         <div className="flex items-center gap-3 w-full overflow-hidden">
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm overflow-hidden shrink-0 ${userColorBg}`} style={customBgStyle}>
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm overflow-hidden shrink-0 ${userColorBg} ${onUserClick ? 'cursor-pointer hover:opacity-80' : ''}`} style={customBgStyle} onClick={(e) => { e.stopPropagation(); if (onUserClick) onUserClick(post.author); }}>
             {authorInfo?.photoUrl ? <img src={authorInfo.photoUrl} alt={post.author} className="w-full h-full object-cover" /> : authorInfo?.displayName ? authorInfo.displayName.charAt(0).toUpperCase() : (post.author ? post.author.charAt(0).toUpperCase() : '?')}
           </div>
           <div className="flex-1 min-w-0">
@@ -851,7 +851,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 
               return (
                 <div key={comment.id} className="flex gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 text-xs shrink-0 overflow-hidden mt-1">
+                  <div className={`w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 text-xs shrink-0 overflow-hidden mt-1 ${onUserClick ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={(e) => { e.stopPropagation(); if (onUserClick) onUserClick(comment.author); }}>
                      {cInfo?.photoUrl ? <img src={cInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : cInfo?.displayName ? cInfo.displayName.charAt(0).toUpperCase() : comment.author.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 group min-w-0">
@@ -975,10 +975,10 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                   const uInfo = accountsInfo && accountsInfo[u];
                   return (
                     <div key={u} className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-xl transition-colors">
-                      <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 dark:text-slate-400 overflow-hidden border border-slate-200 dark:border-slate-700">
+                      <div className={`w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 dark:text-slate-400 overflow-hidden border border-slate-200 dark:border-slate-700 ${onUserClick ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={(e) => { e.stopPropagation(); if (onUserClick) { onUserClick(u); setShowLikesModal(false); } }}>
                         {uInfo?.photoUrl ? <img src={uInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : uInfo?.displayName ? uInfo.displayName.charAt(0).toUpperCase() : u.charAt(0).toUpperCase()}
                       </div>
-                      <span className="font-bold text-slate-800 dark:text-slate-200 text-sm">{uInfo?.displayName || u}</span>
+                      <span className={`font-bold text-slate-800 dark:text-slate-200 text-sm ${onUserClick ? 'cursor-pointer hover:underline' : ''}`} onClick={(e) => { e.stopPropagation(); if (onUserClick) { onUserClick(u); setShowLikesModal(false); } }}>{uInfo?.displayName || u}</span>
                     </div>
                   );
                 })
@@ -1708,6 +1708,7 @@ export default function App() {
   const [redirectUser, setRedirectUser] = useState(null);
   const [targetFriendTab, setTargetFriendTab] = useState(null);
   const [showPushPrompt, setShowPushPrompt] = useState(false);
+  const [selectedUserProfile, setSelectedUserProfile] = useState(null);
   const [pushPromptType, setPushPromptType] = useState('request');
   const [osPermission, setOsPermission] = useState('default');
 
@@ -3154,10 +3155,10 @@ if (timerState.y === 'top') {
              <button onClick={handleLinkGoogle} className="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg shrink-0 transition-colors">連携</button>
           </div>
         )}
-        {currentTab === 'timeline' && <TimelineView posts={visiblePosts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} />}
+        {currentTab === 'timeline' && <TimelineView posts={visiblePosts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} />}
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} currentUser={currentUser} myInfo={myInfo} setCurrentTab={setCurrentTab} onSendRequest={handleSendFriendRequest} />}
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} />}
-        {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} />}
+        {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} />}
         {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onSendPartnerRequest={handleSendPartnerRequest} onAcceptPartnerRequest={handleAcceptPartnerRequest} onRejectPartnerRequest={handleRejectPartnerRequest} onRemovePartner={handleRemovePartner} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} posts={posts} targetFriendTab={targetFriendTab} setTargetFriendTab={setTargetFriendTab} onSendTestPush={async (targetUser, message) => {
           if (!db) return;
           const targetToken = accountsInfo[targetUser]?.fcmToken;
@@ -3185,7 +3186,7 @@ if (timerState.y === 'top') {
       </main>
 
       {editingPost && <EditWorkoutModal post={editingPost} gyms={allGyms} exercises={exercises} onClose={() => setEditingPost(null)} onSave={handleUpdateWorkout} myPastPosts={posts.filter(p => p.author === currentUser)} />}
-      {selectedFriendUser && <FriendDetailModal friendUsername={selectedFriendUser} posts={posts} accountsInfo={accountsInfo} onClose={() => setSelectedFriendUser(null)} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} />}
+      {selectedFriendUser && <FriendDetailModal friendUsername={selectedFriendUser} posts={posts} accountsInfo={accountsInfo} onClose={() => setSelectedFriendUser(null)} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} />}
       
       {focusedPost && (
         <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setFocusedPost(null)}>
@@ -3195,7 +3196,7 @@ if (timerState.y === 'top') {
                 <button onClick={() => setFocusedPost(null)} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={20} /></button>
              </div>
              <div className="p-4 overflow-y-auto flex-1">
-               <WorkoutCard post={focusedPost} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onToggleLike={toggleLike} onImport={handleImportWorkout} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} />
+               <WorkoutCard post={focusedPost} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onToggleLike={toggleLike} onImport={handleImportWorkout} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} />
              </div>
           </div>
         </div>
@@ -3252,6 +3253,7 @@ if (timerState.y === 'top') {
       )}
 
       <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} userInfo={myInfo} onSave={handleSaveProfile} currentUser={currentUser} onLinkGoogle={handleLinkGoogle} onDeleteAccount={handleDeleteAccount} onTogglePush={handleTogglePushPermission} />
+      <UserProfileModal isOpen={!!selectedUserProfile} onClose={() => setSelectedUserProfile(null)} targetUser={selectedUserProfile} accountsInfo={accountsInfo} currentUser={currentUser} onSendRequest={handleSendFriendRequest} />
     </div>
   );
 }
@@ -3570,6 +3572,94 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
   );
 }
 
+// --- ユーザープロフィールモーダル ---
+function UserProfileModal({ isOpen, onClose, targetUser, accountsInfo, currentUser, onSendRequest }) {
+  const [view, setView] = useState('profile');
+
+  useEffect(() => {
+    if (isOpen) setView('profile');
+  }, [isOpen]);
+
+  if (!isOpen || !targetUser) return null;
+
+  const userInfo = accountsInfo[targetUser] || {};
+  const friends = userInfo.friends || [];
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-[80] flex flex-col items-center justify-center animate-in fade-in duration-200 p-4" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        {view === 'profile' ? (
+          <>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-slate-800 dark:text-white">プロフィール</h2>
+              <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={20} /></button>
+            </div>
+            <div className="flex flex-col items-center space-y-4">
+              <div className="w-32 h-32 rounded-full bg-slate-100 dark:bg-slate-800 border-4 border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center text-4xl font-bold text-slate-500 shadow-sm">
+                {userInfo.photoUrl ? <img src={userInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : userInfo.displayName ? userInfo.displayName.charAt(0).toUpperCase() : targetUser.charAt(0).toUpperCase()}
+              </div>
+              <div className="text-center w-full">
+                <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{userInfo.displayName || targetUser}</div>
+                {userInfo.goal && <div className="mt-2 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-100 dark:border-slate-800 break-words">{userInfo.goal}</div>}
+              </div>
+              <button onClick={() => setView('friends')} className="mt-4 flex items-center justify-center gap-2 w-full bg-slate-100 dark:bg-slate-800 px-4 py-3 rounded-xl text-slate-700 dark:text-slate-300 font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                <Users size={18} /> フレンド: {friends.length}人
+              </button>
+              {targetUser !== currentUser && !(accountsInfo[currentUser]?.friends || []).includes(targetUser) && !(accountsInfo[targetUser]?.friendRequests || []).includes(currentUser) && (
+                <button onClick={() => onSendRequest(targetUser)} className="w-full mt-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+                  <UserPlus size={18} /> フレンド申請
+                </button>
+              )}
+              {targetUser !== currentUser && (accountsInfo[targetUser]?.friendRequests || []).includes(currentUser) && (
+                <div className="w-full mt-2 text-center text-sm font-bold text-slate-400 py-3 bg-slate-100 dark:bg-slate-800 rounded-xl">フレンド申請済み</div>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex justify-between items-center mb-6">
+              <button onClick={() => setView('profile')} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-full"><ChevronLeft size={20} /></button>
+              <h2 className="text-lg font-bold text-slate-800 dark:text-white">フレンド一覧</h2>
+              <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={20} /></button>
+            </div>
+            <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+              {friends.length === 0 ? (
+                <div className="text-center text-sm font-bold text-slate-400 py-8">フレンドがいません</div>
+              ) : (
+                friends.map(fId => {
+                  const fInfo = accountsInfo[fId];
+                  const isMe = fId === currentUser;
+                  const isMyFriend = (accountsInfo[currentUser]?.friends || []).includes(fId);
+                  const hasRequested = (fInfo?.friendRequests || []).includes(currentUser);
+
+                  return (
+                    <div key={fId} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 overflow-hidden shrink-0">
+                          {fInfo?.photoUrl ? <img src={fInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : fInfo?.displayName ? fInfo.displayName.charAt(0).toUpperCase() : fId.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="font-bold text-slate-800 dark:text-slate-200 text-sm truncate">{fInfo?.displayName || fId}</span>
+                      </div>
+                      {!isMe && !isMyFriend && !hasRequested && (
+                        <button onClick={() => onSendRequest(fId)} className="shrink-0 text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition-colors">
+                          申請
+                        </button>
+                      )}
+                      {!isMe && !isMyFriend && hasRequested && (
+                        <span className="shrink-0 text-[10px] font-bold text-slate-400 bg-slate-200 dark:bg-slate-800 px-2 py-1 rounded">申請済</span>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // --- ログイン・登録画面 ---
 function LoginScreen({ onLogin, onGoogleLogin, isOnline }) {
   const [agreed, setAgreed] = useState(false);
@@ -3674,7 +3764,7 @@ function AdBanner() {
 }
 
 // --- タイムライン画面 ---
-function TimelineView({ posts, onToggleLike, onImport, currentUser, onDelete, onEdit, accountsInfo, onAddComment, onDeleteComment, onToggleCommentLike }) {
+function TimelineView({ posts, onToggleLike, onImport, currentUser, onDelete, onEdit, accountsInfo, onAddComment, onDeleteComment, onToggleCommentLike, onUserClick }) {
   const [displayLimit, setDisplayLimit] = useState(10);
   const displayedPosts = posts.slice(0, displayLimit);
 
@@ -3690,7 +3780,7 @@ function TimelineView({ posts, onToggleLike, onImport, currentUser, onDelete, on
         <>
           {displayedPosts.map((post, index) => (
             <React.Fragment key={post.id}>
-              <WorkoutCard post={post} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={onEdit} onDelete={onDelete} onToggleLike={onToggleLike} onImport={onImport} onAddComment={onAddComment} onDeleteComment={onDeleteComment} onToggleCommentLike={onToggleCommentLike} />
+              <WorkoutCard post={post} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={onEdit} onDelete={onDelete} onToggleLike={onToggleLike} onImport={onImport} onAddComment={onAddComment} onDeleteComment={onDeleteComment} onToggleCommentLike={onToggleCommentLike} onUserClick={onUserClick} />
               {(index + 1) % 5 === 0 && <AdBanner />}
             </React.Fragment>
           ))}
@@ -3861,7 +3951,7 @@ function BodyCompositionInfo({ info, dailyCalories = 0, dateLabel = '' }) {
 }
 
 // --- データ画面 (カレンダー・グラフ・レポート) ---
-function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport, targetUser, onToggleLike, onAddComment, onDeleteComment, onToggleCommentLike }) {
+function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport, targetUser, onToggleLike, onAddComment, onDeleteComment, onToggleCommentLike, onUserClick }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState(formatDateFromTimestamp(Date.now()));
   const displayUser = targetUser || currentUser;
@@ -3943,7 +4033,7 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
           <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-3">{selectedDateStr.replace(/-/g, '/')} の記録</h3>
 
           {selectedPosts.length > 0 ? (
-            selectedPosts.map(post => <WorkoutCard key={post.id} post={post} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={onEdit} onDelete={onDelete} onImport={onImport} onToggleLike={onToggleLike} onAddComment={onAddComment} onDeleteComment={onDeleteComment} onToggleCommentLike={onToggleCommentLike} />)
+            selectedPosts.map(post => <WorkoutCard key={post.id} post={post} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={onEdit} onDelete={onDelete} onImport={onImport} onToggleLike={onToggleLike} onAddComment={onAddComment} onDeleteComment={onDeleteComment} onToggleCommentLike={onToggleCommentLike} onUserClick={onUserClick} />)
           ) : (
              <div className="bg-slate-100 dark:bg-slate-900 p-4 rounded-xl text-center text-slate-400 dark:text-slate-500 text-sm font-bold border border-slate-200 dark:border-slate-800">記録はありません</div>
           )}
@@ -6274,7 +6364,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.24, 22:38, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.24, 23:24, updated)</p>
       </div>
     </div>
   );
