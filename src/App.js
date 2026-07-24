@@ -1635,6 +1635,9 @@ function useAutoScrollDisable() {
 export default function App() {
   useAutoScrollDisable();
 
+  const [firebaseUser, setFirebaseUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+
   useEffect(() => {
     const handleNativeMessage = (event) => {
       try {
@@ -1650,10 +1653,7 @@ export default function App() {
       window.removeEventListener('message', handleNativeMessage);
       document.removeEventListener('message', handleNativeMessage);
     };
-  }, [currentUser]);
-
-  const [firebaseUser, setFirebaseUser] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null); 
+  }, [currentUser]); 
   const [currentTab, setCurrentTab] = useState('timeline');
   const [isRecordManual, setIsRecordManual] = useState(false);
   const [importGymId, setImportGymId] = useState('');
@@ -6265,7 +6265,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.24, 22:10, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.24, 22:21, updated)</p>
       </div>
     </div>
   );
