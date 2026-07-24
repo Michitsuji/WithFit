@@ -1747,6 +1747,7 @@ export default function App() {
   useEffect(() => {
     if (alarmAudio.current) {
       alarmAudio.current.volume = timerVolume;
+      alarmAudio.current.muted = timerVolume === 0;
     }
     if (typeof window !== 'undefined') {
       localStorage.setItem('withfit_timer_volume', timerVolume.toString());
@@ -1788,14 +1789,13 @@ export default function App() {
 
   const startRestTimer = (minutes) => {
     if (alarmAudio.current) {
-        const currentVol = alarmAudio.current.volume;
-        alarmAudio.current.volume = 0;
+        alarmAudio.current.muted = true;
         alarmAudio.current.play().then(() => {
             alarmAudio.current.pause();
             alarmAudio.current.currentTime = 0;
-            alarmAudio.current.volume = currentVol;
+            alarmAudio.current.muted = timerVolume === 0;
         }).catch(() => {
-            alarmAudio.current.volume = currentVol;
+            alarmAudio.current.muted = timerVolume === 0;
         });
     }
     setRestDuration(minutes * 60);
@@ -3103,7 +3103,7 @@ export default function App() {
                     </button>
                     {showVolumeSlider && (
                       <div className={`absolute left-1/2 -translate-x-1/2 bg-slate-800/95 backdrop-blur p-3 rounded-xl border border-slate-600 shadow-xl flex items-center justify-center z-50 w-32 ${timerState.y === 'top' ? 'top-full mt-2' : 'bottom-full mb-2'}`} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()} onTouchStart={e=>e.stopPropagation()}>
-                         <input type="range" min="0" max="1" step="0.01" value={timerVolume} onChange={e => { const newVol = parseFloat(e.target.value); setTimerVolume(newVol); if (alarmAudio.current) alarmAudio.current.volume = newVol; }} className="w-full accent-emerald-500 cursor-pointer" />
+                         <input type="range" min="0" max="1" step="0.01" value={timerVolume} onChange={e => { const newVol = parseFloat(e.target.value); setTimerVolume(newVol); if (alarmAudio.current) { alarmAudio.current.volume = newVol; alarmAudio.current.muted = newVol === 0; } }} className="w-full accent-emerald-500 cursor-pointer" />
                       </div>
                     )}
                   </div>
@@ -3141,7 +3141,7 @@ export default function App() {
         </div>
       )}
 
-      <main className={`px-4 pb-48 max-w-md mx-auto w-full ${myInfo?.isTraining && timerState.y === 'top' ? 'pt-44' : 'pt-24'}`}>
+      <main className={`px-4 pb-48 max-w-md mx-auto w-full ${myInfo?.isTraining && timerState.y === 'top' ? (activeFriends.length > 0 ? 'pt-52' : 'pt-44') : (activeFriends.length > 0 ? 'pt-32' : 'pt-24')}`}>
         {!myInfo?.googleUid && (
           <div className="bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 px-4 py-3 rounded-2xl border border-rose-200 dark:border-rose-900/60 font-bold text-xs mb-6 flex justify-between items-center shadow-sm">
              <div className="flex items-center gap-1.5 min-w-0">
@@ -6271,7 +6271,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.24, 22:27, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.24, 22:33, updated)</p>
       </div>
     </div>
   );
