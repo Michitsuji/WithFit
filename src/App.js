@@ -1900,11 +1900,11 @@ export default function App() {
         else transformX = screenW - cardW - 16;
      }
      
-     if (timerState.y === 'top') {
-        transformY = 80;
-     } else {
-        transformY = screenH - cardH - 90;
-     }
+if (timerState.y === 'top') {
+                  const hasActiveFriends = currentUser && accountsInfo[currentUser]?.friends?.some(f => accountsInfo[f]?.isTraining);
+                                  transformY = hasActiveFriends ? 112 : 80;             } else {
+                                                    transformY = screenH - cardH - 90;
+                                                               }
   }
   const isHidden = timerState.hidden;
 
