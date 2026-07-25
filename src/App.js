@@ -3507,43 +3507,44 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
           <div>             
             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">プッシュ通知設定</label>
           <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
-            {osPermission === 'denied' ? (
+            {osPermission === 'denied' && (
               <div className="bg-rose-50 border border-rose-200 p-3 rounded-xl flex flex-col gap-3">
                 <div className="flex items-start gap-2">
                   <Settings size={16} className="text-rose-500 shrink-0 mt-0.5" />
-                  <p className="text-xs text-rose-700 font-bold leading-relaxed">端末の設定で通知がオフになっています。<br/>iPhoneの「設定」アプリからアプリの通知を許可してください。</p>
+                  <p className="text-xs text-rose-700 font-bold leading-relaxed">端末の設定で通知がオフになっています。<br/>iPhoneの設定アプリからアプリの通知を許可してください。</p>
                 </div>
               </div>
-            ) : !isPushEnabled && osPermission === 'default' ? (
+            )}
+            {!isPushEnabled && osPermission === 'default' && (
               <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex flex-col gap-3">
                 <p className="text-xs text-amber-700 font-bold leading-relaxed">通知が許可されていません。<br/>後日表示されるポップアップから許可を行ってください。</p>
               </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-lg">
-                  <span className="text-sm font-bold text-slate-700 dark:text-slate-300">フレンドのトレーニング完了</span>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" checked={notifyPost} onChange={e => setNotifyPost(e.target.checked)} className="sr-only peer" />
-                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-emerald-500"></div>
-                  </label>
-                </div>
-                <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-lg">
-                  <span className="text-sm font-bold text-slate-700 dark:text-slate-300">コメントの受信</span>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" checked={notifyComment} onChange={e => setNotifyComment(e.target.checked)} className="sr-only peer" />
-                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-emerald-500"></div>
-                  </label>
-                </div>
-                <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-lg">
-                  <span className="text-sm font-bold text-slate-700 dark:text-slate-300">ナイス！の受信</span>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" checked={notifyLike} onChange={e => setNotifyLike(e.target.checked)} className="sr-only peer" />
-                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-emerald-500"></div>
-                  </label>
-                </div>
-                <p className="text-[10px] text-slate-400 font-bold mt-2">※すべての通知を完全に停止する場合は、iPhoneの「設定」アプリから通知をオフにしてください。</p>
-              </div>
             )}
+            
+            <div className={`space-y-3 ${(osPermission === 'denied' || (!isPushEnabled && osPermission === 'default')) ? 'opacity-50 pointer-events-none' : ''}`}>
+              <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-lg">
+                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">フレンドのトレーニング完了</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" checked={notifyPost} onChange={e => setNotifyPost(e.target.checked)} className="sr-only peer" />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-emerald-500"></div>
+                </label>
+              </div>
+              <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-lg">
+                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">コメントの受信</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" checked={notifyComment} onChange={e => setNotifyComment(e.target.checked)} className="sr-only peer" />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-emerald-500"></div>
+                </label>
+              </div>
+              <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-lg">
+                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">ナイス！の受信</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" checked={notifyLike} onChange={e => setNotifyLike(e.target.checked)} className="sr-only peer" />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-emerald-500"></div>
+                </label>
+              </div>
+              <p className="text-[10px] text-slate-400 font-bold mt-2">※すべての通知を完全に停止する場合は、iPhoneの設定アプリから通知をオフにしてください。</p>
+            </div>
           </div>
           </div>
 
@@ -6369,7 +6370,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.24, 23:33, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.25, 11:34, updated)</p>
       </div>
     </div>
   );
