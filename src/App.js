@@ -500,7 +500,6 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
   const authorInfo = accountsInfo && accountsInfo[post.author];
   const hideMetrics = !isMyPost && authorInfo?.hideBodyMetrics;
   
-  // 動的なカラー生成
   const generateColor = (str) => {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
@@ -509,8 +508,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
     const hue = Math.abs(hash) % 360;
     return `hsl(${hue}, 70%, 50%)`;
   };
-  const userColorBg = isMyPost ? 'bg-slate-600 dark:bg-slate-500' : 'bg-emerald-500';
-  const customBgStyle = isMyPost ? {} : { backgroundColor: post.author ? generateColor(post.author) : '#10b981' };
+  const authorColor = authorInfo?.userColor || (post.author ? generateColor(post.author) : '#10b981');
 
   const baseWeight = Number(post.bodyWeight) || Number(authorInfo?.weight) || 60;
   const { processedItems, totalVolume, totalCalories } = useMemo(() => {
@@ -655,10 +653,10 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm overflow-hidden relative mb-4">
-      <div className={`absolute top-0 left-0 w-1.5 h-full ${isMyPost ? 'bg-slate-300 dark:bg-slate-600' : ''}`} style={!isMyPost ? { backgroundColor: customBgStyle.backgroundColor } : {}}></div>
+      <div className="absolute top-0 left-0 w-1.5 h-full" style={{ backgroundColor: authorColor }}></div>
       <div className="flex justify-between items-start mb-4 pl-3">
         <div className="flex items-center gap-3 w-full overflow-hidden">
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm overflow-hidden shrink-0 ${userColorBg} ${onUserClick ? 'cursor-pointer hover:opacity-80' : ''}`} style={customBgStyle} onClick={(e) => { e.stopPropagation(); if (onUserClick) onUserClick(post.author); }}>
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm shrink-0 overflow-hidden ${onUserClick ? 'cursor-pointer hover:opacity-80' : ''}`} style={{ backgroundColor: authorColor, border: `2px solid ${authorColor}` }} onClick={(e) => { e.stopPropagation(); if (onUserClick) onUserClick(post.author); }}>
             {authorInfo?.photoUrl ? <img src={authorInfo.photoUrl} alt={post.author} className="w-full h-full object-cover" /> : authorInfo?.displayName ? authorInfo.displayName.charAt(0).toUpperCase() : (post.author ? post.author.charAt(0).toUpperCase() : '?')}
           </div>
           <div className="flex-1 min-w-0">
@@ -3277,6 +3275,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
   const [goal, setGoal] = useState(userInfo?.goal || '');
   const [theme, setTheme] = useState(userInfo?.theme || 'light');
   const [photoUrl, setPhotoUrl] = useState(userInfo?.photoUrl || null);
+  const [userColor, setUserColor] = useState(userInfo?.userColor || '#10b981');
   
   const [birthDate, setBirthDate] = useState(userInfo?.birthDate || '');
   const [gender, setGender] = useState(userInfo?.gender || 'male');
@@ -3301,6 +3300,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
       setGoal(userInfo?.goal || '');
       setTheme(userInfo?.theme || 'light');
       setPhotoUrl(userInfo?.photoUrl || null);
+      setUserColor(userInfo?.userColor || '#10b981');
       setBirthDate(userInfo?.birthDate || '');
       setGender(userInfo?.gender || 'male');
       setHeight(userInfo?.height || '');
@@ -3407,7 +3407,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
   };
 
   const handleSave = () => {
-    onSave({ displayName: displayName.trim() || currentUser, photoUrl, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null, hideBodyMetrics, enablePartnerFeature, notifyPost, notifyComment, notifyLike });
+    onSave({ displayName: displayName.trim() || currentUser, photoUrl, userColor, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null, hideBodyMetrics, enablePartnerFeature, notifyPost, notifyComment, notifyLike });
   };
 
   if (cropImageSrc) {
@@ -3482,6 +3482,14 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
                 <Trash2 size={16} /> 削除
               </button>
             )}
+          </div>
+          
+          <div className="w-full mt-4">
+            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">テーマカラー (アイコン枠・タイムライン左枠)</label>
+            <div className="flex items-center gap-2">
+              <input type="color" value={userColor} onChange={e => setUserColor(e.target.value)} className="w-12 h-10 p-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg cursor-pointer shrink-0" />
+              <input type="text" value={userColor} onChange={e => setUserColor(e.target.value)} className="flex-1 min-w-0 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500 uppercase font-mono" placeholder="#10B981" />
+            </div>
           </div>
         </div>
 
@@ -6392,7 +6400,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.25, 11:45, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.25, 11:51, updated)</p>
       </div>
     </div>
   );
