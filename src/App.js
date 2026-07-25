@@ -846,10 +846,11 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
               const isCLiked = cLikedUsers.includes(currentUser);
               const cLikesCount = cLikedUsers.length;
               const currentRootId = rootId || comment.id;
+              const cUserColor = cInfo?.userColor || '#10b981';
 
               return (
                 <div key={comment.id} className="flex gap-2.5">
-                  <div className={`w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 text-xs shrink-0 overflow-hidden mt-1 ${onUserClick ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={(e) => { e.stopPropagation(); if (onUserClick) onUserClick(comment.author); }}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden mt-1 ${onUserClick ? 'cursor-pointer hover:opacity-80' : ''}`} style={{ backgroundColor: cUserColor, border: `2px solid ${cUserColor}`, color: 'white' }} onClick={(e) => { e.stopPropagation(); if (onUserClick) onUserClick(comment.author); }}>
                      {cInfo?.photoUrl ? <img src={cInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : cInfo?.displayName ? cInfo.displayName.charAt(0).toUpperCase() : comment.author.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 group min-w-0">
@@ -922,14 +923,17 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
           <div className="relative flex gap-2 items-end">
             {mentionQuery !== null && mentionCandidates.length > 0 && (
               <div className="absolute bottom-full left-0 w-full mb-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg max-h-40 overflow-y-auto z-10">
-                {mentionCandidates.map(([uname, data]) => (
+                {mentionCandidates.map(([uname, data]) => {
+                  const mUserColor = data?.userColor || '#10b981';
+                  return (
                   <div key={uname} onClick={() => insertMention(uname)} className="px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs overflow-hidden">
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs overflow-hidden font-bold" style={{ backgroundColor: mUserColor, border: `2px solid ${mUserColor}`, color: 'white' }}>
                       {data.photoUrl ? <img src={data.photoUrl} alt="" className="w-full h-full object-cover" /> : (data.displayName || uname).charAt(0).toUpperCase()}
                     </div>
                     <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{data.displayName || uname}</span>
                   </div>
-                ))}
+                );
+                })}
               </div>
             )}
             <div className="flex-1 flex flex-col min-w-0">
@@ -971,9 +975,10 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
               {likedUsers.length > 0 ? (
                 likedUsers.map(u => {
                   const uInfo = accountsInfo && accountsInfo[u];
+                  const lUserColor = uInfo?.userColor || '#10b981';
                   return (
                     <div key={u} className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-xl transition-colors">
-                      <div className={`w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 dark:text-slate-400 overflow-hidden border border-slate-200 dark:border-slate-700 ${onUserClick ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={(e) => { e.stopPropagation(); if (onUserClick) { onUserClick(u); setShowLikesModal(false); } }}>
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold overflow-hidden ${onUserClick ? 'cursor-pointer hover:opacity-80' : ''}`} style={{ backgroundColor: lUserColor, border: `2px solid ${lUserColor}`, color: 'white' }} onClick={(e) => { e.stopPropagation(); if (onUserClick) { onUserClick(u); setShowLikesModal(false); } }}>
                         {uInfo?.photoUrl ? <img src={uInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : uInfo?.displayName ? uInfo.displayName.charAt(0).toUpperCase() : u.charAt(0).toUpperCase()}
                       </div>
                       <span className={`font-bold text-slate-800 dark:text-slate-200 text-sm ${onUserClick ? 'cursor-pointer hover:underline' : ''}`} onClick={(e) => { e.stopPropagation(); if (onUserClick) { onUserClick(u); setShowLikesModal(false); } }}>{uInfo?.displayName || u}</span>
@@ -2983,7 +2988,7 @@ if (timerState.y === 'top') {
               <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">{isOnline ? 'オンライン' : 'オフライン'}</span>
             </div>
             <button onClick={() => setShowProfileModal(true)} className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-              <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-xs overflow-hidden border border-emerald-200 dark:border-emerald-800">
+              <div className="w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs overflow-hidden" style={{ backgroundColor: myInfo?.userColor || '#10b981', border: `2px solid ${myInfo?.userColor || '#10b981'}`, color: 'white' }}>
                 {myInfo.photoUrl ? <img src={myInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : myInfo.displayName ? myInfo.displayName.charAt(0).toUpperCase() : currentUser.charAt(0).toUpperCase()}
               </div>
               <span className="text-sm font-bold text-slate-700 dark:text-slate-200 hidden sm:inline">
@@ -3032,10 +3037,11 @@ if (timerState.y === 'top') {
                ) : (
                   notifications.map(notif => {
                      const isUnread = notif.timestamp > (myInfo.lastNotificationCheck || 0);
+                     const notifUserColor = accountsInfo[notif.fromUser]?.userColor || '#10b981';
                      return (
                        <div key={notif.id} onClick={() => handleNotificationClick(notif)} className={`flex gap-3 items-center p-2 rounded-xl cursor-pointer transition-colors ${isUnread ? 'bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-100/50 dark:hover:bg-emerald-950/40' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                           <div className="relative shrink-0 mt-0.5">
-                             <div className="w-9 h-9 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-xs overflow-hidden border border-slate-100 dark:border-slate-800">
+                             <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs overflow-hidden" style={{ backgroundColor: notifUserColor, border: `2px solid ${notifUserColor}`, color: 'white' }}>
                                 {accountsInfo[notif.fromUser]?.photoUrl ? <img src={accountsInfo[notif.fromUser].photoUrl} alt="" className="w-full h-full object-cover"/> : accountsInfo[notif.fromUser]?.displayName ? accountsInfo[notif.fromUser].displayName.charAt(0).toUpperCase() : notif.fromUser.charAt(0).toUpperCase()}
                              </div>
                              {notif.type === 'like' && (
@@ -3626,7 +3632,7 @@ function UserProfileModal({ isOpen, onClose, targetUser, accountsInfo, currentUs
               <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={20} /></button>
             </div>
             <div className="flex flex-col items-center space-y-4">
-              <div className="w-32 h-32 rounded-full bg-slate-100 dark:bg-slate-800 border-4 overflow-hidden flex items-center justify-center text-4xl font-bold text-slate-500 shadow-sm" style={{ borderColor: userInfo.userColor || '#10b981' }}>
+              <div className="w-32 h-32 rounded-full border-4 overflow-hidden flex items-center justify-center text-4xl font-bold shadow-sm" style={{ borderColor: userInfo.userColor || '#10b981', backgroundColor: userInfo.userColor || '#10b981', color: 'white' }}>
                 {userInfo.photoUrl ? <img src={userInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : userInfo.displayName ? userInfo.displayName.charAt(0).toUpperCase() : targetUser.charAt(0).toUpperCase()}
               </div>
               <div className="text-center w-full">
@@ -3672,7 +3678,7 @@ function UserProfileModal({ isOpen, onClose, targetUser, accountsInfo, currentUs
                   return (
                     <div key={fId} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 overflow-hidden shrink-0" style={{ border: `2px solid ${userColor}` }}>
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold overflow-hidden shrink-0" style={{ backgroundColor: userColor, border: `2px solid ${userColor}`, color: 'white' }}>
                           {fInfo?.photoUrl ? <img src={fInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : fInfo?.displayName ? fInfo.displayName.charAt(0).toUpperCase() : fId.charAt(0).toUpperCase()}
                         </div>
                         <span className="font-bold text-slate-800 dark:text-slate-200 text-sm truncate">{fInfo?.displayName || fId}</span>
@@ -3868,7 +3874,7 @@ function MonthlyReport({ monthDate, posts, userName, accountsInfo }) {
   return (
     <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm animate-in fade-in">
       <div className="flex items-center gap-3 mb-5">
-         <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center font-bold text-white text-xs bg-slate-600">
+         <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center font-bold text-xs" style={{ backgroundColor: accountsInfo[userName]?.userColor || '#10b981', border: `2px solid ${accountsInfo[userName]?.userColor || '#10b981'}`, color: 'white' }}>
             {accountsInfo[userName]?.photoUrl ? <img src={accountsInfo[userName].photoUrl} alt={userName} className="w-full h-full object-cover" /> : accountsInfo[userName]?.displayName ? accountsInfo[userName].displayName.charAt(0).toUpperCase() : userName.charAt(0).toUpperCase()}
          </div>
          <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1">{renderUsernameWithBadge(userName, accountsInfo[userName]?.displayName, accountsInfo, "font-bold text-slate-800 dark:text-slate-100")} のレポート</h3>
@@ -5580,10 +5586,11 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                               const isMe = mId === currentUser;
                               const isFriend = (myInfo?.friends || []).includes(mId);
                               const hasRequested = (accountsInfo[mId]?.friendRequests || []).includes(currentUser);
+                              const mColor = mInfo?.userColor || '#10b981';
                               
                               return (
                                 <div key={mId} className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 pl-2 pr-1.5 py-1.5 rounded-full border border-slate-100 dark:border-slate-800">
-                                  <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[9px] font-bold overflow-hidden shrink-0">
+                                  <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold overflow-hidden shrink-0" style={{ backgroundColor: mColor, border: `2px solid ${mColor}`, color: 'white' }}>
                                     {mInfo?.photoUrl ? <img src={mInfo.photoUrl} alt="member" className="w-full h-full object-cover"/> : mId.charAt(0).toUpperCase()}
                                   </div>
                                   {renderUsernameWithBadge(mId, mInfo?.displayName, accountsInfo, "text-xs font-bold text-slate-600 dark:text-slate-300 truncate max-w-[80px]")}
@@ -6016,10 +6023,12 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
           {myInfo.partnerRequests && myInfo.partnerRequests.length > 0 && (
              <div className="mb-6 space-y-2">
                 <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">パートナー申請 承認待ち</h3>
-                {myInfo.partnerRequests.map(reqUser => (
+                {myInfo.partnerRequests.map(reqUser => {
+                   const reqColor = accountsInfo[reqUser]?.userColor || '#10b981';
+                   return (
                    <div key={reqUser} className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-xl p-3 flex items-center justify-between shadow-sm">
                       <div className="flex items-center gap-3">
-                         <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 dark:text-slate-400 overflow-hidden">
+                         <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold overflow-hidden" style={{ backgroundColor: reqColor, border: `2px solid ${reqColor}`, color: 'white' }}>
                             {accountsInfo[reqUser]?.photoUrl ? <img src={accountsInfo[reqUser].photoUrl} alt={reqUser} className="w-full h-full object-cover" /> : accountsInfo[reqUser]?.displayName ? accountsInfo[reqUser].displayName.charAt(0).toUpperCase() : reqUser.charAt(0).toUpperCase()}
                          </div>
                          {renderUsernameWithBadge(reqUser, accountsInfo[reqUser]?.displayName, accountsInfo, "font-bold text-slate-800 dark:text-slate-100 text-sm")}
@@ -6029,7 +6038,8 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
                          <button onClick={() => onRejectPartnerRequest(reqUser)} className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg transition-colors">拒否</button>
                       </div>
                    </div>
-                ))}
+                );
+                })}
              </div>
           )}
 
@@ -6052,10 +6062,11 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
                     {myFriends.map(f => {
                        const fInfo = accountsInfo[f];
                        const hasRequested = (fInfo?.partnerRequests || []).includes(currentUser);
+                       const fColor = fInfo?.userColor || '#10b981';
                        return (
                          <div key={f} className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 dark:text-slate-400 overflow-hidden">
+                              <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold overflow-hidden" style={{ backgroundColor: fColor, border: `2px solid ${fColor}`, color: 'white' }}>
                                  {fInfo?.photoUrl ? <img src={fInfo.photoUrl} alt={f} className="w-full h-full object-cover" /> : fInfo?.displayName ? fInfo.displayName.charAt(0).toUpperCase() : f.charAt(0).toUpperCase()}
                               </div>
                               {renderUsernameWithBadge(f, fInfo?.displayName, accountsInfo, "font-bold text-slate-800 dark:text-slate-200 text-sm")}
@@ -6082,8 +6093,8 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
             
             <div className="flex flex-col items-center justify-center text-center relative z-10 py-4">
               <div className="relative mb-4">
-                <div className={`w-24 h-24 rounded-full bg-white border-4 ${iconBorder} shadow-xl flex items-center justify-center text-3xl font-bold overflow-hidden`}>
-                  {partnerInfo.photoUrl ? <img src={partnerInfo.photoUrl} alt={partnerName} className="w-full h-full object-cover" /> : <span className="text-slate-800">{partnerName.charAt(0).toUpperCase()}</span>}
+                <div className={`w-24 h-24 rounded-full border-4 shadow-xl flex items-center justify-center text-3xl font-bold overflow-hidden`} style={{ backgroundColor: partnerInfo.userColor || '#10b981', borderColor: partnerInfo.userColor || '#10b981', color: 'white' }}>
+                  {partnerInfo.photoUrl ? <img src={partnerInfo.photoUrl} alt={partnerName} className="w-full h-full object-cover" /> : <span className="text-white">{partnerName.charAt(0).toUpperCase()}</span>}
                 </div>
                 <div className={`absolute bottom-0 right-0 w-6 h-6 border-4 border-white rounded-full ${badgeColor} z-20`}></div>
               </div>
@@ -6281,19 +6292,6 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
 
       {activeTab === 'friends' && (
         <div className="space-y-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-lg shrink-0 overflow-hidden" style={{ backgroundColor: myInfo?.userColor || '#10b981', border: `2px solid ${myInfo?.userColor || '#10b981'}` }}>
-              {myInfo?.photoUrl ? <img src={myInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : myInfo?.displayName ? myInfo.displayName.charAt(0).toUpperCase() : currentUser.charAt(0).toUpperCase()}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-bold text-slate-800 dark:text-slate-100 text-base truncate">{myInfo?.displayName || currentUser}</span>
-                <span className="text-[10px] font-bold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 shrink-0">あなた</span>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-bold truncate">{myInfo?.goal || '目標を設定してトレーニングを頑張りましょう'}</p>
-            </div>
-          </div>
-          <div className="w-full h-px bg-slate-200 dark:bg-slate-800"></div>
           <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 rounded-3xl p-5 text-white shadow-xl mb-6 overflow-hidden relative">
             <div className="absolute -right-6 -bottom-6 text-white/10 transform rotate-12 pointer-events-none">
               <Trophy size={140} />
@@ -6311,6 +6309,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
             <div className="space-y-2.5 relative z-10">
               {(rankingType === 'global' ? rankingData.globalRanking : rankingData.friendRanking).slice(0, isRankingExpanded ? 100 : 5).map((user, idx) => {
                 const isMe = user.username === currentUser;
+                const uColor = accountsInfo[user.username]?.userColor || '#10b981';
                 let rankBadge = <span className="text-xs font-bold w-6 text-center text-white/70">{idx + 1}</span>;
                 if (idx === 0) rankBadge = <Award className="text-amber-300 shrink-0" size={20} />;
                 if (idx === 1) rankBadge = <Award className="text-slate-300 shrink-0" size={20} />;
@@ -6320,7 +6319,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
                   <div key={user.username} className={`flex items-center justify-between p-2.5 rounded-2xl border backdrop-blur-md transition-all ${isMe ? 'bg-white/20 border-white/40 shadow-md' : 'bg-black/10 border-white/10 hover:bg-black/20'}`}>
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="w-6 flex justify-center items-center shrink-0">{rankBadge}</div>
-                      <div className="w-7 h-7 rounded-full bg-white/20 border border-white/20 overflow-hidden flex items-center justify-center font-bold text-xs shrink-0">
+                      <div className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center font-bold text-xs shrink-0" style={{ backgroundColor: uColor, border: `2px solid ${uColor}`, color: 'white' }}>
                         {user.photoUrl ? <img src={user.photoUrl} alt="" className="w-full h-full object-cover" /> : user.displayName.charAt(0).toUpperCase()}
                       </div>
                       {renderUsernameWithBadge(user.username, user.displayName, accountsInfo, `text-xs font-bold truncate ${isMe ? 'text-amber-200' : ''}`)}
@@ -6414,7 +6413,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.25, 11:58, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.25, 12:05, updated)</p>
       </div>
     </div>
   );
