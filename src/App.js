@@ -3467,7 +3467,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
           
         </div>
         <div className="flex flex-col items-center space-y-6">
-          <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800 border-4 border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center relative font-bold text-2xl text-slate-500">
+          <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800 border-4 overflow-hidden flex items-center justify-center relative font-bold text-2xl text-slate-500" style={{ borderColor: userColor }}>
             {photoUrl ? <img src={photoUrl} alt="profile" className="w-full h-full object-cover" /> : displayName ? displayName.charAt(0).toUpperCase() : currentUser.charAt(0).toUpperCase()}
             {isUploading && <div className="absolute inset-0 bg-white/60 dark:bg-slate-900/60 flex items-center justify-center"><Activity className="animate-spin text-emerald-500" size={24} /></div>}
           </div>
@@ -6400,7 +6400,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.25, 11:51, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.25, 11:53, updated)</p>
       </div>
     </div>
   );
