@@ -1923,32 +1923,43 @@ if (timerState.y === 'top') {
   };
 
   useEffect(() => {
-    const checkPermission = () => {
-      if (typeof window !== 'undefined') {
-        if (window.ReactNativeWebView) {
-          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'CHECK_PUSH_PERMISSION' }));
-        } else if ('Notification' in window) {
-          setOsPermission(prev => prev !== Notification.permission ? Notification.permission : prev);
-        }
+    const checkPermission = async () => {
+      if (typeof window === 'undefined') return;
+      let current = 'default';
+      
+      if ('Notification' in window) {
+        current = Notification.permission;
       }
+      
+      if (navigator.permissions && navigator.permissions.query) {
+        try {
+          const status = await navigator.permissions.query({ name: 'notifications' });
+          if (status && status.state) current = status.state === 'prompt' ? 'default' : status.state;
+        } catch(e) {}
+      }
+      
+      if (navigator.serviceWorker) {
+         try {
+            const reg = await navigator.serviceWorker.getRegistration();
+            if (reg && reg.pushManager) {
+               const pmState = await reg.pushManager.permissionState({ userVisibleOnly: true });
+               if (pmState) current = pmState === 'prompt' ? 'default' : pmState;
+            }
+         } catch(e) {}
+      }
+      
+      setOsPermission(prev => prev !== current ? current : prev);
     };
+
     checkPermission();
 
     let intervalId;
     if (typeof window !== 'undefined') {
-       intervalId = setInterval(checkPermission, 2000);
+       intervalId = setInterval(checkPermission, 1500);
        window.addEventListener('focus', checkPermission);
        window.addEventListener('visibilitychange', () => {
           if (document.visibilityState === 'visible') checkPermission();
        });
-    }
-
-    if (typeof window !== 'undefined' && navigator.permissions && navigator.permissions.query) {
-       navigator.permissions.query({ name: 'notifications' }).then(status => {
-          status.onchange = () => {
-             checkPermission();
-          };
-       }).catch(()=>{});
     }
 
     return () => {
@@ -3308,8 +3319,19 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
       setNotifyLike(userInfo?.notifyLike !== false);
       setCropImageSrc(null);
       setImageObj(null);
-      if (typeof window !== 'undefined' && 'Notification' in window) {
-        setOsPermission(Notification.permission);
+      if (typeof window !== 'undefined') {
+        const checkModalPermission = async () => {
+          let current = 'default';
+          if ('Notification' in window) current = Notification.permission;
+          if (navigator.permissions && navigator.permissions.query) {
+            try { const status = await navigator.permissions.query({ name: 'notifications' }); if (status && status.state) current = status.state === 'prompt' ? 'default' : status.state; } catch(e) {}
+          }
+          if (navigator.serviceWorker) {
+            try { const reg = await navigator.serviceWorker.getRegistration(); if (reg && reg.pushManager) { const pmState = await reg.pushManager.permissionState({ userVisibleOnly: true }); if (pmState) current = pmState === 'prompt' ? 'default' : pmState; } } catch(e) {}
+          }
+          setOsPermission(current);
+        };
+        checkModalPermission();
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -6376,7 +6398,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.25, 11:38, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.25, 11:42, updated)</p>
       </div>
     </div>
   );
