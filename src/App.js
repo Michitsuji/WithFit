@@ -3626,7 +3626,7 @@ function UserProfileModal({ isOpen, onClose, targetUser, accountsInfo, currentUs
               <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={20} /></button>
             </div>
             <div className="flex flex-col items-center space-y-4">
-              <div className="w-32 h-32 rounded-full bg-slate-100 dark:bg-slate-800 border-4 border-slate-200 dark:border-slate-700 overflow-hidden flex items-center justify-center text-4xl font-bold text-slate-500 shadow-sm">
+              <div className="w-32 h-32 rounded-full bg-slate-100 dark:bg-slate-800 border-4 overflow-hidden flex items-center justify-center text-4xl font-bold text-slate-500 shadow-sm" style={{ borderColor: userInfo.userColor || '#10b981' }}>
                 {userInfo.photoUrl ? <img src={userInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : userInfo.displayName ? userInfo.displayName.charAt(0).toUpperCase() : targetUser.charAt(0).toUpperCase()}
               </div>
               <div className="text-center w-full">
@@ -3667,11 +3667,12 @@ function UserProfileModal({ isOpen, onClose, targetUser, accountsInfo, currentUs
                   const isMe = fId === currentUser;
                   const isMyFriend = (accountsInfo[currentUser]?.friends || []).includes(fId);
                   const hasRequested = (fInfo?.friendRequests || []).includes(currentUser);
+                  const userColor = fInfo?.userColor || '#10b981';
 
                   return (
                     <div key={fId} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 overflow-hidden shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 overflow-hidden shrink-0" style={{ border: `2px solid ${userColor}` }}>
                           {fInfo?.photoUrl ? <img src={fInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : fInfo?.displayName ? fInfo.displayName.charAt(0).toUpperCase() : fId.charAt(0).toUpperCase()}
                         </div>
                         <span className="font-bold text-slate-800 dark:text-slate-200 text-sm truncate">{fInfo?.displayName || fId}</span>
@@ -6280,6 +6281,19 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
 
       {activeTab === 'friends' && (
         <div className="space-y-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-lg shrink-0 overflow-hidden" style={{ backgroundColor: myInfo?.userColor || '#10b981', border: `2px solid ${myInfo?.userColor || '#10b981'}` }}>
+              {myInfo?.photoUrl ? <img src={myInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : myInfo?.displayName ? myInfo.displayName.charAt(0).toUpperCase() : currentUser.charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-bold text-slate-800 dark:text-slate-100 text-base truncate">{myInfo?.displayName || currentUser}</span>
+                <span className="text-[10px] font-bold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 shrink-0">あなた</span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-bold truncate">{myInfo?.goal || '目標を設定してトレーニングを頑張りましょう'}</p>
+            </div>
+          </div>
+          <div className="w-full h-px bg-slate-200 dark:bg-slate-800"></div>
           <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 rounded-3xl p-5 text-white shadow-xl mb-6 overflow-hidden relative">
             <div className="absolute -right-6 -bottom-6 text-white/10 transform rotate-12 pointer-events-none">
               <Trophy size={140} />
@@ -6400,7 +6414,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.25, 11:53, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.25, 11:58, updated)</p>
       </div>
     </div>
   );
