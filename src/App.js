@@ -2968,12 +2968,6 @@ if (timerState.y === 'top') {
             <WithFitLogo className="text-indigo-500" /><span>With<span className="text-indigo-500">Fit</span></span>
           </h1>
           <div className="flex items-center gap-3">
-            {osPermission === 'denied' && (
-              <button onClick={() => { setPushPromptType('warning'); setShowPushPrompt(true); }} className="flex items-center gap-1 bg-rose-50 dark:bg-rose-950/50 px-2 py-1.5 rounded-full border border-rose-200 dark:border-rose-900 text-rose-600 dark:text-rose-400 transition-colors hover:bg-rose-100">
-                <Settings size={14} />
-                <span className="text-[10px] font-bold hidden sm:inline">通知オフ</span>
-              </button>
-            )}
             <button onClick={handleOpenNotifications} className="relative p-1.5 text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors">
               <Bell size={20} />
               {unreadNotificationCount > 0 && (
@@ -6398,7 +6392,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.25, 11:42, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.25, 11:45, updated)</p>
       </div>
     </div>
   );
