@@ -6136,22 +6136,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
                </div>
              </div>
           </div>
-
-          {/* ランキングの下に配置する自分の枠 */}
-          <div onClick={() => onFriendClick(currentUser)} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 overflow-hidden shrink-0" style={{ border: `2px solid ${myInfo?.userColor || '#10b981'}` }}>
-                {myInfo?.photoUrl ? <img src={myInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : myInfo?.displayName ? myInfo.displayName.charAt(0).toUpperCase() : currentUser.charAt(0).toUpperCase()}
-              </div>
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-slate-800 dark:text-slate-200 text-sm truncate">{myInfo?.displayName || currentUser}</span>
-                  <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400 px-1.5 py-0.5 rounded">あなた</span>
-                </div>
-                {myInfo?.goal && <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold mt-0.5 truncate max-w-[200px]">{myInfo.goal}</p>}
-              </div>
-            </div>
-          </div>
+          
 
           <div className="mt-8">
              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">{partnerInfo.displayName || partnerName}の月間レポート</h3>
@@ -6297,6 +6282,19 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
 
       {activeTab === 'friends' && (
         <div className="space-y-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-lg shrink-0 overflow-hidden" style={{ backgroundColor: myInfo?.userColor || '#10b981', border: `2px solid ${myInfo?.userColor || '#10b981'}` }}>
+              {myInfo?.photoUrl ? <img src={myInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : myInfo?.displayName ? myInfo.displayName.charAt(0).toUpperCase() : currentUser.charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-bold text-slate-800 dark:text-slate-100 text-base truncate">{myInfo?.displayName || currentUser}</span>
+                <span className="text-[10px] font-bold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 shrink-0">あなた</span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-bold truncate">{myInfo?.goal || '目標を設定してトレーニングを頑張りましょう'}</p>
+            </div>
+          </div>
+          <div className="w-full h-px bg-slate-200 dark:bg-slate-800"></div>
           <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 rounded-3xl p-5 text-white shadow-xl mb-6 overflow-hidden relative">
             <div className="absolute -right-6 -bottom-6 text-white/10 transform rotate-12 pointer-events-none">
               <Trophy size={140} />
@@ -6417,7 +6415,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.25, 12:18, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.25, 11:58, updated)</p>
       </div>
     </div>
   );
