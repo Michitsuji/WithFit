@@ -1644,6 +1644,8 @@ export default function App() {
         const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
         if (data.type === 'PUSH_TOKEN' && currentUser) {
           setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { fcmToken: data.token }, { merge: true });
+        } else if (data.type === 'PUSH_PERMISSION_STATUS') {
+          setOsPermission(prev => prev !== data.status ? data.status : prev);
         }
       } catch (e) {}
     };
@@ -1922,15 +1924,19 @@ if (timerState.y === 'top') {
 
   useEffect(() => {
     const checkPermission = () => {
-      if (typeof window !== 'undefined' && 'Notification' in window) {
-        setOsPermission(prev => prev !== Notification.permission ? Notification.permission : prev);
+      if (typeof window !== 'undefined') {
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'CHECK_PUSH_PERMISSION' }));
+        } else if ('Notification' in window) {
+          setOsPermission(prev => prev !== Notification.permission ? Notification.permission : prev);
+        }
       }
     };
     checkPermission();
 
     let intervalId;
     if (typeof window !== 'undefined') {
-       intervalId = setInterval(checkPermission, 1000);
+       intervalId = setInterval(checkPermission, 2000);
        window.addEventListener('focus', checkPermission);
        window.addEventListener('visibilitychange', () => {
           if (document.visibilityState === 'visible') checkPermission();
@@ -6370,7 +6376,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.25, 11:34, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.25, 11:38, updated)</p>
       </div>
     </div>
   );
