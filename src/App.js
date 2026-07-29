@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus, EyeOff, Bell, Download, CheckCircle, Handshake, MessageCircle, Send, Volume2, VolumeX, Music, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus, EyeOff, Bell, Download, CheckCircle, Handshake, MessageCircle, Send, Volume2, VolumeX, Music, ChevronLeft, ChevronRight, Search, MoreVertical, FileText } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy, getDocs, where } from 'firebase/firestore';
@@ -492,6 +492,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
   };
   const [showImportOptions, setShowImportOptions] = useState(false);
   const [showLikesModal, setShowLikesModal] = useState(false);
+  const [showPostMenu, setShowPostMenu] = useState(false);
   const isMyPost = post.author === currentUser;
   
   const likedUsers = post.likedUsers || [];
@@ -526,6 +527,150 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
     }
   });
   const categories = Object.keys(categoryCounts).sort((a, b) => categoryCounts[b] - categoryCounts[a]);
+
+  const handleExportText = () => {
+    const d = new Date(post.timestamp);
+    const days = ['日', '月', '火', '水', '木', '金', '土'];
+    const dateStr = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日(${days[d.getDay()]}) ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    
+    let text = `【トレーニング記録】\n`;
+    text += `日時: ${dateStr}\n`;
+    if (post.gymName) text += `場所: ${post.gymName}\n`;
+    if (post.bodyWeight || post.bodyFat) {
+        text += `体組成: `;
+        if (post.bodyWeight) text += `${post.bodyWeight}kg `;
+        if (post.bodyFat) text += `${post.bodyFat}%`;
+        text += `\n`;
+    }
+    if (displayVolumeCalc > 0) text += `総負荷量: ${displayVolumeCalc.toLocaleString()}kg\n`;
+    if (displayCalories > 0) text += `総消費: ${displayCalories.toLocaleString()} kcal\n`;
+    text += `\n`;
+
+    processedItems.forEach((item, idx) => {
+        text += `■ ${idx + 1}. ${item.exerciseName}`;
+        if (item.category) text += ` [${item.category}]`;
+        text += `\n`;
+        
+        if (item.isSuperSet && item.superExerciseName) {
+            text += `  スーパー: ${item.superExerciseName}\n`;
+            if (item.superExerciseName3) text += `  ジャイアント: ${item.superExerciseName3}\n`;
+        }
+
+        const getSetText = (setObj, wType, type, isDrop, prefix) => {
+            const isCardio = wType === 'cardio';
+            const isLR = wType === 'lr';
+            
+            const val = (f) => {
+              let fieldName = f;
+              if (type === 'super2') fieldName = 'super' + f.charAt(0).toUpperCase() + f.slice(1);
+              if (type === 'super3') fieldName = 'super' + f.charAt(0).toUpperCase() + f.slice(1) + '3';
+              return setObj[fieldName] || '';
+            };
+
+            if (isCardio) {
+                const distance = val('distance');
+                const time = val('time');
+                const calories = val('calories');
+                if (!distance && !time && !calories) return null;
+                let t = `${prefix} `;
+                if (distance) t += `${distance}km `;
+                if (time) t += `${time}分 `;
+                if (calories) t += `${calories}kcal `;
+                return t.trim() + '\n';
+            }
+
+            const weight = val('weight');
+            const reps = val('reps');
+            const lReps = val('lReps');
+            const rReps = val('rReps');
+            const forcedReps = val('forcedReps');
+
+            if (!weight && !reps && !lReps && !rReps) return null;
+
+            let displayWeight = weight || 0;
+            let weightLabel = 'kg';
+            if (wType === 'plate') weightLabel = '枚';
+            else if (wType === 'oneSide') weightLabel = 'kg(片)';
+            else if (wType === 'bodyWeight') {
+                if (Number(weight) < 0) { displayWeight = weight; weightLabel = 'kg'; } 
+                else if (Number(weight) > 0) { displayWeight = `+${weight}`; weightLabel = 'kg'; } 
+                else { displayWeight = '自重'; weightLabel = ''; }
+            }
+
+            let t = `${prefix} ${displayWeight}${weightLabel} x `;
+            if (isLR) {
+                t += `L:${lReps||0} R:${rReps||0}回`;
+            } else {
+                t += `${reps||0}回`;
+            }
+            if (forcedReps) t += ` (+補助${forcedReps})`;
+            return t + '\n';
+        };
+
+        if (item.sets && Array.isArray(item.sets)) {
+            item.sets.forEach((set, sIdx) => {
+                const mainText = getSetText(set, item.weightType, 'main', false, `Set ${sIdx + 1}:`);
+                if (mainText) text += `  ${mainText}`;
+                
+                if (item.isDropSet && set.dropSets) {
+                    set.dropSets.forEach((ds, dsIdx) => {
+                        const dropText = getSetText(ds, item.weightType, 'main', true, `   ↳ Drop:`);
+                        if (dropText) text += `  ${dropText}`;
+                    });
+                }
+                
+                if (item.isSuperSet && item.superExerciseName) {
+                    const sup2Text = getSetText(set, item.superWeightType || 'total', 'super2', false, `   ↳ Sup2:`);
+                    if (sup2Text) text += `  ${sup2Text}`;
+                    
+                    if (item.isDropSet && set.dropSets && !set.superDropSets) {
+                        set.dropSets.forEach((ds, dsIdx) => {
+                            if (ds.superWeight !== undefined) {
+                                const dsSup2Text = getSetText(ds, item.superWeightType || 'total', 'super2', true, `     ↳ Drop2:`);
+                                if (dsSup2Text) text += `    ${dsSup2Text}`;
+                            }
+                        });
+                    }
+                    if (item.isDropSet && set.superDropSets) {
+                        set.superDropSets.forEach((ds, dsIdx) => {
+                            const dsSup2Text = getSetText(ds, item.superWeightType || 'total', 'super2', true, `     ↳ Drop2:`);
+                            if (dsSup2Text) text += `    ${dsSup2Text}`;
+                        });
+                    }
+                }
+
+                if (item.isSuperSet && item.superExerciseName3) {
+                    const sup3Text = getSetText(set, item.superWeightType3 || 'total', 'super3', false, `   ↳ Sup3:`);
+                    if (sup3Text) text += `  ${sup3Text}`;
+                    
+                    if (item.isDropSet && set.dropSets && !set.superDropSets3) {
+                        set.dropSets.forEach((ds, dsIdx) => {
+                            if (ds.superWeight3 !== undefined) {
+                                const dsSup3Text = getSetText(ds, item.superWeightType3 || 'total', 'super3', true, `     ↳ Drop3:`);
+                                if (dsSup3Text) text += `    ${dsSup3Text}`;
+                            }
+                        });
+                    }
+                    if (item.isDropSet && set.superDropSets3) {
+                        set.superDropSets3.forEach((ds, dsIdx) => {
+                            const dsSup3Text = getSetText(ds, item.superWeightType3 || 'total', 'super3', true, `     ↳ Drop3:`);
+                            if (dsSup3Text) text += `    ${dsSup3Text}`;
+                        });
+                    }
+                }
+            });
+        }
+        if (item.memo) text += `  メモ: ${item.memo}\n`;
+        text += `\n`;
+    });
+
+    navigator.clipboard.writeText(text).then(() => {
+        alert("テキストをクリップボードにコピーしました！");
+    }).catch(err => {
+        alert("コピーに失敗しました。");
+    });
+    setShowPostMenu(false);
+  };
 
   const renderSetRow = (setObj, wType, type, isDrop, label) => {
     const isLR = wType === 'lr';
@@ -676,9 +821,19 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
           </div>
         </div>
         {isMyPost && onEdit && onDelete && (
-          <div className="flex gap-1 shrink-0 ml-2">
+          <div className="flex gap-1 shrink-0 ml-2 relative">
             <button onClick={() => onEdit(post)} className="text-slate-400 hover:text-emerald-500 p-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"><Edit2 size={16} /></button>
             <button onClick={() => onDelete(post.id)} className="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"><Trash2 size={16} /></button>
+            <button onClick={() => setShowPostMenu(!showPostMenu)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"><MoreVertical size={16} /></button>
+            
+            {showPostMenu && (
+               <div className="absolute top-full right-0 mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg z-20 w-48 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                  <button onClick={handleExportText} className="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-2">
+                     <FileText size={16} className="text-slate-400" />
+                     テキストで出力してコピー
+                  </button>
+               </div>
+            )}
           </div>
         )}
       </div>
@@ -6454,7 +6609,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.29, 13:37, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.29, 14:02, updated)</p>
       </div>
     </div>
   );
