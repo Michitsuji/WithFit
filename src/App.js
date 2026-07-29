@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus, EyeOff, Bell, Download, CheckCircle, Handshake, MessageCircle, Send, Volume2, VolumeX, Music, ChevronLeft, ChevronRight, Search, MoreVertical, FileText } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signInWithCredential } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy, getDocs, where } from 'firebase/firestore';
 import { getMessaging, getToken } from 'firebase/messaging';
 
@@ -1794,11 +1794,17 @@ export default function App() {
   useEffect(() => {
     const handleNativeMessage = (event) => {
       try {
-        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        const rawData = event.data || (event.nativeEvent && event.nativeEvent.data);
+        if (!rawData) return;
+        const data = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
+        
         if (data.type === 'PUSH_TOKEN' && currentUser) {
           setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { fcmToken: data.token }, { merge: true });
         } else if (data.type === 'PUSH_PERMISSION_STATUS') {
           setOsPermission(prev => prev !== data.status ? data.status : prev);
+        } else if (data.type === 'NATIVE_GOOGLE_LOGIN' && data.idToken) {
+          const credential = GoogleAuthProvider.credential(data.idToken);
+          signInWithCredential(auth, credential).catch(err => console.error("Native login error:", err));
         }
       } catch (e) {}
     };
@@ -2544,6 +2550,10 @@ if (timerState.y === 'top') {
 
   const handleLinkGoogle = async () => {
     if (!currentUser || !db || !auth) return;
+    if (typeof window !== 'undefined' && window.ReactNativeWebView) {
+      alert('アプリ版からの新規Google連携はOSの制限により行えません。Safari等のブラウザからWeb版にアクセスして連携を行ってください。');
+      return;
+    }
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
@@ -3906,20 +3916,24 @@ function LoginScreen({ onLogin, onGoogleLogin, isOnline }) {
            <button 
              disabled={!agreed}
              onClick={() => { 
-               const provider = new GoogleAuthProvider(); 
-               provider.setCustomParameters({ prompt: 'select_account' }); 
                const isWebView = typeof window !== 'undefined' && window.ReactNativeWebView;
-               if (navigator.userAgent.includes('Edg') || isWebView) {
-                 signInWithRedirect(getAuth(), provider);
+               if (isWebView) {
+                 window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'REQUEST_GOOGLE_LOGIN' }));
                } else {
-                 signInWithPopup(getAuth(), provider).then((result) => { 
-                   onGoogleLogin(result.user); 
-                 }).catch((err) => {
-                   console.error(err);
-                   if (err.code !== 'auth/popup-closed-by-user') {
-                     signInWithRedirect(getAuth(), provider);
-                   }
-                 }); 
+                 const provider = new GoogleAuthProvider(); 
+                 provider.setCustomParameters({ prompt: 'select_account' }); 
+                 if (navigator.userAgent.includes('Edg')) {
+                   signInWithRedirect(getAuth(), provider);
+                 } else {
+                   signInWithPopup(getAuth(), provider).then((result) => { 
+                     onGoogleLogin(result.user); 
+                   }).catch((err) => {
+                     console.error(err);
+                     if (err.code !== 'auth/popup-closed-by-user') {
+                       signInWithRedirect(getAuth(), provider);
+                     }
+                   }); 
+                 }
                }
              }} 
              className={`w-full font-bold py-3 rounded-xl shadow-sm flex items-center justify-center gap-2 transition-colors border ${agreed ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'}`}
@@ -6599,7 +6613,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.29, 22:43, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.29, 23:00, updated)</p>
       </div>
     </div>
   );
