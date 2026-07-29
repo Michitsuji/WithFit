@@ -652,7 +652,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm overflow-hidden relative mb-4">
+    <div id={`post-${post.id}`} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm overflow-hidden relative mb-4">
       <div className="absolute top-0 left-0 w-1.5 h-full" style={{ backgroundColor: authorColor }}></div>
       <div className="flex justify-between items-start mb-4 pl-3">
         <div className="flex items-center gap-3 w-full overflow-hidden">
@@ -888,7 +888,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
             };
 
             return rootComments.length > 0 && (
-              <div ref={commentsContainerRef} className="space-y-3 mb-3 max-h-60 overflow-y-auto pr-1 relative">
+              <div ref={commentsContainerRef} className="space-y-3 mb-3 max-h-80 overflow-y-auto pr-1 relative">
                 {rootComments.map(rootComment => {
                   const replies = localComments.filter(c => c.parentId === rootComment.id);
                   const isExpanded = expandedThreads[rootComment.id];
@@ -1705,6 +1705,7 @@ export default function App() {
   const [selectedFriendUser, setSelectedFriendUser] = useState(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [focusedPost, setFocusedPost] = useState(null);
+  const [scrollToPostId, setScrollToPostId] = useState(null);
   const [redirectUser, setRedirectUser] = useState(null);
   const [targetFriendTab, setTargetFriendTab] = useState(null);
   const [showPushPrompt, setShowPushPrompt] = useState(false);
@@ -2626,8 +2627,8 @@ if (timerState.y === 'top') {
        setCurrentTab('friends');
        setTargetFriendTab(notif.title.includes('パートナー') ? 'partner' : 'friends');
     } else if (notif.postId) {
-       const targetPost = posts.find(p => p.id === notif.postId);
-       if (targetPost) setFocusedPost(targetPost);
+       setCurrentTab('timeline');
+       setScrollToPostId(notif.postId);
     }
   };
 
@@ -3164,7 +3165,7 @@ if (timerState.y === 'top') {
              <button onClick={handleLinkGoogle} className="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg shrink-0 transition-colors">連携</button>
           </div>
         )}
-        {currentTab === 'timeline' && <TimelineView posts={visiblePosts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} />}
+        {currentTab === 'timeline' && <TimelineView posts={visiblePosts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} scrollToPostId={scrollToPostId} setScrollToPostId={setScrollToPostId} />}
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} currentUser={currentUser} myInfo={myInfo} setCurrentTab={setCurrentTab} onSendRequest={handleSendFriendRequest} />}
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} />}
@@ -3801,8 +3802,31 @@ function AdBanner() {
 }
 
 // --- タイムライン画面 ---
-function TimelineView({ posts, onToggleLike, onImport, currentUser, onDelete, onEdit, accountsInfo, onAddComment, onDeleteComment, onToggleCommentLike, onUserClick }) {
+function TimelineView({ posts, onToggleLike, onImport, currentUser, onDelete, onEdit, accountsInfo, onAddComment, onDeleteComment, onToggleCommentLike, onUserClick, scrollToPostId, setScrollToPostId }) {
   const [displayLimit, setDisplayLimit] = useState(10);
+
+  useEffect(() => {
+    if (scrollToPostId) {
+       const postIndex = posts.findIndex(p => p.id === scrollToPostId);
+       if (postIndex !== -1 && postIndex >= displayLimit) {
+           setDisplayLimit(postIndex + 5);
+       }
+       setTimeout(() => {
+         const postEl = document.getElementById(`post-${scrollToPostId}`);
+         if (postEl) {
+            const headerOffset = 80;
+            const elementPosition = postEl.getBoundingClientRect().top;
+            const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+            window.scrollTo({
+                 top: offsetPosition,
+                 behavior: 'smooth'
+            });
+         }
+         if (setScrollToPostId) setScrollToPostId(null);
+       }, 300);
+    }
+  }, [scrollToPostId, posts, displayLimit, setScrollToPostId]);
+
   const displayedPosts = posts.slice(0, displayLimit);
 
   return (
@@ -5859,6 +5883,16 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
 // --- フレンド画面 ---
 function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccept, onReject, onRemoveFriend, onSendPartnerRequest, onAcceptPartnerRequest, onRejectPartnerRequest, onRemovePartner, onFriendClick, onGenerateFriendCode, posts, targetFriendTab, setTargetFriendTab, onSendTestPush }) {
   const [currentTime, setCurrentTime] = useState(Date.now());
+  const [reportsCount, setReportsCount] = useState(0);
+
+  useEffect(() => {
+    if (currentUser === MASTER_USER && db) {
+      const unsub = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'reports'), (snap) => {
+        setReportsCount(snap.size);
+      });
+      return () => unsub();
+    }
+  }, [currentUser]);
   const [searchUsername, setSearchUsername] = useState('');
   const [searchPartnerName, setSearchPartnerName] = useState('');
   const partnerName = myInfo?.partnerId;
@@ -6189,8 +6223,13 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
 
           {currentUser === MASTER_USER && (
             <>
-              <button onClick={() => setShowReportsModal(true)} className="w-full py-3 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900 text-indigo-600 dark:text-indigo-400 font-bold rounded-xl shadow-sm hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors flex items-center justify-center gap-2">
+              <button onClick={() => setShowReportsModal(true)} className="relative w-full py-3 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900 text-indigo-600 dark:text-indigo-400 font-bold rounded-xl shadow-sm hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors flex items-center justify-center gap-2">
                 <AlignLeft size={18} /> 【マスター限定】不具合報告一覧を見る
+                {reportsCount > 0 && (
+                  <div className="absolute -top-2 -right-2 bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md">
+                    {reportsCount}
+                  </div>
+                )}
               </button>
               <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-2xl p-5 shadow-sm mt-4">
                 <h3 className="text-sm font-bold text-amber-700 dark:text-amber-400 mb-4 flex items-center gap-2">
@@ -6415,7 +6454,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.25, 11:58, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.29, 13:37, updated)</p>
       </div>
     </div>
   );
