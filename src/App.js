@@ -5584,6 +5584,8 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
 
   const [activeTab, setActiveTab] = useState('exercises'); 
   const [gymSearchQuery, setGymSearchQuery] = useState('');
+  const [searchedGyms, setSearchedGyms] = useState([]);
+  const [isSearchingGym, setIsSearchingGym] = useState(false);
   const [newGymName, setNewGymName] = useState('');
   const [selectedGymId, setSelectedGymId] = useState(isAdmin ? 'common' : (joinedGyms.find(id => id !== 'common') || ''));
   const [filterGymId, setFilterGymId] = useState('all');
@@ -5609,6 +5611,25 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
   
   const [selectedExerciseForChart, setSelectedExerciseForChart] = useState(null);
   const [exerciseSearchQuery, setExerciseSearchQuery] = useState('');
+
+  const handleSearchGyms = async (e) => {
+     e.preventDefault();
+     if (!gymSearchQuery.trim() || !db) { setSearchedGyms([]); return; }
+     setIsSearchingGym(true);
+     try {
+        const q = query(
+           collection(db, 'artifacts', appId, 'public', 'data', 'gyms'),
+           where('name', '>=', gymSearchQuery.trim()),
+           where('name', '<=', gymSearchQuery.trim() + '\uf8ff'),
+           limit(20)
+        );
+        const snap = await getDocs(q);
+        const results = [];
+        snap.forEach(doc => results.push({ id: doc.id, ...doc.data() }));
+        setSearchedGyms(results);
+     } catch(err) { console.error(err); }
+     setIsSearchingGym(false);
+  };
 
   const handleAddGym = async (e) => {
     e.preventDefault();
@@ -5788,9 +5809,19 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
   };
 
   const myFriends = myInfo?.friends || [];
-  const filteredGyms = gyms.filter(gym => {
+  
+  const combinedGymsMap = new Map();
+  gyms.forEach(g => combinedGymsMap.set(g.id, g));
+  searchedGyms.forEach(g => combinedGymsMap.set(g.id, g));
+  const combinedGyms = Array.from(combinedGymsMap.values());
+
+  const filteredGyms = combinedGyms.filter(gym => {
     if (gym.id === 'common') return false;
-    if (gymSearchQuery && !gym.name.toLowerCase().includes(gymSearchQuery.toLowerCase())) return false;
+    if (gymSearchQuery && searchedGyms.length > 0) {
+        return searchedGyms.some(sg => sg.id === gym.id) || gym.name.toLowerCase().includes(gymSearchQuery.toLowerCase());
+    } else if (gymSearchQuery) {
+        return gym.name.toLowerCase().includes(gymSearchQuery.toLowerCase());
+    }
     return true;
   });
 
@@ -5852,17 +5883,22 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
             </div>
           </form>
 
-          <div className="relative mb-6">
-             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-               <Search size={18} className="text-slate-400" />
+          <form onSubmit={handleSearchGyms} className="relative mb-6 flex gap-2">
+             <div className="relative flex-1">
+               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                 <Search size={18} className="text-slate-400" />
+               </div>
+               <input type="text" value={gymSearchQuery} onChange={e => { setGymSearchQuery(e.target.value); if(!e.target.value) setSearchedGyms([]); }} placeholder="ジムの名前で検索..." className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-10 py-3 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 shadow-sm" style={{ fontSize: '16px' }} />
+               {gymSearchQuery && (
+                 <button type="button" onClick={() => { setGymSearchQuery(''); setSearchedGyms([]); }} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+                   <X size={18} />
+                 </button>
+               )}
              </div>
-             <input type="text" value={gymSearchQuery} onChange={e => setGymSearchQuery(e.target.value)} placeholder="ジムの名前で検索..." className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-10 py-3 text-sm text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 shadow-sm" style={{ fontSize: '16px' }} />
-             {gymSearchQuery && (
-               <button onClick={() => setGymSearchQuery('')} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
-                 <X size={18} />
-               </button>
-             )}
-          </div>
+             <button type="submit" disabled={isSearchingGym || !gymSearchQuery.trim()} className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-4 rounded-xl shadow-sm transition-colors disabled:opacity-50 text-sm shrink-0">
+               検索
+             </button>
+          </form>
 
           {joinedGymsList.length > 0 && (
             <div>
@@ -6765,7 +6801,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.31, 21:30, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.31, 21:31, updated)</p>
       </div>
     </div>
   );
