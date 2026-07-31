@@ -4669,6 +4669,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const [showImportTextModal, setShowImportTextModal] = useState(false);
   const [importText, setImportText] = useState('');
   const [aiErrorMsg, setAiErrorMsg] = useState(null);
+  const [aiErrorMsg, setAiErrorMsg] = useState(null);
 
   const round25 = (val) => Math.round(val / 2.5) * 2.5;
 
