@@ -2436,14 +2436,49 @@ if (timerState.y === 'top') {
       const exData = []; snapshot.forEach(doc => { exData.push({ id: doc.id, ...doc.data() }); }); exData.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); setExercises(exData); setDataLoaded(prev => ({ ...prev, exercises: true }));
     }, () => setDataLoaded(prev => ({ ...prev, exercises: true })));
 
-    const workoutsRef = collection(db, 'artifacts', appId, 'public', 'data', 'workouts');
-    const workoutsQuery = query(workoutsRef, orderBy('timestamp', 'desc'), limit(100));
-    const u4 = onSnapshot(workoutsQuery, (snapshot) => {
-      const workoutsData = []; snapshot.forEach(doc => { workoutsData.push({ id: doc.id, ...doc.data() }); }); setPosts(workoutsData); setDataLoaded(prev => ({ ...prev, workouts: true }));
-    }, () => setDataLoaded(prev => ({ ...prev, workouts: true })));
-
-    return () => { u1(); u2(); u3(); u4(); };
+    return () => { u1(); u2(); u3(); };
   }, []);
+
+  const postsByChunkRef = useRef({});
+
+  useEffect(() => {
+    if (!db) return;
+    if (!currentUser || !accountsInfo[currentUser]) {
+      setDataLoaded(prev => ({ ...prev, workouts: true }));
+      return;
+    }
+    
+    const myFriends = accountsInfo[currentUser].friends || [];
+    const targetUsers = [currentUser, ...myFriends];
+    const chunks = [];
+    for (let i = 0; i < targetUsers.length; i += 10) {
+      chunks.push(targetUsers.slice(i, i + 10));
+    }
+    
+    const workoutsRef = collection(db, 'artifacts', appId, 'public', 'data', 'workouts');
+    const unsubs = chunks.map((chunk, index) => {
+      const q = query(workoutsRef, where('author', 'in', chunk), orderBy('timestamp', 'desc'), limit(50));
+      return onSnapshot(q, (snapshot) => {
+        const chunkData = []; 
+        snapshot.forEach(doc => { chunkData.push({ id: doc.id, ...doc.data() }); });
+        postsByChunkRef.current[index] = chunkData;
+        
+        const allPosts = Object.values(postsByChunkRef.current).flat();
+        allPosts.sort((a, b) => b.timestamp - a.timestamp);
+        
+        setPosts(allPosts);
+        setDataLoaded(prev => ({ ...prev, workouts: true }));
+      }, (err) => {
+        console.error(err);
+        setDataLoaded(prev => ({ ...prev, workouts: true }));
+      });
+    });
+    
+    return () => {
+       unsubs.forEach(unsub => unsub());
+       postsByChunkRef.current = {};
+    };
+  }, [db, currentUser, accountsInfo[currentUser]?.friends?.join(',')]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -6613,7 +6648,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.29, 23:00, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.31, 21:23, updated)</p>
       </div>
     </div>
   );
