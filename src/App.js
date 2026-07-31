@@ -2430,7 +2430,14 @@ if (timerState.y === 'top') {
     }
 
     const joinedGyms = accountsInfo[currentUser].joinedGyms || ['common'];
-    const targetGymIds = [...new Set([...joinedGyms, 'common'])];
+    const myFriends = accountsInfo[currentUser].friends || [];
+    const friendGymIds = [];
+    myFriends.forEach(f => {
+       if (accountsInfo[f]?.joinedGyms) {
+          friendGymIds.push(...accountsInfo[f].joinedGyms);
+       }
+    });
+    const targetGymIds = [...new Set([...joinedGyms, 'common', ...friendGymIds])];
     
     const chunks = [];
     for (let i = 0; i < targetGymIds.length; i += 10) {
@@ -5665,7 +5672,13 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { 
         joinedGyms: [...new Set([...joinedGyms, gymId])] 
       }, { merge: true });
-      const targetGym = gyms.find(g => g.id === gymId);
+      
+      const combinedGymsMap = new Map();
+      gyms.forEach(g => combinedGymsMap.set(g.id, g));
+      searchedGyms.forEach(g => combinedGymsMap.set(g.id, g));
+      const combinedGyms = Array.from(combinedGymsMap.values());
+
+      const targetGym = combinedGyms.find(g => g.id === gymId);
       if (targetGym) {
         const members = targetGym.members || [];
         if (!members.includes(currentUser)) {
@@ -6802,7 +6815,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.31, 21:33, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.31, 21:38, updated)</p>
       </div>
     </div>
   );
