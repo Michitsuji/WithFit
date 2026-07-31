@@ -4668,6 +4668,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const [isMetricsOnlyMode, setIsMetricsOnlyMode] = useState(false);
   const [showImportTextModal, setShowImportTextModal] = useState(false);
   const [importText, setImportText] = useState('');
+  const [aiErrorMsg, setAiErrorMsg] = useState(null);
 
   const round25 = (val) => Math.round(val / 2.5) * 2.5;
 
@@ -4697,7 +4698,8 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
 対象テキスト:
 ${importText}`;
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      setAiErrorMsg(null);
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -4708,7 +4710,7 @@ ${importText}`;
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(`API通信エラー: ${errorData.error?.message || response.statusText}`);
+        throw new Error(`${errorData.error?.message || response.statusText}`);
       }
       const data = await response.json();
       let textResponse = data.candidates[0].content.parts[0].text;
@@ -4747,7 +4749,7 @@ ${importText}`;
       }
     } catch (error) {
       console.error(error);
-      alert(`AI解析エラー: ${error.message}\nAPIキーが正しいか、または制限設定などを確認してください。`);
+      setAiErrorMsg(error.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -5302,12 +5304,18 @@ ${importText}`;
               </button>
             </div>
             <div className="p-5 overflow-y-auto">
+              {aiErrorMsg && (
+                <div className="mb-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400">
+                  AI解析に失敗しました。以下のエラーを確認してください：<br/>
+                  <span className="font-normal opacity-80 break-all">{aiErrorMsg}</span>
+                </div>
+              )}
               <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-3">
-                コピーしたトレーニング記録を貼り付けてください。解析ロジックが自動でアプリの形式に変換し、一覧に追加します。
+                コピーしたトレーニング記録を貼り付けてください。AIが自動でアプリの形式に変換し、一覧に追加します。
               </p>
               <textarea
                 value={importText}
-                onChange={e => setImportText(e.target.value)}
+                onChange={e => { setImportText(e.target.value); setAiErrorMsg(null); }}
                 placeholder="例:&#10;■ 1. ベンチプレス [胸]&#10;Set 1: 50kg x 10回&#10;Set 2: 50kg x 8回"
                 className="w-full h-64 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:border-indigo-500 resize-none"
               />
@@ -6887,7 +6895,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.31, 22:12, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.31, 22:18, updated)</p>
       </div>
     </div>
   );
