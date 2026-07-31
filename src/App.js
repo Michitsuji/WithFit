@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus, EyeOff, Bell, Download, CheckCircle, Handshake, MessageCircle, Send, Volume2, VolumeX, Music, ChevronLeft, ChevronRight, Search, MoreVertical, FileText } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signInWithCredential } from 'firebase/auth';
-import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy, getDocs, where } from 'firebase/firestore';
+import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy, getDocs, where, documentId } from 'firebase/firestore';
 import { getMessaging, getToken } from 'firebase/messaging';
 
 // --- カスタムアイコン ---
@@ -2419,21 +2419,66 @@ if (timerState.y === 'top') {
     return () => unsubscribe();
   }, []);
 
+  const gymsByChunkRef = useRef({});
+  const exercisesByChunkRef = useRef({});
+
   useEffect(() => {
     if (!db) return;
+    if (!currentUser || !accountsInfo[currentUser]) {
+      setDataLoaded(prev => ({ ...prev, gyms: true, exercises: true }));
+      return;
+    }
+
+    const joinedGyms = accountsInfo[currentUser].joinedGyms || ['common'];
+    const targetGymIds = [...new Set([...joinedGyms, 'common'])];
+    
+    const chunks = [];
+    for (let i = 0; i < targetGymIds.length; i += 10) {
+      chunks.push(targetGymIds.slice(i, i + 10));
+    }
 
     const gymsRef = collection(db, 'artifacts', appId, 'public', 'data', 'gyms');
-    const u2 = onSnapshot(gymsRef, (snapshot) => {
-      const gymsData = []; snapshot.forEach(doc => { gymsData.push({ id: doc.id, ...doc.data() }); }); gymsData.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); setGyms(gymsData); setDataLoaded(prev => ({ ...prev, gyms: true }));
-    }, () => setDataLoaded(prev => ({ ...prev, gyms: true })));
-
     const exercisesRef = collection(db, 'artifacts', appId, 'public', 'data', 'exercises');
-    const u3 = onSnapshot(exercisesRef, (snapshot) => {
-      const exData = []; snapshot.forEach(doc => { exData.push({ id: doc.id, ...doc.data() }); }); exData.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); setExercises(exData); setDataLoaded(prev => ({ ...prev, exercises: true }));
-    }, () => setDataLoaded(prev => ({ ...prev, exercises: true })));
+    
+    const unsubs = [];
+    chunks.forEach((chunk, index) => {
+      const gymQuery = query(gymsRef, where(documentId(), 'in', chunk));
+      unsubs.push(onSnapshot(gymQuery, (snapshot) => {
+        const chunkGyms = [];
+        snapshot.forEach(doc => { chunkGyms.push({ id: doc.id, ...doc.data() }); });
+        gymsByChunkRef.current[index] = chunkGyms;
+        
+        const allGyms = Object.values(gymsByChunkRef.current).flat();
+        allGyms.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+        setGyms(allGyms);
+        setDataLoaded(prev => ({ ...prev, gyms: true }));
+      }, (err) => {
+        console.error(err);
+        setDataLoaded(prev => ({ ...prev, gyms: true }));
+      }));
 
-    return () => { u2(); u3(); };
-  }, []);
+      const exQuery = query(exercisesRef, where('gymId', 'in', chunk));
+      unsubs.push(onSnapshot(exQuery, (snapshot) => {
+        const chunkExs = [];
+        snapshot.forEach(doc => { chunkExs.push({ id: doc.id, ...doc.data() }); });
+        exercisesByChunkRef.current[index] = chunkExs;
+        
+        const allExs = Object.values(exercisesByChunkRef.current).flat();
+        allExs.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+        setExercises(allExs);
+        setDataLoaded(prev => ({ ...prev, exercises: true }));
+      }, (err) => {
+        console.error(err);
+        setDataLoaded(prev => ({ ...prev, exercises: true }));
+      }));
+    });
+
+    return () => {
+      unsubs.forEach(unsub => unsub());
+      gymsByChunkRef.current = {};
+      exercisesByChunkRef.current = {};
+    };
+  }, [db, currentUser, accountsInfo[currentUser]?.joinedGyms?.join(',')]);
 
   const postsByChunkRef = useRef({});
 
@@ -6720,7 +6765,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.31, 21:27, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.31, 21:30, updated)</p>
       </div>
     </div>
   );
