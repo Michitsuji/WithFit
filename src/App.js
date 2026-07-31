@@ -4697,7 +4697,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
 対象テキスト:
 ${importText}`;
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -4706,9 +4706,13 @@ ${importText}`;
         })
       });
 
-      if (!response.ok) throw new Error("API通信エラー");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`API通信エラー: ${errorData.error?.message || response.statusText}`);
+      }
       const data = await response.json();
-      const textResponse = data.candidates[0].content.parts[0].text;
+      let textResponse = data.candidates[0].content.parts[0].text;
+      textResponse = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsedItems = JSON.parse(textResponse);
 
       const newItems = parsedItems.map(item => {
@@ -4743,7 +4747,7 @@ ${importText}`;
       }
     } catch (error) {
       console.error(error);
-      alert("AI解析中にエラーが発生しました。APIキーの設定などを確認してください。");
+      alert(`AI解析エラー: ${error.message}\nAPIキーが正しいか、または制限設定などを確認してください。`);
     } finally {
       setIsSubmitting(false);
     }
@@ -6883,7 +6887,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.31, 22:08, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.31, 22:12, updated)</p>
       </div>
     </div>
   );
