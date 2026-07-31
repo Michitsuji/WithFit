@@ -4669,7 +4669,6 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const [showImportTextModal, setShowImportTextModal] = useState(false);
   const [importText, setImportText] = useState('');
   const [aiErrorMsg, setAiErrorMsg] = useState(null);
-  const [aiErrorMsg, setAiErrorMsg] = useState(null);
 
   const round25 = (val) => Math.round(val / 2.5) * 2.5;
 
@@ -4701,7 +4700,7 @@ ${importText}`;
 
       setAiErrorMsg(null);
       // 最も互換性が高く安定している gemini-pro を使用します
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
