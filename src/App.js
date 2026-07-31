@@ -4680,68 +4680,58 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
     }
     setIsSubmitting(true);
     try {
-      const lines = importText.split('\n');
-      const newItems = [];
-      let currentItem = null;
+      const apiKey = "AIzaSyDkNNFGDLDlm9UuzY01QFLLoNZ7inftGfk";
+      const prompt = `以下のトレーニング記録テキストを解析し、JSON配列のみを出力してください。
+フォーマット要件:
+[
+  {
+    "exerciseName": "種目名",
+    "category": "胸/背中/肩/腕/脚/腹筋/有酸素/その他のいずれか",
+    "weightType": "total",
+    "memo": "メモがあれば抽出",
+    "sets": [
+      { "weight": "重量(数値のみ。自重は0)", "reps": "回数", "lReps": "", "rReps": "" }
+    ]
+  }
+]
+対象テキスト:
+${importText}`;
 
-      const exerciseRegex = /^(?:■|・|第?\d+[.．章-部-]\s*)?([^\n\[（]+)(?:\s*\[([^\]]+)\])?/;
-      const setRegex = /(?:Set\s*\d+\s*[:：]\s*)?(?:(自重|[+-]?\d+(?:\.\d+)?)\s*(?:kg|枚)?(?:[xｘ×]\s*|[\s/]+))?(?:L:\s*(\d+)\s*R:\s*(\d+)|(\d+))\s*回?(?:\s*\(\+補助\s*(\d+)\))?/i;
-
-      lines.forEach(line => {
-        const trimmed = line.trim();
-        if (!trimmed) return;
-
-        if (trimmed.includes('【トレーニング記録】') || trimmed.includes('日時:') || trimmed.includes('場所:') || trimmed.includes('体組成:') || trimmed.includes('総負荷量:') || trimmed.includes('総消費:')) {
-          return;
-        }
-
-        if (trimmed.match(/^(■|・|\d+\.)/) || (!trimmed.match(/Set/i) && !trimmed.match(/\d+kg/) && !trimmed.match(/\d+回/))) {
-          const match = trimmed.match(exerciseRegex);
-          if (match) {
-            const exName = match[1].trim();
-            const matchedEx = availableExercises.find(ex => ex.name.includes(exName) || exName.includes(ex.name));
-            
-            if (currentItem) newItems.push(currentItem);
-            currentItem = {
-              id: generateId(),
-              exerciseName: matchedEx ? matchedEx.name : exName,
-              weightType: matchedEx ? (matchedEx.weightType || 'total') : 'total',
-              category: matchedEx ? (matchedEx.category || 'その他') : 'その他',
-              isSuperSet: false, isDropSet: false, isForcedReps: false, memo: '',
-              sets: []
-            };
-            if (matchedEx && !selectedCategories.includes(matchedEx.category)) {
-               toggleCategory(matchedEx.category);
-            }
-          }
-        } else if (currentItem) {
-          const setMatch = trimmed.match(setRegex);
-          if (setMatch) {
-            const weightRaw = setMatch[1];
-            const lReps = setMatch[2];
-            const rReps = setMatch[3];
-            const reps = setMatch[4];
-            const forced = setMatch[5];
-            
-            let parsedWeight = '';
-            if (weightRaw === '自重') parsedWeight = '0';
-            else if (weightRaw) parsedWeight = weightRaw.replace('+', '');
-            
-            currentItem.sets.push({
-              id: generateId(),
-              weight: parsedWeight,
-              reps: reps || '',
-              lReps: lReps || '',
-              rReps: rReps || '',
-              forcedReps: forced || ''
-            });
-          } else if (trimmed.startsWith('メモ:') || trimmed.startsWith('memo:')) {
-            currentItem.memo = trimmed.replace(/^(メモ|memo)[:：\s]*/i, '');
-          }
-        }
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { response_mime_type: "application/json" }
+        })
       });
 
-      if (currentItem) newItems.push(currentItem);
+      if (!response.ok) throw new Error("API通信エラー");
+      const data = await response.json();
+      const textResponse = data.candidates[0].content.parts[0].text;
+      const parsedItems = JSON.parse(textResponse);
+
+      const newItems = parsedItems.map(item => {
+        const matchedEx = availableExercises.find(ex => ex.name.includes(item.exerciseName) || (item.exerciseName && item.exerciseName.includes(ex.name)));
+        if (matchedEx && !selectedCategories.includes(matchedEx.category)) {
+           toggleCategory(matchedEx.category);
+        }
+        return {
+          id: generateId(),
+          exerciseName: matchedEx ? matchedEx.name : (item.exerciseName || ''),
+          weightType: matchedEx ? (matchedEx.weightType || 'total') : (item.weightType || 'total'),
+          category: matchedEx ? (matchedEx.category || 'その他') : (item.category || 'その他'),
+          isSuperSet: false, isDropSet: false, isForcedReps: false, memo: item.memo || '',
+          sets: (item.sets || []).map(set => ({
+            id: generateId(),
+            weight: set.weight || '',
+            reps: set.reps || '',
+            lReps: set.lReps || '',
+            rReps: set.rReps || '',
+            forcedReps: ''
+          }))
+        };
+      });
 
       if (newItems.length > 0) {
          setWorkoutItems(prev => [...prev, ...newItems]);
@@ -4749,11 +4739,11 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
          setShowImportTextModal(false);
          setImportText('');
       } else {
-         alert("トレーニング内容を解析できませんでした。テキストの形式を確認してください。");
+         alert("トレーニング内容を解析できませんでした。");
       }
     } catch (error) {
       console.error(error);
-      alert("インポート中にエラーが発生しました。");
+      alert("AI解析中にエラーが発生しました。APIキーの設定などを確認してください。");
     } finally {
       setIsSubmitting(false);
     }
@@ -6893,7 +6883,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.31, 22:02, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.31, 22:08, updated)</p>
       </div>
     </div>
   );
