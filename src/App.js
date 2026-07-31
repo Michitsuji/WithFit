@@ -2421,10 +2421,6 @@ if (timerState.y === 'top') {
 
   useEffect(() => {
     if (!db) return;
-    const accountsRef = collection(db, 'artifacts', appId, 'public', 'data', 'accounts');
-    const u1 = onSnapshot(accountsRef, (snapshot) => {
-      const accData = {}; snapshot.forEach(doc => { accData[doc.id] = doc.data(); }); setAccountsInfo(accData); setDataLoaded(prev => ({ ...prev, accounts: true }));
-    }, () => setDataLoaded(prev => ({ ...prev, accounts: true })));
 
     const gymsRef = collection(db, 'artifacts', appId, 'public', 'data', 'gyms');
     const u2 = onSnapshot(gymsRef, (snapshot) => {
@@ -2436,7 +2432,7 @@ if (timerState.y === 'top') {
       const exData = []; snapshot.forEach(doc => { exData.push({ id: doc.id, ...doc.data() }); }); exData.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); setExercises(exData); setDataLoaded(prev => ({ ...prev, exercises: true }));
     }, () => setDataLoaded(prev => ({ ...prev, exercises: true })));
 
-    return () => { u1(); u2(); u3(); };
+    return () => { u2(); u3(); };
   }, []);
 
   const postsByChunkRef = useRef({});
@@ -2481,6 +2477,44 @@ if (timerState.y === 'top') {
   }, [db, currentUser, accountsInfo[currentUser]?.friends?.join(',')]);
 
   useEffect(() => {
+    if (!db) return;
+    if (!currentUser) {
+       setDataLoaded(prev => ({ ...prev, accounts: true }));
+       return;
+    }
+    const meRef = doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser);
+    const unsub = onSnapshot(meRef, (docSnap) => {
+       if (docSnap.exists()) {
+          setAccountsInfo(prev => ({ ...prev, [currentUser]: docSnap.data() }));
+          setDataLoaded(prev => ({ ...prev, accounts: true }));
+       }
+    }, (err) => {
+       console.error(err);
+       setDataLoaded(prev => ({ ...prev, accounts: true }));
+    });
+    return () => unsub();
+  }, [db, currentUser]);
+
+  useEffect(() => {
+    if (!db || !currentUser || !accountsInfo[currentUser]) return;
+    const myFriends = accountsInfo[currentUser].friends || [];
+    const friendRequests = accountsInfo[currentUser].friendRequests || [];
+    const partnerRequests = accountsInfo[currentUser].partnerRequests || [];
+    const targetUsers = [...new Set([...myFriends, ...friendRequests, ...partnerRequests])];
+    
+    const unsubs = [];
+    targetUsers.forEach(fId => {
+       const fRef = doc(db, 'artifacts', appId, 'public', 'data', 'accounts', fId);
+       unsubs.push(onSnapshot(fRef, (docSnap) => {
+          if (docSnap.exists()) {
+             setAccountsInfo(prev => ({ ...prev, [fId]: docSnap.data() }));
+          }
+       }));
+    });
+    return () => unsubs.forEach(u => u());
+  }, [db, currentUser, accountsInfo[currentUser]?.friends?.join(','), accountsInfo[currentUser]?.friendRequests?.join(','), accountsInfo[currentUser]?.partnerRequests?.join(',')]);
+
+  useEffect(() => {
     if (!currentUser) return;
     
     let isActiveSession = true;
@@ -2523,7 +2557,11 @@ if (timerState.y === 'top') {
 
   const handleLogin = async (username, pin) => {
     if (!db) return false;
-    const accountData = accountsInfo[username];
+    let accountData = null;
+    try {
+      const docSnap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username));
+      if (docSnap.exists()) accountData = docSnap.data();
+    } catch(e) { return false; }
     const joinedGyms = accountData?.joinedGyms || ['common'];
     if (pin === 'google') {
       if (!accountData) {
@@ -2545,42 +2583,46 @@ if (timerState.y === 'top') {
 
   const handleGoogleLogin = async (googleUser) => {
     if (!db) return false;
-    const existingUser = Object.entries(accountsInfo).find(([uname, data]) => data.googleUid === googleUser.uid);
-    if (existingUser) {
-      const username = existingUser[0];
-      setCurrentUser(username);
-      localStorage.setItem('withfit_login_session', JSON.stringify({ userId: username, lastActive: Date.now() }));
-      const joinedGyms = existingUser[1]?.joinedGyms || ['common'];
-      try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { lastActive: Date.now(), isAppOnline: true, joinedGyms }, { merge: true }); } catch (e) {}
-      return true;
-    } else {
-      let baseName = googleUser.displayName || (googleUser.email ? googleUser.email.split('@')[0] : 'user');
+    try {
+      const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'accounts'), where('googleUid', '==', googleUser.uid), limit(1));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const username = snap.docs[0].id;
+        setCurrentUser(username);
+        localStorage.setItem('withfit_login_session', JSON.stringify({ userId: username, lastActive: Date.now() }));
+        const joinedGyms = snap.docs[0].data()?.joinedGyms || ['common'];
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { lastActive: Date.now(), isAppOnline: true, joinedGyms }, { merge: true });
+        return true;
+      }
       
-      const legacyUser = Object.entries(accountsInfo).find(([uname, data]) => 
-         !data.googleUid && (uname === baseName || data.displayName === baseName) && data.friendCode
-      );
-      if (legacyUser) {
-         const username = legacyUser[0];
+      let baseName = googleUser.displayName || (googleUser.email ? googleUser.email.split('@')[0] : 'user');
+      const docSnap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', baseName));
+      if (docSnap.exists() && !docSnap.data().googleUid && docSnap.data().friendCode) {
+         const username = baseName;
          setCurrentUser(username);
          localStorage.setItem('withfit_login_session', JSON.stringify({ userId: username, lastActive: Date.now() }));
-         const joinedGyms = legacyUser[1]?.joinedGyms || ['common'];
-         try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { googleUid: googleUser.uid, lastActive: Date.now(), isAppOnline: true, joinedGyms }, { merge: true }); } catch (e) {}
+         const joinedGyms = docSnap.data()?.joinedGyms || ['common'];
+         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { googleUid: googleUser.uid, lastActive: Date.now(), isAppOnline: true, joinedGyms }, { merge: true });
          return true;
       }
 
       let username = baseName;
       let counter = 1;
-      while (accountsInfo[username] && accountsInfo[username].friendCode) {
-        username = `${baseName}${counter}`;
-        counter++;
+      while (true) {
+        const checkSnap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username));
+        if (checkSnap.exists() && checkSnap.data().friendCode) {
+          username = `${baseName}${counter}`;
+          counter++;
+        } else {
+          break;
+        }
       }
-      try { 
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { displayName: username, googleUid: googleUser.uid, friendCode: generateFriendCode(), isTraining: false, lastActive: Date.now(), isAppOnline: true, theme: 'light', friends: [], joinedGyms: ['common'] }, { merge: true }); 
-        setCurrentUser(username); 
-        localStorage.setItem('withfit_login_session', JSON.stringify({ userId: username, lastActive: Date.now() }));
-        return true;
-      } catch (e) { return false; }
-    }
+      
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { displayName: username, googleUid: googleUser.uid, friendCode: generateFriendCode(), isTraining: false, lastActive: Date.now(), isAppOnline: true, theme: 'light', friends: [], joinedGyms: ['common'] }, { merge: true }); 
+      setCurrentUser(username); 
+      localStorage.setItem('withfit_login_session', JSON.stringify({ userId: username, lastActive: Date.now() }));
+      return true;
+    } catch (e) { return false; }
   };
 
   const handleLinkGoogle = async () => {
@@ -2834,12 +2876,27 @@ if (timerState.y === 'top') {
 
   const handleSendFriendRequest = async (friendCodeOrName) => {
     if (!currentUser || !db || !friendCodeOrName) return;
-    const friendEntry = Object.entries(accountsInfo).find(([uname, data]) => data.friendCode === friendCodeOrName || uname === friendCodeOrName);
-    if (!friendEntry) {
+    let friendUsername = null;
+    let friendData = null;
+    try {
+       const docSnap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', friendCodeOrName));
+       if (docSnap.exists()) {
+          friendUsername = friendCodeOrName;
+          friendData = docSnap.data();
+       } else {
+          const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'accounts'), where('friendCode', '==', friendCodeOrName), limit(1));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+             friendUsername = snap.docs[0].id;
+             friendData = snap.docs[0].data();
+          }
+       }
+    } catch(e) {}
+    
+    if (!friendUsername || !friendData) {
       alert("該当するフレンドコード（またはユーザー名）が見つかりません。");
       return;
     }
-    const friendUsername = friendEntry[0];
 
     if (friendUsername === currentUser) {
       alert("自分自身は追加できません。");
@@ -2850,17 +2907,17 @@ if (timerState.y === 'top') {
       alert("既にフレンドです。");
       return;
     }
-    const targetRequests = accountsInfo[friendUsername]?.friendRequests || [];
+    const targetRequests = friendData.friendRequests || [];
     if (targetRequests.includes(currentUser)) {
       alert("既に申請済みです。");
       return;
     }
 
-    if (!window.confirm(`${accountsInfo[friendUsername]?.displayName || friendUsername}さんにフレンド申請を送りますか？`)) return;
+    if (!window.confirm(`${friendData.displayName || friendUsername}さんにフレンド申請を送りますか？`)) return;
 
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', friendUsername), { friendRequests: [...targetRequests, currentUser] }, { merge: true });
-      alert(`${accountsInfo[friendUsername]?.displayName || friendUsername}さんにフレンド申請を送信しました！`);
+      alert(`${friendData.displayName || friendUsername}さんにフレンド申請を送信しました！`);
       const authorName = accountsInfo[currentUser]?.displayName || currentUser;
       sendNotification(friendUsername, '🤝 フレンド申請', `${authorName}さんからフレンド申請が届きました`, 'request');
     } catch (e) {}
@@ -2868,18 +2925,33 @@ if (timerState.y === 'top') {
 
   const handleSendPartnerRequest = async (friendCodeOrName) => {
     if (!currentUser || !db || !friendCodeOrName) return;
-    const friendEntry = Object.entries(accountsInfo).find(([uname, data]) => data.friendCode === friendCodeOrName || uname === friendCodeOrName);
-    if (!friendEntry) { alert("該当するフレンドコード（またはユーザー名）が見つかりません。"); return; }
-    const partnerUsername = friendEntry[0];
+    let partnerUsername = null;
+    let partnerData = null;
+    try {
+       const docSnap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', friendCodeOrName));
+       if (docSnap.exists()) {
+          partnerUsername = friendCodeOrName;
+          partnerData = docSnap.data();
+       } else {
+          const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'accounts'), where('friendCode', '==', friendCodeOrName), limit(1));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+             partnerUsername = snap.docs[0].id;
+             partnerData = snap.docs[0].data();
+          }
+       }
+    } catch(e) {}
+    
+    if (!partnerUsername || !partnerData) { alert("該当するフレンドコード（またはユーザー名）が見つかりません。"); return; }
     if (partnerUsername === currentUser) { alert("自分自身は追加できません。"); return; }
     if (myInfo.partnerId === partnerUsername) { alert("既にパートナーです。"); return; }
-    if (accountsInfo[partnerUsername]?.partnerId) { alert("相手は既に別のパートナーがいます。"); return; }
-    const targetRequests = accountsInfo[partnerUsername]?.partnerRequests || [];
+    if (partnerData.partnerId) { alert("相手は既に別のパートナーがいます。"); return; }
+    const targetRequests = partnerData.partnerRequests || [];
     if (targetRequests.includes(currentUser)) { alert("既に申請済みです。"); return; }
-    if (!window.confirm(`${accountsInfo[partnerUsername]?.displayName || partnerUsername}さんにパートナー申請を送りますか？`)) return;
+    if (!window.confirm(`${partnerData.displayName || partnerUsername}さんにパートナー申請を送りますか？`)) return;
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', partnerUsername), { partnerRequests: [...new Set([...targetRequests, currentUser])] }, { merge: true });
-      alert(`${accountsInfo[partnerUsername]?.displayName || partnerUsername}さんにパートナー申請を送信しました！`);
+      alert(`${partnerData.displayName || partnerUsername}さんにパートナー申請を送信しました！`);
       const authorName = accountsInfo[currentUser]?.displayName || currentUser;
       sendNotification(partnerUsername, '🤝 パートナー申請', `${authorName}さんからパートナー申請が届きました`, 'request');
     } catch (e) {}
@@ -6648,7 +6720,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.31, 21:23, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.31, 21:27, updated)</p>
       </div>
     </div>
   );
