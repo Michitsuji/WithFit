@@ -4666,10 +4666,98 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const [manualEndTime, setManualEndTime] = useState("13:00");
 
   const [isMetricsOnlyMode, setIsMetricsOnlyMode] = useState(false);
+  const [showImportTextModal, setShowImportTextModal] = useState(false);
+  const [importText, setImportText] = useState('');
 
   const round25 = (val) => Math.round(val / 2.5) * 2.5;
 
   const activeProgramsList = myInfo.activePrograms || (myInfo.activeProgram ? [myInfo.activeProgram] : []);
+
+  const handleTextImportSubmit = async () => {
+    if (!importText.trim()) {
+      alert("テキストを入力してください。");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const lines = importText.split('\n');
+      const newItems = [];
+      let currentItem = null;
+
+      const exerciseRegex = /^(?:■|・|第?\d+[.．章-部-]\s*)?([^\n\[（]+)(?:\s*\[([^\]]+)\])?/;
+      const setRegex = /(?:Set\s*\d+\s*[:：]\s*)?(?:(自重|[+-]?\d+(?:\.\d+)?)\s*(?:kg|枚)?(?:[xｘ×]\s*|[\s/]+))?(?:L:\s*(\d+)\s*R:\s*(\d+)|(\d+))\s*回?(?:\s*\(\+補助\s*(\d+)\))?/i;
+
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        if (trimmed.includes('【トレーニング記録】') || trimmed.includes('日時:') || trimmed.includes('場所:') || trimmed.includes('体組成:') || trimmed.includes('総負荷量:') || trimmed.includes('総消費:')) {
+          return;
+        }
+
+        if (trimmed.match(/^(■|・|\d+\.)/) || (!trimmed.match(/Set/i) && !trimmed.match(/\d+kg/) && !trimmed.match(/\d+回/))) {
+          const match = trimmed.match(exerciseRegex);
+          if (match) {
+            const exName = match[1].trim();
+            const matchedEx = availableExercises.find(ex => ex.name.includes(exName) || exName.includes(ex.name));
+            
+            if (currentItem) newItems.push(currentItem);
+            currentItem = {
+              id: generateId(),
+              exerciseName: matchedEx ? matchedEx.name : exName,
+              weightType: matchedEx ? (matchedEx.weightType || 'total') : 'total',
+              category: matchedEx ? (matchedEx.category || 'その他') : 'その他',
+              isSuperSet: false, isDropSet: false, isForcedReps: false, memo: '',
+              sets: []
+            };
+            if (matchedEx && !selectedCategories.includes(matchedEx.category)) {
+               toggleCategory(matchedEx.category);
+            }
+          }
+        } else if (currentItem) {
+          const setMatch = trimmed.match(setRegex);
+          if (setMatch) {
+            const weightRaw = setMatch[1];
+            const lReps = setMatch[2];
+            const rReps = setMatch[3];
+            const reps = setMatch[4];
+            const forced = setMatch[5];
+            
+            let parsedWeight = '';
+            if (weightRaw === '自重') parsedWeight = '0';
+            else if (weightRaw) parsedWeight = weightRaw.replace('+', '');
+            
+            currentItem.sets.push({
+              id: generateId(),
+              weight: parsedWeight,
+              reps: reps || '',
+              lReps: lReps || '',
+              rReps: rReps || '',
+              forcedReps: forced || ''
+            });
+          } else if (trimmed.startsWith('メモ:') || trimmed.startsWith('memo:')) {
+            currentItem.memo = trimmed.replace(/^(メモ|memo)[:：\s]*/i, '');
+          }
+        }
+      });
+
+      if (currentItem) newItems.push(currentItem);
+
+      if (newItems.length > 0) {
+         setWorkoutItems(prev => [...prev, ...newItems]);
+         alert(newItems.length + "種目をインポートしました！微調整を行ってください。");
+         setShowImportTextModal(false);
+         setImportText('');
+      } else {
+         alert("トレーニング内容を解析できませんでした。テキストの形式を確認してください。");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("インポート中にエラーが発生しました。");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleGenerateProgram = async (progType, exerciseName, oneRM) => {
     let schedule = [];
@@ -5197,12 +5285,48 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
           </div>
         </div>
 
-        <button onClick={handleSubmit} disabled={isSubmitting || (workoutItems.length === 0 && !bodyWeight && !bodyFat)} className={`w-full text-white font-bold py-4 rounded-xl shadow-md flex items-center justify-center gap-2 mt-6 mb-8 transition-all ${isSubmitting || (workoutItems.length === 0 && !bodyWeight && !bodyFat) ? 'bg-slate-300 dark:bg-slate-800 cursor-not-allowed text-slate-500 dark:text-slate-400' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30'}`}>
+        <button onClick={handleSubmit} disabled={isSubmitting || (workoutItems.length === 0 && !bodyWeight && !bodyFat)} className={`w-full text-white font-bold py-4 rounded-xl shadow-md flex items-center justify-center gap-2 mt-6 mb-4 transition-all ${isSubmitting || (workoutItems.length === 0 && !bodyWeight && !bodyFat) ? 'bg-slate-300 dark:bg-slate-800 cursor-not-allowed text-slate-500 dark:text-slate-400' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30'}`}>
           {isSubmitting ? <Activity className="animate-spin" size={20} /> : (isManual ? <><CalendarIcon size={20} /> 過去の記録を保存</> : <><Flame size={20} /> トレーニングを完了して保存</>)}
+        </button>
+
+        <button onClick={() => setShowImportTextModal(true)} className="w-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold py-3 rounded-xl shadow-sm flex items-center justify-center gap-2 mb-4 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all border border-slate-200 dark:border-slate-700">
+          <Sparkles size={18} className="text-indigo-500" /> テキストから一括インポート
         </button>
         
         <button onClick={handleCancel} className="w-full text-slate-500 dark:text-slate-400 font-bold py-3 rounded-xl flex items-center justify-center gap-2 mt-2 mb-8 transition-all bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:text-rose-500 hover:border-rose-200 dark:hover:border-rose-800">記録を破棄して終了</button>
       </div>
+
+      {showImportTextModal && (
+        <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950/40">
+              <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                <Sparkles size={18} className="text-indigo-500"/> テキストからインポート
+              </h3>
+              <button onClick={() => setShowImportTextModal(false)} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto">
+              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-3">
+                コピーしたトレーニング記録を貼り付けてください。解析ロジックが自動でアプリの形式に変換し、一覧に追加します。
+              </p>
+              <textarea
+                value={importText}
+                onChange={e => setImportText(e.target.value)}
+                placeholder="例:&#10;■ 1. ベンチプレス [胸]&#10;Set 1: 50kg x 10回&#10;Set 2: 50kg x 8回"
+                className="w-full h-64 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:border-indigo-500 resize-none"
+              />
+            </div>
+            <div className="p-4 border-t border-slate-200 dark:border-slate-800">
+              <button onClick={handleTextImportSubmit} disabled={isSubmitting || !importText.trim()} className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-bold py-3.5 rounded-xl shadow-md transition-colors flex items-center justify-center gap-2">
+                {isSubmitting ? <Activity className="animate-spin" size={18} /> : <Sparkles size={18} />} 解析して入力
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showReorderModal && (
         <ReorderItemsModal 
           items={workoutItems} 
@@ -6769,7 +6893,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.31, 21:47, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.31, 22:02, updated)</p>
       </div>
     </div>
   );
