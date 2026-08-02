@@ -4372,26 +4372,67 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
   
   const myPosts = posts.filter(p => p.author === displayUser);
 
-  const [touchStartX, setTouchStartX] = useState(null);
   const [swipeOffset, setSwipeOffset] = useState(0);
+  const swipeContainerRef = useRef(null);
+  const touchState = useRef({ startX: 0, startY: 0, isHorizontal: null });
 
-  const handleTouchStart = (e) => setTouchStartX(e.touches[0].clientX);
-  const handleTouchMove = (e) => {
-    if (touchStartX !== null) {
-      setSwipeOffset(e.touches[0].clientX - touchStartX);
-    }
-  };
-  const handleTouchEnd = () => {
-    if (touchStartX !== null) {
-      if (swipeOffset > 50) {
-        setCurrentMonth(new Date(year, month - 1, 1));
-      } else if (swipeOffset < -50) {
-        setCurrentMonth(new Date(year, month + 1, 1));
+  useEffect(() => {
+    const container = swipeContainerRef.current;
+    if (!container) return;
+
+    const handleTouchStart = (e) => {
+      touchState.current = {
+        startX: e.touches[0].clientX,
+        startY: e.touches[0].clientY,
+        isHorizontal: null
+      };
+    };
+
+    const handleTouchMove = (e) => {
+      if (!touchState.current.startX) return;
+
+      const dx = e.touches[0].clientX - touchState.current.startX;
+      const dy = e.touches[0].clientY - touchState.current.startY;
+
+      if (touchState.current.isHorizontal === null) {
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 5) {
+          touchState.current.isHorizontal = true;
+        } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 5) {
+          touchState.current.isHorizontal = false;
+        }
       }
-      setTouchStartX(null);
-      setSwipeOffset(0);
-    }
-  };
+
+      if (touchState.current.isHorizontal) {
+        if (e.cancelable) e.preventDefault();
+        setSwipeOffset(dx);
+      }
+    };
+
+    const handleTouchEnd = (e) => {
+      if (touchState.current.isHorizontal) {
+        const dx = e.changedTouches ? e.changedTouches[0].clientX - touchState.current.startX : 0;
+        if (dx > 50) {
+          setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+        } else if (dx < -50) {
+          setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+        }
+        setSwipeOffset(0);
+      }
+      touchState.current = { startX: 0, startY: 0, isHorizontal: null };
+    };
+
+    container.addEventListener('touchstart', handleTouchStart, { passive: false });
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    container.addEventListener('touchend', handleTouchEnd);
+    container.addEventListener('touchcancel', handleTouchEnd);
+
+    return () => {
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+      container.removeEventListener('touchend', handleTouchEnd);
+      container.removeEventListener('touchcancel', handleTouchEnd);
+    };
+  }, []);
 
   const renderMonthGrid = (targetDate) => {
     const y = targetDate.getFullYear();
@@ -4399,7 +4440,7 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
     const fd = new Date(y, m, 1).getDay();
     const dim = new Date(y, m + 1, 0).getDate();
     
-    const monthBlanks = Array.from({ length: fd || 0 }).map((_, i) => <div key={`blank-${i}`} className="p-2"></div>);
+    const monthBlanks = Array.from({ length: fd || 0 }).map((_, i) => <div key={`blank-${i}`} className="p-1 h-14"></div>);
     const monthDays = Array.from({ length: dim || 0 }).map((_, i) => {
       const date = i + 1;
       const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(date).padStart(2,'0')}`;
@@ -4424,7 +4465,7 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
     });
 
     const totalCells = (fd || 0) + (dim || 0);
-    const trailingBlanks = Array.from({ length: 42 - totalCells }).map((_, i) => <div key={`trail-${i}`} className="p-2"></div>);
+    const trailingBlanks = Array.from({ length: 42 - totalCells }).map((_, i) => <div key={`trail-${i}`} className="p-1 h-14"></div>);
 
     return (
       <div className="w-1/3 shrink-0 flex-none px-1">
@@ -7074,7 +7115,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 18:40, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 18:42, updated)</p>
       </div>
     </div>
   );
