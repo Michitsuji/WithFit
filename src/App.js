@@ -4372,33 +4372,25 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
   
   const myPosts = posts.filter(p => p.author === displayUser);
 
-  const scrollRef = useRef(null);
-  const isAdjusting = useRef(false);
-  const scrollTimeout = useRef(null);
+  const [touchStartX, setTouchStartX] = useState(null);
+  const [swipeOffset, setSwipeOffset] = useState(0);
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      isAdjusting.current = true;
-      scrollRef.current.scrollLeft = scrollRef.current.clientWidth;
-      setTimeout(() => { isAdjusting.current = false; }, 50);
+  const handleTouchStart = (e) => setTouchStartX(e.touches[0].clientX);
+  const handleTouchMove = (e) => {
+    if (touchStartX !== null) {
+      setSwipeOffset(e.touches[0].clientX - touchStartX);
     }
-  }, [currentMonth]);
-
-  const handleScroll = (e) => {
-    if (isAdjusting.current) return;
-    if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
-    
-    const container = e.target;
-    const width = container.clientWidth;
-    const scrollLeft = container.scrollLeft;
-    
-    scrollTimeout.current = setTimeout(() => {
-      if (scrollLeft < width * 0.5) {
+  };
+  const handleTouchEnd = () => {
+    if (touchStartX !== null) {
+      if (swipeOffset > 50) {
         setCurrentMonth(new Date(year, month - 1, 1));
-      } else if (scrollLeft > width * 1.5) {
+      } else if (swipeOffset < -50) {
         setCurrentMonth(new Date(year, month + 1, 1));
       }
-    }, 100);
+      setTouchStartX(null);
+      setSwipeOffset(0);
+    }
   };
 
   const renderMonthGrid = (targetDate) => {
@@ -4432,7 +4424,7 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
     });
 
     return (
-      <div className="w-full shrink-0 snap-center flex-none">
+      <div className="w-1/3 shrink-0 flex-none px-1">
         <div className="grid grid-cols-7 text-center mb-2">
           {['日', '月', '火', '水', '木', '金', '土'].map(d => <div key={d} className={`text-xs font-bold ${d === '日' ? 'text-rose-400' : d === '土' ? 'text-blue-400' : 'text-slate-400 dark:text-slate-500'}`}>{d}</div>)}
         </div>
@@ -4470,18 +4462,23 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
           <button onClick={() => setCurrentMonth(new Date(year, month + 1, 1))} className="text-slate-400 hover:text-emerald-500 font-bold p-2 transition-colors">&gt;</button>
         </div>
 
-        <style>{`
-          .hide-scrollbar::-webkit-scrollbar { display: none; }
-          .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        `}</style>
         <div 
-          ref={scrollRef}
-          onScroll={handleScroll}
-          className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar -mx-5 px-5"
+          className="overflow-hidden w-full relative -mx-1 px-1"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
-          {renderMonthGrid(new Date(year, month - 1, 1))}
-          {renderMonthGrid(currentMonth)}
-          {renderMonthGrid(new Date(year, month + 1, 1))}
+          <div 
+            className="flex w-[300%]"
+            style={{ 
+              transform: `translateX(calc(-33.333% + ${swipeOffset}px))`,
+              transition: touchStartX !== null ? 'none' : 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)' 
+            }}
+          >
+            {renderMonthGrid(new Date(year, month - 1, 1))}
+            {renderMonthGrid(currentMonth)}
+            {renderMonthGrid(new Date(year, month + 1, 1))}
+          </div>
         </div>
         
         <div className="flex justify-center gap-4 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
@@ -6440,12 +6437,12 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                         <div className="divide-y divide-slate-100 dark:divide-slate-800">
                           {gymExercises.map(ex => {
                             const isMuted = mutedExercises.includes(ex.name);
-                            const isMaster = ex.gymId === 'common' ? ex.author === MASTER_USER : ex.author === gym.owner;
+                            const isMaster = ex.gymId === 'common' ? (!ex.author || ex.author === MASTER_USER) : (!ex.author || ex.author === gym.owner);
                             let bgClass = "hover:bg-slate-50 dark:hover:bg-slate-800/50";
                             if (isMaster) {
-                               bgClass = "bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 border-l-4 border-l-amber-500";
+                               bgClass = "bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 border-l-[6px] border-l-amber-400";
                             } else {
-                               bgClass = "bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border-l-4 border-l-blue-500";
+                               bgClass = "bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border-l-[6px] border-l-blue-400";
                             }
 
                             return (
@@ -6454,10 +6451,6 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                                   <p className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2 flex-wrap">
                                     {ex.name}
                                     {ex.category && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${getCategoryColor(ex.category)}`}>{ex.category}</span>}
-                                    {isMaster ? 
-                                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white shadow-sm">管理者</span> : 
-                                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-500 text-white shadow-sm">個人追加</span>
-                                    }
                                     {isMuted && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400">非表示中</span>}
                                   </p>
                                   <div className="flex gap-2 mt-1">
@@ -7079,7 +7072,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 12:27, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 12:40, updated)</p>
       </div>
     </div>
   );
