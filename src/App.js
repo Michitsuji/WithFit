@@ -4376,6 +4376,12 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
   const swipeContainerRef = useRef(null);
   const touchState = useRef({ startX: 0, startY: 0, isHorizontal: null });
 
+  const handleMonthChange = (direction) => {
+    const scrollY = window.scrollY;
+    setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + direction, 1));
+    setTimeout(() => window.scrollTo(0, scrollY), 0);
+  };
+
   useEffect(() => {
     const container = swipeContainerRef.current;
     if (!container) return;
@@ -4412,9 +4418,9 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
       if (touchState.current.isHorizontal) {
         const dx = e.changedTouches ? e.changedTouches[0].clientX - touchState.current.startX : 0;
         if (dx > 50) {
-          setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+          handleMonthChange(-1);
         } else if (dx < -50) {
-          setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+          handleMonthChange(1);
         }
         setSwipeOffset(0);
       }
@@ -4501,9 +4507,9 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
 
       <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
         <div className="flex justify-between items-center mb-4">
-          <button onClick={() => setCurrentMonth(new Date(year, month - 1, 1))} className="text-slate-400 hover:text-emerald-500 font-bold p-2 transition-colors">&lt;</button>
+          <button onClick={() => handleMonthChange(-1)} className="text-slate-400 hover:text-emerald-500 font-bold p-2 transition-colors">&lt;</button>
           <span className="font-bold text-slate-700 dark:text-slate-200">{year}年 {month + 1}月</span>
-          <button onClick={() => setCurrentMonth(new Date(year, month + 1, 1))} className="text-slate-400 hover:text-emerald-500 font-bold p-2 transition-colors">&gt;</button>
+          <button onClick={() => handleMonthChange(1)} className="text-slate-400 hover:text-emerald-500 font-bold p-2 transition-colors">&gt;</button>
         </div>
 
         <div 
@@ -7115,7 +7121,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 18:42, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 18:49, updated)</p>
       </div>
     </div>
   );
