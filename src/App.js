@@ -4466,16 +4466,15 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
         </div>
 
         <div 
+          ref={swipeContainerRef}
           className="overflow-hidden w-full relative -mx-1 px-1"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
+          style={{ touchAction: 'pan-y' }}
         >
           <div 
             className="flex w-[300%]"
             style={{ 
               transform: `translateX(calc(-33.333% + ${swipeOffset}px))`,
-              transition: touchStartX !== null ? 'none' : 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)' 
+              transition: swipeOffset !== 0 ? 'none' : 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)' 
             }}
           >
             {renderMonthGrid(new Date(year, month - 1, 1))}
@@ -7075,7 +7074,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 12:42, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 18:40, updated)</p>
       </div>
     </div>
   );
