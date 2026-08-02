@@ -4679,6 +4679,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const [showImportTextModal, setShowImportTextModal] = useState(false);
   const [importText, setImportText] = useState('');
   const [aiErrorMsg, setAiErrorMsg] = useState(null);
+  const [importProgress, setImportProgress] = useState(0);
 
   const round25 = (val) => Math.round(val / 2.5) * 2.5;
 
@@ -4690,6 +4691,15 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
       return;
     }
     setIsSubmitting(true);
+    setImportProgress(0);
+    
+    const progressInterval = setInterval(() => {
+      setImportProgress(prev => {
+        if (prev >= 90) return 90;
+        return prev + 15;
+      });
+    }, 800);
+
     try {
       const prompt = `以下のトレーニング記録テキストを解析し、JSON配列のみを出力してください。
 フォーマット要件:
@@ -4708,17 +4718,18 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
     "memo": "アプリの項目で表現しきれない情報やメモがあれば記載",
     "sets": [
       {
-        "weight": "重量(自重は0)", "reps": "回数", "lReps": "", "rReps": "", "forcedReps": "補助回数",
+        "weight": "重量(自重は0)", "reps": "通常の回数", "lReps": "片側の左の回数", "rReps": "片側の右の回数", "forcedReps": "補助回数",
         "distance": "有酸素距離", "time": "時間", "calories": "カロリー",
-        "superWeight": "スーパーセット重量", "superReps": "回数", "superLReps": "", "superRReps": "", "superForcedReps": "",
-        "superWeight3": "ジャイアントセット重量", "superReps3": "回数", "superLReps3": "", "superRReps3": "", "superForcedReps3": "",
+        "superWeight": "スーパーセット重量", "superReps": "回数", "superLReps": "左回数", "superRReps": "右回数", "superForcedReps": "",
+        "superWeight3": "ジャイアントセット重量", "superReps3": "回数", "superLReps3": "左回数", "superRReps3": "右回数", "superForcedReps3": "",
         "dropSets": [
-           { "weight": "ドロップ重量", "reps": "回数", "lReps": "", "rReps": "", "forcedReps": "", "superWeight": "", "superReps": "", "superWeight3": "", "superReps3": "" }
+           { "weight": "ドロップ重量", "reps": "通常の回数", "lReps": "左の回数", "rReps": "右の回数", "forcedReps": "", "superWeight": "", "superReps": "", "superWeight3": "", "superReps3": "" }
         ]
       }
     ]
   }
 ]
+※片側種目（ランジやワンアーム系など左右で回数を分ける種目）の場合は、必ず reps ではなく lReps と rReps に回数を代入してください。
 アプリで記録できる上記形式で可能な限り抽出し、表現しきれない部分はmemoにまとめてください。JSONのみ出力してください。
 対象テキスト:
 ${importText}`;
@@ -4800,14 +4811,26 @@ ${importText}`;
       });
 
       if (newItems.length > 0) {
-         setWorkoutItems(prev => [...prev, ...newItems]);
-         alert(newItems.length + "種目をインポートしました！微調整を行ってください。");
-         setShowImportTextModal(false);
-         setImportText('');
+         clearInterval(progressInterval);
+         setImportProgress(100);
+         setTimeout(() => {
+           setWorkoutItems(prev => {
+             const hasOnlyEmpty = prev.length === 1 && !prev[0].exerciseName && prev[0].sets.length === 1 && !prev[0].sets[0].weight && !prev[0].sets[0].reps;
+             return hasOnlyEmpty ? newItems : [...prev, ...newItems];
+           });
+           alert(newItems.length + "種目をインポートしました！微調整を行ってください。");
+           setShowImportTextModal(false);
+           setImportText('');
+           setImportProgress(0);
+         }, 300);
       } else {
+         clearInterval(progressInterval);
+         setImportProgress(0);
          alert("トレーニング内容を解析できませんでした。");
       }
     } catch (error) {
+      clearInterval(progressInterval);
+      setImportProgress(0);
       console.error(error);
       setAiErrorMsg(error.message);
     } finally {
@@ -5381,9 +5404,21 @@ ${importText}`;
               />
             </div>
             <div className="p-4 border-t border-slate-200 dark:border-slate-800">
-              <button onClick={handleTextImportSubmit} disabled={isSubmitting || !importText.trim()} className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-bold py-3.5 rounded-xl shadow-md transition-colors flex items-center justify-center gap-2">
-                {isSubmitting ? <Activity className="animate-spin" size={18} /> : <Sparkles size={18} />} 解析して入力
-              </button>
+              {isSubmitting ? (
+                <div className="w-full">
+                  <div className="flex justify-between text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2">
+                    <span>AIが解析しています...</span>
+                    <span>{importProgress}%</span>
+                  </div>
+                  <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden shadow-inner">
+                    <div className="bg-indigo-500 h-2.5 rounded-full transition-all duration-300" style={{ width: `${importProgress}%` }}></div>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={handleTextImportSubmit} disabled={!importText.trim()} className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-bold py-3.5 rounded-xl shadow-md transition-colors flex items-center justify-center gap-2">
+                  <Sparkles size={18} /> 解析して入力
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -6955,7 +6990,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 11:32, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 11:43, updated)</p>
       </div>
     </div>
   );
