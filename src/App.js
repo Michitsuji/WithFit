@@ -4691,7 +4691,6 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
     }
     setIsSubmitting(true);
     try {
-      const apiKey = "AIzaSyDkNNFGDLDlm9UuzY01QFLLoNZ7inftGfk";
       const prompt = `以下のトレーニング記録テキストを解析し、JSON配列のみを出力してください。
 フォーマット要件:
 [
@@ -4725,20 +4724,17 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
 ${importText}`;
 
       setAiErrorMsg(null);
-      // 最も互換性が高く安定している gemini-pro を使用します
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
+      
+      const response = await fetch('/api/gemini', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
+        body: JSON.stringify({ prompt })
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(`${errorData.error?.message || response.statusText}`);
-      }
       const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || '解析リクエストに失敗しました');
+      }
       let textResponse = data.candidates[0].content.parts[0].text;
       textResponse = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsedItems = JSON.parse(textResponse);
@@ -6959,7 +6955,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 11:23, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 11:32, updated)</p>
       </div>
     </div>
   );
