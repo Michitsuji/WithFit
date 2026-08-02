@@ -6857,19 +6857,6 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
 
       {activeTab === 'friends' && (
         <div className="space-y-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-lg shrink-0 overflow-hidden" style={{ backgroundColor: myInfo?.userColor || '#10b981', border: `2px solid ${myInfo?.userColor || '#10b981'}` }}>
-              {myInfo?.photoUrl ? <img src={myInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : myInfo?.displayName ? myInfo.displayName.charAt(0).toUpperCase() : currentUser.charAt(0).toUpperCase()}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-bold text-slate-800 dark:text-slate-100 text-base truncate">{myInfo?.displayName || currentUser}</span>
-                <span className="text-[10px] font-bold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 shrink-0">あなた</span>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-bold truncate">{myInfo?.goal || '目標を設定してトレーニングを頑張りましょう'}</p>
-            </div>
-          </div>
-          <div className="w-full h-px bg-slate-200 dark:bg-slate-800"></div>
           <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 rounded-3xl p-5 text-white shadow-xl mb-6 overflow-hidden relative">
             <div className="absolute -right-6 -bottom-6 text-white/10 transform rotate-12 pointer-events-none">
               <Trophy size={140} />
@@ -6938,6 +6925,19 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
              </div>
           )}
 
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-lg shrink-0 overflow-hidden" style={{ backgroundColor: myInfo?.userColor || '#10b981', border: `2px solid ${myInfo?.userColor || '#10b981'}` }}>
+              {myInfo?.photoUrl ? <img src={myInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : myInfo?.displayName ? myInfo.displayName.charAt(0).toUpperCase() : currentUser.charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-bold text-slate-800 dark:text-slate-100 text-base truncate">{myInfo?.displayName || currentUser}</span>
+                <span className="text-[10px] font-bold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 shrink-0">あなた</span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-bold truncate">{myInfo?.goal || '目標を設定してトレーニングを頑張りましょう'}</p>
+            </div>
+          </div>
+          <div className="w-full h-px bg-slate-200 dark:bg-slate-800"></div>
           {myFriends.length === 0 ? (
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center shadow-sm">
               <Users className="mx-auto text-slate-300 dark:text-slate-600 w-12 h-12 mb-4" />
@@ -6990,7 +6990,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 11:49, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 11:51, updated)</p>
       </div>
     </div>
   );
