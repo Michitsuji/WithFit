@@ -4423,12 +4423,15 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
       );
     });
 
+    const totalCells = (fd || 0) + (dim || 0);
+    const trailingBlanks = Array.from({ length: 42 - totalCells }).map((_, i) => <div key={`trail-${i}`} className="p-2"></div>);
+
     return (
       <div className="w-1/3 shrink-0 flex-none px-1">
         <div className="grid grid-cols-7 text-center mb-2">
           {['日', '月', '火', '水', '木', '金', '土'].map(d => <div key={d} className={`text-xs font-bold ${d === '日' ? 'text-rose-400' : d === '土' ? 'text-blue-400' : 'text-slate-400 dark:text-slate-500'}`}>{d}</div>)}
         </div>
-        <div className="grid grid-cols-7 text-center">{monthBlanks}{monthDays}</div>
+        <div className="grid grid-cols-7 text-center">{monthBlanks}{monthDays}{trailingBlanks}</div>
       </div>
     );
   };
@@ -7072,7 +7075,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 12:40, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 12:42, updated)</p>
       </div>
     </div>
   );
