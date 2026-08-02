@@ -3232,6 +3232,10 @@ if (timerState.y === 'top') {
     <div className={`min-h-screen font-sans pb-32 overflow-x-hidden select-none transition-colors duration-300 ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'} ${themeContainerClass}`}>
       <style>{`
         input, textarea, select { font-size: 16px !important; }
+        .dark, .dark body { background-color: #0f172a !important; color: #f8fafc !important; }
+        .dark .bg-slate-950 { background-color: #0f172a !important; }
+        .dark .bg-slate-900 { background-color: #1e293b !important; }
+        .dark .border-slate-800 { border-color: #334155 !important; }
       `}</style>
       {myInfo.theme === 'ocean' && (
         <style>{`
@@ -3275,7 +3279,7 @@ if (timerState.y === 'top') {
             --tw-shadow: var(--tw-shadow-colored) !important;
           }
           .theme-pop .text-slate-800, .theme-pop .text-slate-900 {
-            color: #831843 !important;
+            color: #000000 !important;
           }
           .theme-pop .text-slate-500, .theme-pop .text-slate-400 {
             color: #0ea5e9 !important;
@@ -6990,7 +6994,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 11:51, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 12:04, updated)</p>
       </div>
     </div>
   );
