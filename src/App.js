@@ -2811,9 +2811,9 @@ if (timerState.y === 'top') {
     try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now() }, { merge: true }); setDraftWorkoutItems([]); setSelectedCategories([]); setCurrentTab('timeline'); } catch (e) {}
   };
 
-  const handleSaveProfile = async (data) => {
+  const handleSaveProfile = async (data, shouldClose = true) => {
     if (!currentUser || !db) return;
-    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), data, { merge: true }); setShowProfileModal(false); } catch (e) {}
+    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), data, { merge: true }); if (shouldClose) setShowProfileModal(false); } catch (e) {}
   };
 
   const toggleLike = async (postId, currentLikes, isCurrentlyLiked, likedUsers = []) => {
@@ -3640,7 +3640,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
        return;
     }
     const timer = setTimeout(() => {
-      onSave({ displayName: displayName.trim() || currentUser, photoUrl, userColor, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null, hideBodyMetrics, enablePartnerFeature, notifyPost, notifyComment, notifyLike });
+      onSave({ displayName: displayName.trim() || currentUser, photoUrl, userColor, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null, hideBodyMetrics, enablePartnerFeature, notifyPost, notifyComment, notifyLike }, false);
     }, 500);
     return () => clearTimeout(timer);
   }, [displayName, photoUrl, userColor, goal, theme, birthDate, gender, height, weight, hideBodyMetrics, enablePartnerFeature, notifyPost, notifyComment, notifyLike, isOpen]);
@@ -3757,7 +3757,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
   };
 
   const handleSave = () => {
-    onSave({ displayName: displayName.trim() || currentUser, photoUrl, userColor, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null, hideBodyMetrics, enablePartnerFeature, notifyPost, notifyComment, notifyLike });
+    onSave({ displayName: displayName.trim() || currentUser, photoUrl, userColor, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null, hideBodyMetrics, enablePartnerFeature, notifyPost, notifyComment, notifyLike }, true);
   };
 
   if (cropImageSrc) {
@@ -4368,45 +4368,78 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const todayStr = formatDateFromTimestamp(Date.now());
 
-  const [touchStartX, setTouchStartX] = useState(null);
-  const handleTouchStart = (e) => setTouchStartX(e.touches[0].clientX);
-  const handleTouchEnd = (e) => {
-    if (touchStartX === null) return;
-    const touchEndX = e.changedTouches[0].clientX;
-    const diff = touchStartX - touchEndX;
-    if (diff > 50) {
-      setCurrentMonth(new Date(year, month + 1, 1));
-    } else if (diff < -50) {
-      setCurrentMonth(new Date(year, month - 1, 1));
-    }
-    setTouchStartX(null);
-  };
+
   
   const myPosts = posts.filter(p => p.author === displayUser);
 
-  const blanks = Array.from({ length: firstDay || 0 }).map((_, i) => <div key={`blank-${i}`} className="p-2"></div>);
-  const days = Array.from({ length: daysInMonth || 0 }).map((_, i) => {
-    const date = i + 1;
-    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(date).padStart(2,'0')}`;
-    const isMyTraining = myPosts.some(p => formatDateFromTimestamp(p.timestamp) === dateStr);
-    const isSelected = selectedDateStr === dateStr;
-    const isToday = dateStr === todayStr;
+  const scrollRef = useRef(null);
+  const isAdjusting = useRef(false);
+  const scrollTimeout = useRef(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      isAdjusting.current = true;
+      scrollRef.current.scrollLeft = scrollRef.current.clientWidth;
+      setTimeout(() => { isAdjusting.current = false; }, 50);
+    }
+  }, [currentMonth]);
+
+  const handleScroll = (e) => {
+    if (isAdjusting.current) return;
+    if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
     
+    const container = e.target;
+    const width = container.clientWidth;
+    const scrollLeft = container.scrollLeft;
+    
+    scrollTimeout.current = setTimeout(() => {
+      if (scrollLeft < width * 0.5) {
+        setCurrentMonth(new Date(year, month - 1, 1));
+      } else if (scrollLeft > width * 1.5) {
+        setCurrentMonth(new Date(year, month + 1, 1));
+      }
+    }, 100);
+  };
+
+  const renderMonthGrid = (targetDate) => {
+    const y = targetDate.getFullYear();
+    const m = targetDate.getMonth();
+    const fd = new Date(y, m, 1).getDay();
+    const dim = new Date(y, m + 1, 0).getDate();
+    
+    const monthBlanks = Array.from({ length: fd || 0 }).map((_, i) => <div key={`blank-${i}`} className="p-2"></div>);
+    const monthDays = Array.from({ length: dim || 0 }).map((_, i) => {
+      const date = i + 1;
+      const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(date).padStart(2,'0')}`;
+      const isMyTraining = myPosts.some(p => formatDateFromTimestamp(p.timestamp) === dateStr);
+      const isSelected = selectedDateStr === dateStr;
+      const isToday = dateStr === todayStr;
+      
+      return (
+        <div key={`day-${date}`} className="p-1 flex flex-col justify-center items-center h-14" onClick={() => setSelectedDateStr(dateStr)}>
+          <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold transition-all cursor-pointer 
+            ${isSelected ? 'ring-2 ring-offset-1 ring-emerald-500 dark:ring-offset-slate-900' : ''} 
+            ${isMyTraining ? 'bg-slate-100 dark:bg-slate-800' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}
+            ${isToday ? 'border-2 border-emerald-400 text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}
+          `}>
+            {date}
+          </div>
+          <div className="flex gap-1 mt-1 h-1.5">
+            {isMyTraining && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>}
+          </div>
+        </div>
+      );
+    });
+
     return (
-      <div key={`day-${date}`} className="p-1 flex flex-col justify-center items-center h-14" onClick={() => setSelectedDateStr(dateStr)}>
-        <div className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold transition-all cursor-pointer 
-          ${isSelected ? 'ring-2 ring-offset-1 ring-emerald-500 dark:ring-offset-slate-900' : ''} 
-          ${isMyTraining ? 'bg-slate-100 dark:bg-slate-800' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}
-          ${isToday ? 'border-2 border-emerald-400 text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}
-        `}>
-          {date}
+      <div className="w-full shrink-0 snap-center flex-none">
+        <div className="grid grid-cols-7 text-center mb-2">
+          {['日', '月', '火', '水', '木', '金', '土'].map(d => <div key={d} className={`text-xs font-bold ${d === '日' ? 'text-rose-400' : d === '土' ? 'text-blue-400' : 'text-slate-400 dark:text-slate-500'}`}>{d}</div>)}
         </div>
-        <div className="flex gap-1 mt-1 h-1.5">
-          {isMyTraining && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>}
-        </div>
+        <div className="grid grid-cols-7 text-center">{monthBlanks}{monthDays}</div>
       </div>
     );
-  });
+  };
   
   const weightData = myPosts.filter(p => p.bodyWeight && !isNaN(p.bodyWeight)).map(p => ({ date: p.date, value: Number(p.bodyWeight) })).reverse();
   const fatData = myPosts.filter(p => p.bodyFat && !isNaN(p.bodyFat)).map(p => ({ date: p.date, value: Number(p.bodyFat) })).reverse();
@@ -4430,20 +4463,26 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
         <MonthlyReport monthDate={currentMonth} posts={posts} userName={displayUser} accountsInfo={accountsInfo} />
       </div>
 
-      <div 
-        className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
+      <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
         <div className="flex justify-between items-center mb-4">
           <button onClick={() => setCurrentMonth(new Date(year, month - 1, 1))} className="text-slate-400 hover:text-emerald-500 font-bold p-2 transition-colors">&lt;</button>
           <span className="font-bold text-slate-700 dark:text-slate-200">{year}年 {month + 1}月</span>
           <button onClick={() => setCurrentMonth(new Date(year, month + 1, 1))} className="text-slate-400 hover:text-emerald-500 font-bold p-2 transition-colors">&gt;</button>
         </div>
-        <div className="grid grid-cols-7 text-center mb-2">
-          {['日', '月', '火', '水', '木', '金', '土'].map(d => <div key={d} className={`text-xs font-bold ${d === '日' ? 'text-rose-400' : d === '土' ? 'text-blue-400' : 'text-slate-400 dark:text-slate-500'}`}>{d}</div>)}
+
+        <style>{`
+          .hide-scrollbar::-webkit-scrollbar { display: none; }
+          .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        `}</style>
+        <div 
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar -mx-5 px-5"
+        >
+          {renderMonthGrid(new Date(year, month - 1, 1))}
+          {renderMonthGrid(currentMonth)}
+          {renderMonthGrid(new Date(year, month + 1, 1))}
         </div>
-        <div className="grid grid-cols-7 text-center">{blanks}{days}</div>
         
         <div className="flex justify-center gap-4 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> トレーニング日</div>
@@ -6402,19 +6441,23 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                           {gymExercises.map(ex => {
                             const isMuted = mutedExercises.includes(ex.name);
                             const isMaster = ex.gymId === 'common' ? ex.author === MASTER_USER : ex.author === gym.owner;
-                            const isMine = ex.author === currentUser;
                             let bgClass = "hover:bg-slate-50 dark:hover:bg-slate-800/50";
-                            if (isMaster) bgClass = "bg-amber-50/20 dark:bg-amber-950/20 hover:bg-amber-100/40 dark:hover:bg-amber-900/40";
-                            else if (isMine) bgClass = "bg-emerald-50/20 dark:bg-emerald-950/20 hover:bg-emerald-100/40 dark:hover:bg-emerald-900/40";
+                            if (isMaster) {
+                               bgClass = "bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 border-l-4 border-l-amber-500";
+                            } else {
+                               bgClass = "bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border-l-4 border-l-blue-500";
+                            }
 
                             return (
-                              <div key={ex.id} onClick={() => setSelectedExerciseForChart(ex)} className={`p-3 flex justify-between items-center group transition-opacity cursor-pointer ${bgClass} ${isMuted ? 'opacity-40' : 'opacity-100'}`}>
+                              <div key={ex.id} onClick={() => setSelectedExerciseForChart(ex)} className={`p-3 flex justify-between items-center group transition-all cursor-pointer ${bgClass} ${isMuted ? 'opacity-40' : 'opacity-100'}`}>
                                 <div>
                                   <p className="font-bold text-slate-800 dark:text-slate-100 text-sm flex items-center gap-2 flex-wrap">
                                     {ex.name}
                                     {ex.category && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${getCategoryColor(ex.category)}`}>{ex.category}</span>}
-                                    {isMaster && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-400 border border-amber-200 dark:border-amber-800">マスター</span>}
-                                    {isMine && !isMaster && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">自分</span>}
+                                    {isMaster ? 
+                                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500 text-white shadow-sm">管理者</span> : 
+                                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-500 text-white shadow-sm">個人追加</span>
+                                    }
                                     {isMuted && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400">非表示中</span>}
                                   </p>
                                   <div className="flex gap-2 mt-1">
@@ -7036,7 +7079,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 12:18, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 12:27, updated)</p>
       </div>
     </div>
   );
