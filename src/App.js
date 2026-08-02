@@ -2499,7 +2499,7 @@ if (timerState.y === 'top') {
     
     const workoutsRef = collection(db, 'artifacts', appId, 'public', 'data', 'workouts');
     const unsubs = chunks.map((chunk, index) => {
-      const q = query(workoutsRef, where('author', 'in', chunk), orderBy('timestamp', 'desc'), limit(50));
+      const q = query(workoutsRef, where('author', 'in', chunk));
       return onSnapshot(q, (snapshot) => {
         const chunkData = []; 
         snapshot.forEach(doc => { chunkData.push({ id: doc.id, ...doc.data() }); });
@@ -6895,7 +6895,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.7.31, 22:23, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 11:12, updated)</p>
       </div>
     </div>
   );
