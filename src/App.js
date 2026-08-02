@@ -4696,7 +4696,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
     const progressInterval = setInterval(() => {
       setImportProgress(prev => {
         if (prev >= 90) return 90;
-        return prev + 15;
+        return Math.floor(prev + (90 - prev) * 0.15 + 1);
       });
     }, 800);
 
@@ -4729,7 +4729,7 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
     ]
   }
 ]
-※片側種目（ランジやワンアーム系など左右で回数を分ける種目）の場合は、必ず reps ではなく lReps と rReps に回数を代入してください。
+※片側種目（ランジやワンアーム系など左右で回数を分ける種目）の場合は、必ず weightType を "lr" とし、reps ではなく lReps と rReps に回数を代入してください。
 アプリで記録できる上記形式で可能な限り抽出し、表現しきれない部分はmemoにまとめてください。JSONのみ出力してください。
 対象テキスト:
 ${importText}`;
@@ -4758,7 +4758,7 @@ ${importText}`;
         return {
           id: generateId(),
           exerciseName: matchedEx ? matchedEx.name : (item.exerciseName || ''),
-          weightType: matchedEx ? (matchedEx.weightType || 'total') : (item.weightType || 'total'),
+          weightType: item.weightType === 'lr' ? 'lr' : (matchedEx ? (matchedEx.weightType || 'total') : (item.weightType || 'total')),
           category: matchedEx ? (matchedEx.category || 'その他') : (item.category || 'その他'),
           isSuperSet: item.isSuperSet || !!item.superExerciseName || false,
           isDropSet: item.isDropSet || (item.sets && item.sets.some(s => s.dropSets && s.dropSets.length > 0)) || false,
@@ -6990,7 +6990,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 11:43, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 11:49, updated)</p>
       </div>
     </div>
   );
