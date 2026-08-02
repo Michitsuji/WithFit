@@ -2611,6 +2611,8 @@ if (timerState.y === 'top') {
     const joinedGyms = accountData?.joinedGyms || ['common'];
     if (pin === 'google') {
       if (!accountData) {
+        const accountsSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'accounts'));
+        if (accountsSnap.size >= 10) { alert("ユーザー数が上限（10人）に達しているため、新規登録できません。"); return false; }
         try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { displayName: '新規ユーザー', friendCode: generateFriendCode(), isTraining: false, lastActive: Date.now(), isAppOnline: true, theme: 'light', friends: [], joinedGyms: ['common'] }, { merge: true }); setCurrentUser(username); } catch (e) { return false; }
       } else {
         setCurrentUser(username);
@@ -2664,6 +2666,9 @@ if (timerState.y === 'top') {
         }
       }
       
+      const accountsSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'accounts'));
+      if (accountsSnap.size >= 10) { alert("ユーザー数が上限（10人）に達しているため、新規登録できません。"); return false; }
+
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { displayName: username, googleUid: googleUser.uid, friendCode: generateFriendCode(), isTraining: false, lastActive: Date.now(), isAppOnline: true, theme: 'light', friends: [], joinedGyms: ['common'] }, { merge: true }); 
       setCurrentUser(username); 
       localStorage.setItem('withfit_login_session', JSON.stringify({ userId: username, lastActive: Date.now() }));
@@ -3390,7 +3395,12 @@ if (timerState.y === 'top') {
         <div className="fixed inset-0 z-[25] pointer-events-none overflow-hidden" style={{ perspective: 1000 }}>
           <div 
             ref={timerCardRef}
-            onClick={restoreTimerCard}
+            onClick={(e) => {
+              restoreTimerCard();
+              if (currentTab !== 'record' && !e.target.closest('button, select')) {
+                setCurrentTab('record');
+              }
+            }}
             onTouchStart={handleTimerTouchStart}
             onTouchMove={handleTimerTouchMove}
             onTouchEnd={handleTimerTouchEnd}
@@ -4689,12 +4699,28 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
     "exerciseName": "種目名",
     "category": "胸/背中/肩/腕/脚/腹筋/有酸素/その他のいずれか",
     "weightType": "total",
-    "memo": "メモがあれば抽出",
+    "isSuperSet": false,
+    "isDropSet": false,
+    "isForcedReps": false,
+    "superExerciseName": "スーパーセット種目名(あれば)",
+    "superWeightType": "total",
+    "superExerciseName3": "ジャイアントセット種目名(あれば)",
+    "superWeightType3": "total",
+    "memo": "アプリの項目で表現しきれない情報やメモがあれば記載",
     "sets": [
-      { "weight": "重量(数値のみ。自重は0)", "reps": "回数", "lReps": "", "rReps": "" }
+      {
+        "weight": "重量(自重は0)", "reps": "回数", "lReps": "", "rReps": "", "forcedReps": "補助回数",
+        "distance": "有酸素距離", "time": "時間", "calories": "カロリー",
+        "superWeight": "スーパーセット重量", "superReps": "回数", "superLReps": "", "superRReps": "", "superForcedReps": "",
+        "superWeight3": "ジャイアントセット重量", "superReps3": "回数", "superLReps3": "", "superRReps3": "", "superForcedReps3": "",
+        "dropSets": [
+           { "weight": "ドロップ重量", "reps": "回数", "lReps": "", "rReps": "", "forcedReps": "", "superWeight": "", "superReps": "", "superWeight3": "", "superReps3": "" }
+        ]
+      }
     ]
   }
 ]
+アプリで記録できる上記形式で可能な限り抽出し、表現しきれない部分はmemoにまとめてください。JSONのみ出力してください。
 対象テキスト:
 ${importText}`;
 
@@ -4727,14 +4753,52 @@ ${importText}`;
           exerciseName: matchedEx ? matchedEx.name : (item.exerciseName || ''),
           weightType: matchedEx ? (matchedEx.weightType || 'total') : (item.weightType || 'total'),
           category: matchedEx ? (matchedEx.category || 'その他') : (item.category || 'その他'),
-          isSuperSet: false, isDropSet: false, isForcedReps: false, memo: item.memo || '',
+          isSuperSet: item.isSuperSet || !!item.superExerciseName || false,
+          isDropSet: item.isDropSet || (item.sets && item.sets.some(s => s.dropSets && s.dropSets.length > 0)) || false,
+          isForcedReps: item.isForcedReps || (item.sets && item.sets.some(s => s.forcedReps || s.superForcedReps || s.superForcedReps3)) || false,
+          superExerciseName: item.superExerciseName || '',
+          superWeightType: item.superWeightType || 'total',
+          superExerciseName3: item.superExerciseName3 || '',
+          superWeightType3: item.superWeightType3 || 'total',
+          memo: item.memo || '',
           sets: (item.sets || []).map(set => ({
             id: generateId(),
             weight: set.weight || '',
             reps: set.reps || '',
             lReps: set.lReps || '',
             rReps: set.rReps || '',
-            forcedReps: ''
+            forcedReps: set.forcedReps || '',
+            distance: set.distance || '',
+            time: set.time || '',
+            calories: set.calories || '',
+            superWeight: set.superWeight || '',
+            superReps: set.superReps || '',
+            superLReps: set.superLReps || '',
+            superRReps: set.superRReps || '',
+            superForcedReps: set.superForcedReps || '',
+            superWeight3: set.superWeight3 || '',
+            superReps3: set.superReps3 || '',
+            superLReps3: set.superLReps3 || '',
+            superRReps3: set.superRReps3 || '',
+            superForcedReps3: set.superForcedReps3 || '',
+            dropSets: (set.dropSets || []).map(ds => ({
+                id: generateId(),
+                weight: ds.weight || '',
+                reps: ds.reps || '',
+                lReps: ds.lReps || '',
+                rReps: ds.rReps || '',
+                forcedReps: ds.forcedReps || '',
+                superWeight: ds.superWeight,
+                superReps: ds.superReps,
+                superLReps: ds.superLReps,
+                superRReps: ds.superRReps,
+                superForcedReps: ds.superForcedReps,
+                superWeight3: ds.superWeight3,
+                superReps3: ds.superReps3,
+                superLReps3: ds.superLReps3,
+                superRReps3: ds.superRReps3,
+                superForcedReps3: ds.superForcedReps3
+            }))
           }))
         };
       });
@@ -6895,7 +6959,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 11:12, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 11:23, updated)</p>
       </div>
     </div>
   );
