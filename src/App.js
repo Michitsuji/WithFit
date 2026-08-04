@@ -4464,7 +4464,7 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
       const isSelected = selectedDateStr === dateStr;
       const isToday = dateStr === todayStr;
       
-      let dotColorClass = "bg-emerald-500";
+      let dots = [];
       if (isMyTraining) {
         const categoryCounts = {};
         daysPosts.forEach(p => {
@@ -4475,19 +4475,19 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
           });
         });
         const categories = Object.keys(categoryCounts).sort((a, b) => categoryCounts[b] - categoryCounts[a]);
-        if (categories.length > 0) {
-           const topCategory = categories[0];
-           switch (topCategory) {
-             case '胸': dotColorClass = 'bg-rose-500'; break;
-             case '背中': dotColorClass = 'bg-blue-500'; break;
-             case '肩': dotColorClass = 'bg-amber-500'; break;
-             case '腕': dotColorClass = 'bg-purple-500'; break;
-             case '脚': dotColorClass = 'bg-emerald-500'; break;
-             case '腹筋': dotColorClass = 'bg-lime-500'; break;
-             case '有酸素': dotColorClass = 'bg-cyan-500'; break;
-             default: dotColorClass = 'bg-slate-600'; break;
+        
+        dots = categories.slice(0, 3).map(cat => {
+           switch (cat) {
+             case '胸': return 'bg-rose-500';
+             case '背中': return 'bg-blue-500';
+             case '肩': return 'bg-amber-500';
+             case '腕': return 'bg-purple-500';
+             case '脚': return 'bg-emerald-500';
+             case '腹筋': return 'bg-lime-500';
+             case '有酸素': return 'bg-cyan-500';
+             default: return 'bg-slate-600';
            }
-        }
+        });
       }
       
       return (
@@ -4499,8 +4499,8 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
           `}>
             {date}
           </div>
-          <div className="flex gap-1 mt-1 h-1.5">
-            {isMyTraining && <div className={`w-1.5 h-1.5 rounded-full ${dotColorClass}`}></div>}
+          <div className="flex gap-0.5 mt-1 h-1.5">
+            {dots.map((bg, idx) => <div key={idx} className={`w-1.5 h-1.5 rounded-full ${bg}`}></div>)}
           </div>
         </div>
       );
@@ -7163,7 +7163,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.4, 23:17, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.4, 23:22, updated)</p>
       </div>
     </div>
   );
