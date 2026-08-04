@@ -4374,12 +4374,21 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
 
   const [swipeOffset, setSwipeOffset] = useState(0);
   const swipeContainerRef = useRef(null);
+  const calendarCardRef = useRef(null);
   const touchState = useRef({ startX: 0, startY: 0, isHorizontal: null });
 
   const handleMonthChange = (direction) => {
-    const scrollY = window.scrollY;
+    let offset = 0;
+    if (calendarCardRef.current) {
+      offset = calendarCardRef.current.getBoundingClientRect().top;
+    }
     setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + direction, 1));
-    setTimeout(() => window.scrollTo(0, scrollY), 0);
+    setTimeout(() => {
+      if (calendarCardRef.current) {
+         const newOffset = calendarCardRef.current.getBoundingClientRect().top;
+         window.scrollBy(0, newOffset - offset);
+      }
+    }, 0);
   };
 
   useEffect(() => {
@@ -4450,9 +4459,36 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
     const monthDays = Array.from({ length: dim || 0 }).map((_, i) => {
       const date = i + 1;
       const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(date).padStart(2,'0')}`;
-      const isMyTraining = myPosts.some(p => formatDateFromTimestamp(p.timestamp) === dateStr);
+      const daysPosts = myPosts.filter(p => formatDateFromTimestamp(p.timestamp) === dateStr);
+      const isMyTraining = daysPosts.length > 0;
       const isSelected = selectedDateStr === dateStr;
       const isToday = dateStr === todayStr;
+      
+      let dotColorClass = "bg-emerald-500";
+      if (isMyTraining) {
+        const categoryCounts = {};
+        daysPosts.forEach(p => {
+          (p.items || []).forEach(item => {
+            if (item.category) {
+              categoryCounts[item.category] = (categoryCounts[item.category] || 0) + (item.sets?.length || 0);
+            }
+          });
+        });
+        const categories = Object.keys(categoryCounts).sort((a, b) => categoryCounts[b] - categoryCounts[a]);
+        if (categories.length > 0) {
+           const topCategory = categories[0];
+           switch (topCategory) {
+             case '胸': dotColorClass = 'bg-rose-500'; break;
+             case '背中': dotColorClass = 'bg-blue-500'; break;
+             case '肩': dotColorClass = 'bg-amber-500'; break;
+             case '腕': dotColorClass = 'bg-purple-500'; break;
+             case '脚': dotColorClass = 'bg-emerald-500'; break;
+             case '腹筋': dotColorClass = 'bg-lime-500'; break;
+             case '有酸素': dotColorClass = 'bg-cyan-500'; break;
+             default: dotColorClass = 'bg-slate-600'; break;
+           }
+        }
+      }
       
       return (
         <div key={`day-${date}`} className="p-1 flex flex-col justify-center items-center h-14" onClick={() => setSelectedDateStr(dateStr)}>
@@ -4464,7 +4500,7 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
             {date}
           </div>
           <div className="flex gap-1 mt-1 h-1.5">
-            {isMyTraining && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>}
+            {isMyTraining && <div className={`w-1.5 h-1.5 rounded-full ${dotColorClass}`}></div>}
           </div>
         </div>
       );
@@ -4505,7 +4541,7 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
         <MonthlyReport monthDate={currentMonth} posts={posts} userName={displayUser} accountsInfo={accountsInfo} />
       </div>
 
-      <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+      <div ref={calendarCardRef} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
         <div className="flex justify-between items-center mb-4">
           <button onClick={() => handleMonthChange(-1)} className="text-slate-400 hover:text-emerald-500 font-bold p-2 transition-colors">&lt;</button>
           <span className="font-bold text-slate-700 dark:text-slate-200">{year}年 {month + 1}月</span>
@@ -7121,7 +7157,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.2, 18:49, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.4, 22:59, updated)</p>
       </div>
     </div>
   );
