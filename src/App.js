@@ -4566,15 +4566,15 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
           </div>
         </div>
         
-        <div className="grid grid-cols-2 gap-x-8 gap-y-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 mx-auto w-max">
-           <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-400"><div className="w-2 h-2 rounded-full bg-rose-500"></div>胸</div>
-           <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-400"><div className="w-2 h-2 rounded-full bg-blue-500"></div>背中</div>
-           <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-400"><div className="w-2 h-2 rounded-full bg-amber-500"></div>肩</div>
-           <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-400"><div className="w-2 h-2 rounded-full bg-purple-500"></div>腕</div>
-           <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-400"><div className="w-2 h-2 rounded-full bg-emerald-500"></div>脚</div>
-           <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-400"><div className="w-2 h-2 rounded-full bg-lime-500"></div>腹筋</div>
-           <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-400"><div className="w-2 h-2 rounded-full bg-cyan-500"></div>有酸素</div>
-           <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 dark:text-slate-400"><div className="w-2 h-2 rounded-full bg-slate-600"></div>その他</div>
+        <div className="grid grid-cols-4 gap-x-4 gap-y-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 mx-auto w-max">
+           <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400"><div className="w-2 h-2 rounded-full bg-rose-500"></div>胸</div>
+           <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400"><div className="w-2 h-2 rounded-full bg-blue-500"></div>背中</div>
+           <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400"><div className="w-2 h-2 rounded-full bg-amber-500"></div>肩</div>
+           <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400"><div className="w-2 h-2 rounded-full bg-purple-500"></div>腕</div>
+           <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400"><div className="w-2 h-2 rounded-full bg-emerald-500"></div>脚</div>
+           <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400"><div className="w-2 h-2 rounded-full bg-lime-500"></div>腹筋</div>
+           <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400"><div className="w-2 h-2 rounded-full bg-cyan-500"></div>有酸素</div>
+           <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 dark:text-slate-400"><div className="w-2 h-2 rounded-full bg-slate-600"></div>その他</div>
         </div>
       </div>
       
@@ -7163,7 +7163,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.4, 23:23, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.4, 23:25, updated)</p>
       </div>
     </div>
   );
