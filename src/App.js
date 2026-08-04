@@ -6882,20 +6882,19 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
           </div>
           
 
-          <div className="mt-8">
-             <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">{partnerInfo.displayName || partnerName}の月間レポート</h3>
-             <MonthlyReport monthDate={new Date(new Date().getFullYear(), new Date().getMonth(), 1)} posts={posts} userName={partnerName} accountsInfo={accountsInfo} />
-          </div>
-
-          <div className="mt-8">
-             <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">基礎代謝・体組成データ</h3>
-             <BodyCompositionInfo info={partnerCompositionInfo} dailyCalories={partnerDailyCalories} dateLabel={dateLabel} />
-          </div>
-
-          <div className="space-y-6 pt-8">
-             <h3 className="text-lg font-bold text-slate-800 dark:text-white">{partnerInfo.displayName || partnerName}のデータ</h3>
-             <SimpleChart data={weightData} color="#10b981" title="体重の推移 (kg)" />
-             <SimpleChart data={fatData} color="#6366f1" title="体脂肪率の推移 (%)" />
+          <div className="mt-8 partner-data-view">
+             <style>{`.partner-data-view > div > h2:first-child { display: none; }`}</style>
+             <DataView 
+               posts={posts} 
+               currentUser={currentUser} 
+               targetUser={partnerName} 
+               accountsInfo={accountsInfo} 
+               onToggleLike={() => {}} 
+               onAddComment={() => {}} 
+               onDeleteComment={() => {}} 
+               onToggleCommentLike={() => {}} 
+               onUserClick={onFriendClick} 
+             />
           </div>
 
           <div className="mt-8 text-center pt-4 border-t border-slate-200 dark:border-slate-800">
@@ -7164,7 +7163,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.4, 23:12, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.4, 23:17, updated)</p>
       </div>
     </div>
   );
