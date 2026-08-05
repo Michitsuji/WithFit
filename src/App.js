@@ -801,13 +801,30 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
     <div id={`post-${post.id}`} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm overflow-hidden relative mb-4">
       <div className="absolute top-0 left-0 w-1.5 h-full" style={{ backgroundColor: authorColor }}></div>
       <div className="flex justify-between items-start mb-4 pl-3">
-        <div className="flex items-center gap-3 w-full overflow-hidden">
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm shrink-0 overflow-hidden ${onUserClick ? 'cursor-pointer hover:opacity-80' : ''}`} style={{ backgroundColor: authorColor, border: `2px solid ${authorColor}` }} onClick={(e) => { e.stopPropagation(); if (onUserClick) onUserClick(post.author); }}>
-            {authorInfo?.photoUrl ? <img src={authorInfo.photoUrl} alt={post.author} className="w-full h-full object-cover" /> : authorInfo?.displayName ? authorInfo.displayName.charAt(0).toUpperCase() : (post.author ? post.author.charAt(0).toUpperCase() : '?')}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 min-w-0">
+        <div className="flex items-start gap-3 w-full overflow-hidden">
+          {post.jointWith ? (
+            <div className="relative w-12 h-10 shrink-0">
+              <div className={`absolute top-0 left-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-white shadow-sm overflow-hidden z-10 ${onUserClick ? 'cursor-pointer hover:opacity-80' : ''}`} style={{ backgroundColor: authorColor, border: `2px solid ${authorColor}` }} onClick={(e) => { e.stopPropagation(); if (onUserClick) onUserClick(post.author); }}>
+                {authorInfo?.photoUrl ? <img src={authorInfo.photoUrl} alt={post.author} className="w-full h-full object-cover" /> : authorInfo?.displayName ? authorInfo.displayName.charAt(0).toUpperCase() : (post.author ? post.author.charAt(0).toUpperCase() : '?')}
+              </div>
+              <div className={`absolute bottom-0 right-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-white shadow-sm overflow-hidden z-0 ${onUserClick ? 'cursor-pointer hover:opacity-80' : ''}`} style={{ backgroundColor: '#f97316', border: `2px solid #fff` }} onClick={(e) => { e.stopPropagation(); if (onUserClick) onUserClick(post.jointWith); }}>
+                {accountsInfo && accountsInfo[post.jointWith]?.photoUrl ? <img src={accountsInfo[post.jointWith].photoUrl} alt={post.jointWith} className="w-full h-full object-cover" /> : accountsInfo && accountsInfo[post.jointWith]?.displayName ? accountsInfo[post.jointWith].displayName.charAt(0).toUpperCase() : post.jointWith.charAt(0).toUpperCase()}
+              </div>
+            </div>
+          ) : (
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm shrink-0 overflow-hidden ${onUserClick ? 'cursor-pointer hover:opacity-80' : ''}`} style={{ backgroundColor: authorColor, border: `2px solid ${authorColor}` }} onClick={(e) => { e.stopPropagation(); if (onUserClick) onUserClick(post.author); }}>
+              {authorInfo?.photoUrl ? <img src={authorInfo.photoUrl} alt={post.author} className="w-full h-full object-cover" /> : authorInfo?.displayName ? authorInfo.displayName.charAt(0).toUpperCase() : (post.author ? post.author.charAt(0).toUpperCase() : '?')}
+            </div>
+          )}
+          <div className="flex-1 min-w-0 pt-0.5">
+            <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
               {renderUsernameWithBadge(post.author, authorInfo?.displayName, accountsInfo)}
+              {post.jointWith && (
+                <>
+                  <span className="text-[10px] font-bold text-slate-400 shrink-0">&</span>
+                  {renderUsernameWithBadge(post.jointWith, accountsInfo?.[post.jointWith]?.displayName, accountsInfo)}
+                </>
+              )}
             </div>
             <div className="flex flex-col gap-1.5 mt-1">
               <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 dark:text-slate-400 font-bold">
@@ -2720,7 +2737,7 @@ if (timerState.y === 'top') {
     try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: true, trainingStartTime: Date.now(), currentGymId: gymId, currentExerciseName: '', lastActive: Date.now() }, { merge: true }); } catch (e) {}
   };
 
-  const handlePostWorkout = async (gymName, workoutItems, bodyWeight, bodyFat, manualStart, manualEnd) => {
+  const handlePostWorkout = async (gymName, workoutItems, bodyWeight, bodyFat, manualStart, manualEnd, jointPartnerId = null, partnerItems = null) => {
     if (!currentUser || !db) return;
     if ((!workoutItems || workoutItems.length === 0) && !bodyWeight && !bodyFat) return;
 
@@ -2766,10 +2783,24 @@ if (timerState.y === 'top') {
     const cleanItems = JSON.parse(JSON.stringify(processedItems));
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', newDocId), {
-        author: currentUser, gymName, items: cleanItems, timestamp: timestamp, startTime, endTime, duration, date: dateIso, likes: 0, likedByMe: false, bodyWeight: bodyWeight || null, bodyFat: bodyFat || null, volume: totalVolume, calories: totalCalories, totalSets: totalSets
+        author: currentUser, gymName, items: cleanItems, timestamp: timestamp, startTime, endTime, duration, date: dateIso, likes: 0, likedByMe: false, bodyWeight: bodyWeight || null, bodyFat: bodyFat || null, volume: totalVolume, calories: totalCalories, totalSets: totalSets, jointWith: jointPartnerId || null
       });
+
+      if (jointPartnerId && partnerItems) {
+         const pInfo = accountsInfo[jointPartnerId];
+         const pBaseWeight = Number(pInfo?.weight) || 60;
+         const pCalc = calculateWorkoutTotals(partnerItems, duration, pBaseWeight);
+         const pTotalSets = pCalc.processedItems.reduce((acc, it) => acc + (it.sets?.length || 0), 0);
+         const pDocId = `workout_${generateId()}`;
+         const pCleanItems = JSON.parse(JSON.stringify(pCalc.processedItems));
+         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', pDocId), {
+            author: jointPartnerId, gymName, items: pCleanItems, timestamp: timestamp, startTime, endTime, duration, date: dateIso, likes: 0, likedByMe: false, bodyWeight: null, bodyFat: null, volume: pCalc.totalVolume, calories: pCalc.totalCalories, totalSets: pTotalSets, jointWith: currentUser
+         });
+         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now(), jointPartnerId: null, currentWorkoutItems: deleteField() }, { merge: true });
+      }
+
       if (!manualStart) {
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now() }, { merge: true });
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now(), jointPartnerId: null }, { merge: true });
       }
       setDraftWorkoutItems([]); setSelectedCategories([]); setCurrentTab('timeline');
       
@@ -3333,8 +3364,12 @@ if (timerState.y === 'top') {
             <button onClick={handleLogout} className="text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 p-1.5 rounded-full transition-colors"><LogOut size={20} /></button>
           </div>
         </div>
-        {activeFriends.length > 0 && (
-          <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white py-2 flex items-center text-xs font-bold animate-in slide-in-from-top duration-300 overflow-hidden w-full">
+        {activeFriends.length > 0 && (() => {
+          const friendsInSameGym = activeFriends.filter(f => accountsInfo[f]?.currentGymId === myInfo?.currentGymId && myInfo?.currentGymId);
+          const isSameGym = friendsInSameGym.length > 0;
+          const marqueeBg = isSameGym ? "bg-gradient-to-r from-rose-600 via-orange-500 to-rose-600 shadow-[0_0_15px_rgba(244,63,94,0.6)]" : "bg-gradient-to-r from-emerald-500 to-teal-500";
+          return (
+          <div className={`${marqueeBg} text-white py-2 flex items-center text-xs font-bold animate-in slide-in-from-top duration-300 overflow-hidden w-full`}>
             <style>{`
               @keyframes marquee {
                 0% { transform: translateX(0%); }
@@ -3349,15 +3384,16 @@ if (timerState.y === 'top') {
             <div className="animate-marquee min-w-max">
                <div className="flex items-center gap-2 px-8">
                  <Flame size={14} className="animate-pulse text-amber-300 shrink-0" />
-                 <span>{activeFriendsText}さんがトレーニング中です！</span>
+                 <span>{activeFriendsText}さんがトレーニング中です！{isSameGym ? ' (同じジムにいます🔥)' : ''}</span>
                </div>
                <div className="flex items-center gap-2 px-8">
                  <Flame size={14} className="animate-pulse text-amber-300 shrink-0" />
-                 <span>{activeFriendsText}さんがトレーニング中です！</span>
+                 <span>{activeFriendsText}さんがトレーニング中です！{isSameGym ? ' (同じジムにいます🔥)' : ''}</span>
                </div>
             </div>
           </div>
-        )}
+          );
+        })()}
         {showNotifications && (
           <>
           <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)}></div>
@@ -4862,6 +4898,8 @@ function ActiveProgramDisplay({ program, onApply, onToggleComplete, onDelete }) 
 
 function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workoutItems, setWorkoutItems, selectedCategories, setSelectedCategories, posts, currentUser, isManual, setIsManual, onActiveExerciseChange, accountsInfo }) {
   const joinedGyms = myInfo.joinedGyms || ['common'];
+  const jointPartnerId = myInfo.jointPartnerId;
+  const partnerItems = jointPartnerId ? (accountsInfo[jointPartnerId]?.currentWorkoutItems || []) : [];
   const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (gyms.filter(g => joinedGyms.includes(g.id) && g.id !== 'common')[0]?.id || ''));
   const [showReorderModal, setShowReorderModal] = useState(false);
   const [showProgramModal, setShowProgramModal] = useState(false);
@@ -5209,10 +5247,27 @@ ${importText}`;
       isSuperSet: false, isDropSet: false, isForcedReps: false, memo: '',
       sets: [ isCardio ? { id: generateId(), distance: '', time: '', calories: '' } : { id: generateId(), weight: '', reps: '', lReps: '', rReps: '' } ] 
     };
+    
+    let newItems = [...workoutItems];
     if (insertAfterIndex !== null) {
-      const newItems = [...workoutItems];
       newItems.splice(insertAfterIndex + 1, 0, newItem);
-      setWorkoutItems(newItems);
+    } else {
+      newItems.push(newItem);
+    }
+    setWorkoutItems(newItems);
+
+    if (jointPartnerId) {
+       const newPItem = { ...newItem, id: generateId(), sets: [ isCardio ? { id: generateId(), distance: '', time: '', calories: '' } : { id: generateId(), weight: '', reps: '', lReps: '', rReps: '' } ] };
+       const newPItems = [...partnerItems];
+       if (insertAfterIndex !== null) {
+         newPItems.splice(insertAfterIndex + 1, 0, newPItem);
+       } else {
+         newPItems.push(newPItem);
+       }
+       setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newPItems }, { merge: true });
+    }
+
+    if (insertAfterIndex !== null) {
       setTimeout(() => {
          const container = document.getElementById('workout-items-container');
          if (container) {
@@ -5220,12 +5275,18 @@ ${importText}`;
             container.scrollTo({ left: (insertAfterIndex + 1) * (cardWidth + 12), behavior: 'smooth' });
          }
       }, 100);
-    } else {
-      setWorkoutItems([...workoutItems, newItem]);
     }
   };
 
-  const removeExerciseItem = (itemId) => setWorkoutItems(workoutItems.filter(item => item.id !== itemId));
+  const removeExerciseItem = (itemId) => {
+    const index = workoutItems.findIndex(item => item.id === itemId);
+    setWorkoutItems(workoutItems.filter(item => item.id !== itemId));
+    if (jointPartnerId && index !== -1) {
+       const newPItems = [...partnerItems];
+       newPItems.splice(index, 1);
+       setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newPItems }, { merge: true });
+    }
+  };
   
   const moveItemUp = (index) => {
     if (index === 0) return;
@@ -5281,6 +5342,89 @@ ${importText}`;
     }));
   };
 
+  const updatePartnerItem = (itemId, data) => {
+    const newItems = partnerItems.map(item => item.id === itemId ? { ...item, ...data } : item);
+    setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newItems }, { merge: true });
+  };
+  const addPartnerSet = (itemId) => {
+    const newItems = partnerItems.map(item => {
+      if (item.id === itemId) {
+        const lastSet = (item.sets && item.sets.length > 0) ? item.sets[item.sets.length - 1] : {};
+        if (item.weightType === 'cardio') return { ...item, sets: [...(item.sets || []), { id: generateId(), distance: lastSet.distance || '', time: lastSet.time || '', calories: lastSet.calories || '' }]};
+        return { ...item, sets: [...(item.sets || []), { id: generateId(), weight: lastSet.weight || '', reps: lastSet.reps || '', lReps: lastSet.lReps || '', rReps: lastSet.rReps || '', dropSets: lastSet.dropSets ? lastSet.dropSets.map(ds => ({...ds, id: generateId()})) : undefined, superDropSets: lastSet.superDropSets ? lastSet.superDropSets.map(ds => ({...ds, id: generateId()})) : undefined, superDropSets3: lastSet.superDropSets3 ? lastSet.superDropSets3.map(ds => ({...ds, id: generateId()})) : undefined }]};
+      }
+      return item;
+    });
+    setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newItems }, { merge: true });
+  };
+  const removePartnerSet = (itemId, setId) => {
+    const newItems = partnerItems.map(item => item.id === itemId ? { ...item, sets: item.sets.filter(s => s.id !== setId) } : item);
+    setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newItems }, { merge: true });
+  };
+  const updatePartnerSetField = (itemId, setId, field, value) => {
+    const newItems = partnerItems.map(item => {
+      if (item.id !== itemId) return item;
+      return { ...item, sets: item.sets.map(set => set.id === setId ? { ...set, [field]: value } : set) };
+    });
+    setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newItems }, { merge: true });
+  };
+  const addPartnerDropSet = (itemId, parentSetId, targetArray = 'dropSets') => {
+    const newItems = partnerItems.map(item => {
+      if (item.id !== itemId) return item;
+      return { ...item, sets: item.sets.map(set => {
+        if (set.id !== parentSetId) return set;
+        return { ...set, [targetArray]: [...(set[targetArray] || []), { id: generateId(), weight: '', reps: '', lReps: '', rReps: '' }]};
+      })};
+    });
+    setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newItems }, { merge: true });
+  };
+  const removePartnerDropSet = (itemId, parentSetId, dropId, targetArray = 'dropSets') => {
+    const newItems = partnerItems.map(item => {
+      if (item.id !== itemId) return item;
+      return { ...item, sets: item.sets.map(set => {
+        if (set.id !== parentSetId) return set;
+        return { ...set, [targetArray]: (set[targetArray] || []).filter(ds => ds.id !== dropId) };
+      })};
+    });
+    setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newItems }, { merge: true });
+  };
+  const updatePartnerDropSetField = (itemId, parentSetId, dropId, field, value, targetArray = 'dropSets') => {
+    const newItems = partnerItems.map(item => {
+      if (item.id !== itemId) return item;
+      return { ...item, sets: item.sets.map(set => {
+        if (set.id !== parentSetId) return set;
+        return { ...set, [targetArray]: (set[targetArray] || []).map(ds => ds.id === dropId ? { ...ds, [field]: value } : ds) };
+      })};
+    });
+    setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newItems }, { merge: true });
+  };
+  const reorderPartnerSet = (itemId, dragIndex, dropIndex) => {
+    const newItems = partnerItems.map(item => {
+      if (item.id !== itemId) return item;
+      const newSets = [...(item.sets || [])];
+      const [dragged] = newSets.splice(dragIndex, 1);
+      newSets.splice(dropIndex, 0, dragged);
+      return { ...item, sets: newSets };
+    });
+    setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newItems }, { merge: true });
+  };
+
+  const handleStartJointTraining = async (partnerId) => {
+    if (!window.confirm(`${accountsInfo[partnerId]?.displayName || partnerId}さんと合トレを開始しますか？\nお互いの記録がリアルタイムで同期されます。`)) return;
+    const pItems = accountsInfo[partnerId]?.currentWorkoutItems || [];
+    let mItems = workoutItems;
+    const maxLen = Math.max(mItems.length, pItems.length);
+    const newMItems = [...mItems];
+    const newPItems = [...pItems];
+    for(let i=0; i<maxLen; i++) {
+      if(!newMItems[i]) newMItems[i] = { id: generateId(), exerciseName: newPItems[i]?.exerciseName || '', weightType: newPItems[i]?.weightType || 'total', category: newPItems[i]?.category || 'その他', sets: [{id: generateId(), weight:'', reps:''}] };
+      if(!newPItems[i]) newPItems[i] = { id: generateId(), exerciseName: newMItems[i]?.exerciseName || '', weightType: newMItems[i]?.weightType || 'total', category: newMItems[i]?.category || 'その他', sets: [{id: generateId(), weight:'', reps:''}] };
+    }
+    setWorkoutItems(newMItems);
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { jointPartnerId: partnerId, currentWorkoutItems: newMItems }, { merge: true });
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', partnerId), { jointPartnerId: currentUser, currentWorkoutItems: newPItems }, { merge: true });
+  };
+
   const addDropSet = (itemId, parentSetId, targetArray = 'dropSets') => {
     setWorkoutItems(prev => prev.map(item => {
       if (item.id !== itemId) return item;
@@ -5332,7 +5476,7 @@ ${importText}`;
          await onPost(gym ? gym.name : '不明なジム', workoutItems, Number(bodyWeight), Number(bodyFat), startTs, endTs);
          setIsManual(false);
       } else {
-         await onPost(gym ? gym.name : '不明なジム', workoutItems, Number(bodyWeight), Number(bodyFat));
+         await onPost(gym ? gym.name : '不明なジム', workoutItems, Number(bodyWeight), Number(bodyFat), null, null, jointPartnerId, partnerItems);
       }
       globalRecordHorizontalScroll = 0;
     } finally {
@@ -5496,9 +5640,43 @@ ${importText}`;
         </div>
       )}
 
-      <div className="flex justify-between items-center mt-6 mb-2">
+      <div className="mt-6 mb-2">
+        {(() => {
+          const friendsInSameGym = (myInfo.friends || []).filter(f => accountsInfo[f]?.isTraining && accountsInfo[f]?.currentGymId === myInfo.currentGymId && myInfo.currentGymId);
+          return (
+            <>
+              {friendsInSameGym.length > 0 && !jointPartnerId && !isManual && (
+                <div className="mb-6 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900 rounded-2xl p-4 shadow-sm">
+                  <h3 className="text-xs font-bold text-orange-600 dark:text-orange-400 mb-2 flex items-center gap-1"><Flame size={14}/> 同じジムにいるフレンド</h3>
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {friendsInSameGym.map(f => (
+                      <button key={f} onClick={() => handleStartJointTraining(f)} className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-orange-200 dark:border-orange-800 text-orange-600 dark:text-orange-400 px-3 py-2 rounded-xl text-xs font-bold shrink-0 hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors shadow-sm">
+                        <div className="w-5 h-5 rounded-full overflow-hidden shrink-0"><img src={accountsInfo[f]?.photoUrl || ''} className="w-full h-full object-cover" /></div>
+                        {accountsInfo[f]?.displayName || f} と合トレ開始
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {jointPartnerId && (
+                <div className="mb-6 flex flex-col gap-2 bg-gradient-to-r from-orange-500 to-rose-500 text-white px-4 py-3 rounded-2xl shadow-lg shadow-orange-500/30">
+                  <div className="flex items-center justify-between font-bold text-sm">
+                    <div className="flex items-center gap-2">
+                      <Flame size={18} className="animate-pulse"/> {accountsInfo[jointPartnerId]?.displayName || jointPartnerId} と合トレ中！
+                    </div>
+                    <button onClick={() => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { jointPartnerId: null }, { merge: true })} className="text-[10px] bg-black/20 hover:bg-black/40 px-2 py-1 rounded-lg transition-colors">解除</button>
+                  </div>
+                  <p className="text-[10px] text-orange-100 font-bold">相手のカードも編集可能です。完了時に二人分の投稿が作成されます。</p>
+                </div>
+              )}
+            </>
+          );
+        })()}
+      </div>
+
+      <div className="flex justify-between items-center mb-2">
         <h2 className="text-lg font-bold text-slate-900 dark:text-white">{isManual ? '記録内容' : 'ワークアウト中'}</h2>
-        {workoutItems.length > 1 && (
+        {workoutItems.length > 1 && !jointPartnerId && (
           <button onClick={() => setShowReorderModal(true)} className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 flex items-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-colors shadow-sm">
             <ArrowUp size={14} /><ArrowDown size={14} className="-ml-2" /> 並び替え
           </button>
@@ -5533,33 +5711,87 @@ ${importText}`;
             </button>
           </div>
         ) : (
-          workoutItems.map((item, index) => (
-             <div key={item.id} className="snap-center shrink-0 w-[88%] sm:w-[320px] relative">
-                <WorkoutItemForm 
-                  item={item} 
-                  index={index}
-                  availableExercises={availableExercises} 
-                  updateItem={updateItem} 
-                  removeItem={removeExerciseItem}
-                  addSet={addSet} 
-                  removeSet={removeSet} 
-                  updateSet={updateSetField} 
-                  addDropSet={addDropSet} 
-                  removeDropSet={removeDropSet} 
-                  updateDropSet={updateDropSetField}
-                  reorderSet={reorderSet}
-                  myPastPosts={myPastPosts}
-                  onActive={onActiveExerciseChange}
-                  isDragging={false}
-                  isAnyDragging={false}
-                  dragHandleProps={{}}
-                />
-                <button onClick={() => addExerciseItem(index)} className="w-full py-3 bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 rounded-xl text-sm font-bold flex flex-col items-center justify-center gap-1 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm -mt-2">
-                  <ListPlus size={16} className="text-emerald-500" />
-                  <span>この次に種目を追加</span>
-                </button>
-             </div>
-          ))
+          Array.from({ length: Math.max(workoutItems.length, partnerItems.length) }).map((_, index) => {
+             const myItem = workoutItems[index];
+             const pItem = partnerItems[index];
+             return (
+               <div key={myItem ? myItem.id : `p_${pItem?.id}`} className="snap-center shrink-0 w-[88%] sm:w-[320px] relative flex flex-col gap-3">
+                 {/* 自分のカード */}
+                 {myItem ? (
+                   <div className="relative">
+                     {jointPartnerId && <div className="absolute -top-3 left-4 z-10 bg-emerald-500 text-white px-2 py-0.5 rounded-full shadow-sm text-[10px] font-bold">あなた</div>}
+                     <WorkoutItemForm 
+                       item={myItem} 
+                       index={index}
+                       availableExercises={availableExercises} 
+                       updateItem={updateItem} 
+                       removeItem={removeExerciseItem}
+                       addSet={addSet} 
+                       removeSet={removeSet} 
+                       updateSet={updateSetField} 
+                       addDropSet={addDropSet} 
+                       removeDropSet={removeDropSet} 
+                       updateDropSet={updateDropSetField}
+                       reorderSet={reorderSet}
+                       myPastPosts={myPastPosts}
+                       onActive={onActiveExerciseChange}
+                       isDragging={false}
+                       isAnyDragging={false}
+                       dragHandleProps={{}}
+                     />
+                   </div>
+                 ) : (
+                   <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-4 opacity-50 flex items-center justify-center min-h-[150px]"><span className="text-xs font-bold">あなたの種目なし</span></div>
+                 )}
+                 
+                 {/* 相手のカード */}
+                 {jointPartnerId && pItem ? (
+                   <div className="relative opacity-90 scale-[0.98]">
+                     <div className="absolute -top-3 left-4 z-10 bg-orange-500 text-white px-2 py-0.5 rounded-full shadow-sm text-[10px] font-bold flex items-center gap-1">
+                       {accountsInfo[jointPartnerId]?.photoUrl ? <img src={accountsInfo[jointPartnerId]?.photoUrl} className="w-3 h-3 rounded-full object-cover bg-white"/> : <div className="w-3 h-3 rounded-full bg-white text-orange-500 flex items-center justify-center">{accountsInfo[jointPartnerId]?.displayName?.charAt(0)}</div>}
+                       {accountsInfo[jointPartnerId]?.displayName || jointPartnerId}
+                     </div>
+                     <WorkoutItemForm 
+                       item={pItem} 
+                       index={index}
+                       availableExercises={availableExercises} 
+                       updateItem={updatePartnerItem} 
+                       removeItem={() => {}}
+                       addSet={addPartnerSet} 
+                       removeSet={removePartnerSet} 
+                       updateSet={updatePartnerSetField} 
+                       addDropSet={addPartnerDropSet} 
+                       removeDropSet={removePartnerDropSet} 
+                       updateDropSet={updatePartnerDropSetField}
+                       reorderSet={reorderPartnerSet}
+                       myPastPosts={posts.filter(p => p.author === jointPartnerId)}
+                       onActive={() => {}}
+                       isDragging={false}
+                       isAnyDragging={false}
+                       dragHandleProps={{}}
+                     />
+                   </div>
+                 ) : jointPartnerId && !pItem ? (
+                   <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-4 opacity-50 flex items-center justify-center min-h-[150px]"><span className="text-xs font-bold text-slate-400">相手の種目なし</span></div>
+                 ) : null}
+                 
+                 {!jointPartnerId && (
+                   <button onClick={() => addExerciseItem(index)} className="w-full py-3 bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 rounded-xl text-sm font-bold flex flex-col items-center justify-center gap-1 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm -mt-2">
+                     <ListPlus size={16} className="text-emerald-500" />
+                     <span>この次に種目を追加</span>
+                   </button>
+                 )}
+               </div>
+             );
+          })
+        )}
+        {jointPartnerId && (
+           <div className="snap-center shrink-0 w-[88%] sm:w-[320px] flex flex-col justify-center h-full min-h-[200px] pb-6">
+             <button onClick={() => addExerciseItem(null)} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
+               <div className="bg-white dark:bg-slate-800 p-3 rounded-full shadow-sm"><ListPlus size={24} className="text-orange-500" /></div>
+               <span>ふたりで種目を追加</span>
+             </button>
+           </div>
         )}
       </div>
 
@@ -7217,7 +7449,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.5, 12:31, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.5, 13:23, updated)</p>
       </div>
     </div>
   );
