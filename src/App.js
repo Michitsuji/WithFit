@@ -6489,7 +6489,13 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
 
               <div>
                 <div className="flex flex-col mb-3 ml-1 gap-2">
-                  <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400">登録済みの種目</h3>
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400">登録済みの種目</h3>
+                    <div className="flex gap-3 text-[10px] font-bold text-slate-400">
+                      <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-emerald-400"></div>編集可</div>
+                      <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600"></div>編集不可</div>
+                    </div>
+                  </div>
                   <div className="relative mb-1">
                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                        <Search size={18} className="text-slate-400" />
@@ -6544,12 +6550,13 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                         <div className="divide-y divide-slate-100 dark:divide-slate-800">
                           {gymExercises.map(ex => {
                             const isMuted = mutedExercises.includes(ex.name);
-                            const isMaster = ex.gymId === 'common' ? (!ex.author || ex.author === MASTER_USER) : (!ex.author || ex.author === gym.owner);
-                            let bgClass = "hover:bg-slate-50 dark:hover:bg-slate-800/50";
-                            if (isMaster) {
-                               bgClass = "bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 border-l-[6px] border-l-amber-400";
+                            const canEdit = ex.gymId === 'common' ? (currentUser === MASTER_USER || ex.author === currentUser) : (ex.author === currentUser || gym.owner === currentUser);
+                            let bgClass = "";
+                            
+                            if (canEdit) {
+                               bgClass = "bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 border-l-[6px] border-l-emerald-400";
                             } else {
-                               bgClass = "bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border-l-[6px] border-l-blue-400";
+                               bgClass = "bg-slate-50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 border-l-[6px] border-l-slate-300 dark:border-l-slate-600";
                             }
 
                             return (
@@ -7178,7 +7185,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.5, 12:23, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.5, 12:27, updated)</p>
       </div>
     </div>
   );
