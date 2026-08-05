@@ -2408,6 +2408,48 @@ if (timerState.y === 'top') {
   }, [currentUser, db]);
 
   useEffect(() => {
+    if (!currentUser || !myInfo?.jointPartnerId || !myInfo?.currentWorkoutItems || !isDraftLoaded) return;
+    const remoteItems = myInfo.currentWorkoutItems;
+    const localItems = draftWorkoutItems;
+    let needsUpdate = false;
+    if (remoteItems.length !== localItems.length) {
+       needsUpdate = true;
+    } else {
+       for (let i = 0; i < remoteItems.length; i++) {
+          const r = remoteItems[i];
+          const l = localItems[i];
+          if (r.id !== l.id || r.exerciseName !== l.exerciseName || r.category !== l.category || r.weightType !== l.weightType || r.superExerciseName !== l.superExerciseName || r.superWeightType !== l.superWeightType || r.superExerciseName3 !== l.superExerciseName3 || r.superWeightType3 !== l.superWeightType3) {
+             needsUpdate = true;
+             break;
+          }
+          if ((r.sets || []).length !== (l.sets || []).length) {
+             needsUpdate = true;
+             break;
+          }
+       }
+    }
+    if (needsUpdate) {
+       const newLocalItems = remoteItems.map(rItem => {
+          const lItem = localItems.find(l => l.id === rItem.id);
+          if (!lItem) return rItem;
+          const newSets = (rItem.sets || []).map(rSet => {
+             const lSet = (lItem.sets || []).find(s => s.id === rSet.id);
+             return lSet ? lSet : rSet;
+          });
+          return {
+             ...rItem,
+             memo: lItem.memo || '',
+             isSuperSet: lItem.isSuperSet || false,
+             isDropSet: lItem.isDropSet || false,
+             isForcedReps: lItem.isForcedReps || false,
+             sets: newSets
+          };
+       });
+       setDraftWorkoutItems(newLocalItems);
+    }
+  }, [myInfo?.currentWorkoutItems, currentUser, isDraftLoaded]);
+
+  useEffect(() => {
     if (currentUser && db && isDraftLoaded) {
       try {
         if (draftWorkoutItems.length > 0 || selectedCategories.length > 0) {
@@ -2867,7 +2909,13 @@ if (timerState.y === 'top') {
   const handleCancelTraining = async () => {
     if (!window.confirm("現在の記録を破棄して終了しますか？")) return;
     if (!currentUser || !db) return;
-    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now() }, { merge: true }); setDraftWorkoutItems([]); setSelectedCategories([]); setCurrentTab('timeline'); } catch (e) {}
+    try { 
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now(), jointPartnerId: null, currentWorkoutItems: deleteField() }, { merge: true }); 
+      setDraftWorkoutItems([]); setSelectedCategories([]); setCurrentTab('timeline'); 
+      if (myInfo?.jointPartnerId) {
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', myInfo.jointPartnerId), { jointPartnerId: null }, { merge: true });
+      }
+    } catch (e) {}
   };
 
   const handleSaveProfile = async (data, shouldClose = true) => {
@@ -5821,7 +5869,7 @@ ${importText}`;
           .hide-scrollbar::-webkit-scrollbar { display: none; }
           .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         `}</style>
-      <div id="workout-items-container" ref={handleContainerRef} onScroll={handleScroll} className="flex overflow-x-auto gap-3 sm:gap-4 pb-6 pt-5 -mx-4 px-4 hide-scrollbar items-start snap-x snap-mandatory">
+      <div id="workout-items-container" ref={handleContainerRef} onScroll={handleScroll} className="flex overflow-x-auto gap-3 sm:gap-4 pb-6 pt-8 -mx-4 px-4 hide-scrollbar items-start snap-x snap-mandatory">
         {workoutItems.length === 0 ? (
           <div className="snap-center shrink-0 w-[88%] sm:w-[320px] flex flex-col justify-center h-full min-h-[200px]">
             <button onClick={() => addExerciseItem(null)} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
@@ -6175,7 +6223,7 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
             .hide-scrollbar::-webkit-scrollbar { display: none; }
             .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
           `}</style>
-          <div id="edit-workout-items-container" className="flex overflow-x-auto gap-3 sm:gap-4 pb-6 pt-5 -mx-4 px-4 hide-scrollbar items-start snap-x snap-mandatory">
+          <div id="edit-workout-items-container" className="flex overflow-x-auto gap-3 sm:gap-4 pb-6 pt-8 -mx-4 px-4 hide-scrollbar items-start snap-x snap-mandatory">
             {workoutItems.length === 0 ? (
               <div className="snap-center shrink-0 w-[88%] sm:w-[320px] flex flex-col justify-center h-full min-h-[200px]">
                 <button onClick={() => addExerciseItem(null)} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
@@ -6224,7 +6272,15 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
         <ReorderItemsModal 
           items={workoutItems} 
           onClose={() => setShowReorderModal(false)} 
-          onSave={(newItems) => { setWorkoutItems(newItems); setShowReorderModal(false); }}
+          onSave={(newItems) => { 
+            const newOrderIndices = newItems.map(item => workoutItems.findIndex(i => i.id === item.id));
+            setWorkoutItems(newItems); 
+            if (jointPartnerId) {
+               const newPItems = newOrderIndices.map(idx => partnerItems[idx] || null).filter(Boolean);
+               setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newPItems }, { merge: true });
+            }
+            setShowReorderModal(false); 
+          }}
         />
       )}
     </div>
@@ -7577,7 +7633,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.5, 13:48, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.5, 14:00, updated)</p>
       </div>
     </div>
   );
