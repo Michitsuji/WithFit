@@ -1165,7 +1165,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 }
 
 // --- 共通コンポーネント：ワークアウト入力フォーム ---
-function WorkoutItemForm({ item, index, availableExercises, updateItem, removeItem, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet, reorderSet, myPastPosts, onActive, isDragging, isAnyDragging, dragHandleProps }) {
+function WorkoutItemForm({ item, index, availableExercises, updateItem, removeItem, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet, reorderSet, myPastPosts, onActive, isDragging, isAnyDragging, dragHandleProps, isJointPartner = false }) {
   const [localFilters, setLocalFilters] = useState([]);
   const [draggedSetIndex, setDraggedSetIndex] = useState(null);
   const [dragOverSetIndex, setDragOverSetIndex] = useState(null);
@@ -1428,16 +1428,16 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
   const isConfirmed = item.isConfirmed;
 
   return (
-    <div {...dragHandleProps} className={`${isPartnerCard ? '' : (isConfirmed ? 'bg-emerald-50/30 dark:bg-emerald-950/20 border-2 border-emerald-400 dark:border-emerald-600' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm')} relative w-full overflow-hidden ${isPartnerCard ? '' : 'mb-6'} transition-all duration-200 ${isDragging ? 'cursor-grabbing' : 'cursor-auto'}`} onClickCapture={() => onActive && onActive(item.exerciseName)}>
-      {isConfirmed && !isPartnerCard && (
+    <div {...dragHandleProps} className={`${isConfirmed ? 'bg-emerald-50/30 dark:bg-emerald-950/20 border-2 border-emerald-400 dark:border-emerald-600' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800'} rounded-2xl p-4 shadow-sm relative w-full overflow-hidden mb-6 transition-all duration-200 ${isDragging ? 'cursor-grabbing' : 'cursor-auto'}`} onClickCapture={() => onActive && onActive(item.exerciseName)}>
+      {isConfirmed && (
         <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl rounded-tr-2xl shadow-sm z-10 flex items-center gap-1">
           <CheckCircle size={12} /> 保存済み
         </div>
       )}
-      <div className={`flex justify-between items-start ${isPartnerCard && !item.isPartnerCommonControl ? 'hidden' : 'mb-4'}`}>
+      <div className="flex justify-between items-start mb-4">
         <div className="flex items-start gap-1.5 flex-1 min-w-0">
           <div className={`flex flex-col flex-1 min-w-0 gap-2 ${isConfirmed ? 'pointer-events-none opacity-60' : ''}`}>
-            {!isAnyDragging && (
+            {!isJointPartner && !isAnyDragging && (
               <div className="flex flex-wrap bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg gap-1">
                 <button onClick={() => toggleFilter('gym')} disabled={isConfirmed} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilters.includes('gym') ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>マシン等</button>
                 <button onClick={() => toggleFilter('barbell')} disabled={isConfirmed} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilters.includes('barbell') ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>バーベル</button>
@@ -1445,24 +1445,32 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
                 <button onClick={() => toggleFilter('smith')} disabled={isConfirmed} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilters.includes('smith') ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>スミス</button>
               </div>
             )}
-            <div className="relative w-full">
-              <select value={item.exerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, 0)} disabled={isConfirmed} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base pr-8" style={{ fontSize: '16px' }}>
-                <option value="" disabled>{filteredExercises.length === 0 ? (availableExercises.length === 0 ? "上の部位を選択してください" : "該当する種目がありません") : "種目を選択"}</option>
-                {item.exerciseName && !filteredExercises.some(ex => ex.name === item.exerciseName) && (
-                  <option value={item.exerciseName}>{item.exerciseName}</option>
-                )}
-                {filteredExercises.map(ex => <option key={ex.id} value={ex.name}>{ex.name}{ex.maker ? `（${ex.maker}）` : ''}</option>)}
-              </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
-            </div>
+            {!isJointPartner ? (
+              <div className="relative w-full">
+                <select value={item.exerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, 0)} disabled={isConfirmed} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base pr-8" style={{ fontSize: '16px' }}>
+                  <option value="" disabled>{filteredExercises.length === 0 ? (availableExercises.length === 0 ? "上の部位を選択してください" : "該当する種目がありません") : "種目を選択"}</option>
+                  {item.exerciseName && !filteredExercises.some(ex => ex.name === item.exerciseName) && (
+                    <option value={item.exerciseName}>{item.exerciseName}</option>
+                  )}
+                  {filteredExercises.map(ex => <option key={ex.id} value={ex.name}>{ex.name}{ex.maker ? `（${ex.maker}）` : ''}</option>)}
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
+              </div>
+            ) : (
+              <div className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold text-base">
+                {item.exerciseName || "種目未選択"}
+              </div>
+            )}
           </div>
         </div>
-        <button onClick={() => removeItem(item.id)} disabled={isConfirmed} className={`ml-2 text-slate-400 hover:text-rose-500 p-2 flex-shrink-0 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors mt-2 ${isConfirmed ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''}`}><Trash2 size={18} /></button>
+        {!isJointPartner && (
+          <button onClick={() => removeItem(item.id)} disabled={isConfirmed} className={`ml-2 text-slate-400 hover:text-rose-500 p-2 flex-shrink-0 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors mt-2 ${isConfirmed ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''}`}><Trash2 size={18} /></button>
+        )}
       </div>
 
-      <div className={`transition-all overflow-hidden ${isAnyDragging || item.isPartnerCommonControl ? 'h-0 opacity-0' : 'h-auto opacity-100'}`}>
+      <div className={`transition-all overflow-hidden ${isAnyDragging ? 'h-0 opacity-0' : 'h-auto opacity-100'}`}>
         <div className={`transition-all duration-300 ${isConfirmed ? 'pointer-events-none opacity-60 select-none' : ''}`}>
-      {prevRecord && (
+      {prevRecord && !isJointPartner && (
         <div className="mb-4 pl-8 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950/50 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
           <span className="text-emerald-600 dark:text-emerald-400 mr-2 flex items-center inline-flex gap-1"><Clock size={12}/>前回 ({formatDateWithDay(prevRecord.date)})</span>
           <div className="mt-1 flex flex-wrap gap-2">
@@ -1478,7 +1486,7 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
         </div>
       )}
 
-      {item.weightType !== 'cardio' && (
+      {!isJointPartner && item.weightType !== 'cardio' && (
         <div className="flex gap-2 mb-5 overflow-x-auto scrollbar-hide py-1 pl-8">
           <button onClick={() => updateItem(item.id, { isSuperSet: !item.isSuperSet })} className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${item.isSuperSet ? 'bg-indigo-50 dark:bg-indigo-950 border-indigo-300 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>スーパー</button>
           <button onClick={() => updateItem(item.id, { isDropSet: !item.isDropSet })} className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${item.isDropSet ? 'bg-orange-50 dark:bg-orange-950 border-orange-300 dark:border-orange-800 text-orange-700 dark:text-orange-300' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>ドロップ</button>
@@ -1488,27 +1496,42 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
 
       {item.isSuperSet && item.weightType !== 'cardio' && (
         <div className="mb-5 pl-8 border-l-2 border-indigo-300 dark:border-indigo-600 space-y-3">
-          <div className="relative w-full">
-            <select value={item.superExerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, 2)} className="w-full bg-indigo-50/30 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold appearance-none focus:outline-none focus:border-indigo-500 text-base pr-8" style={{ fontSize: '16px' }}>
-              <option value="" disabled>スーパーセットの種目 (2種目目)</option>
-              {item.superExerciseName && !filteredExercises.some(ex => ex.name === item.superExerciseName) && (
-                <option value={item.superExerciseName}>{item.superExerciseName}</option>
-              )}
-              {filteredExercises.filter(ex => ex.weightType !== 'cardio').map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
-            </select>
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-300 pointer-events-none text-xs">▼</div>
-          </div>
-          {item.superExerciseName && (
+          {!isJointPartner ? (
             <div className="relative w-full">
-              <select value={item.superExerciseName3 || ''} onChange={(e) => updateExerciseName(e.target.value, 3)} className="w-full bg-indigo-50/30 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold appearance-none focus:outline-none focus:border-indigo-500 text-base pr-8" style={{ fontSize: '16px' }}>
-                <option value="">ジャイアントセット (3種目目・任意)</option>
-                {item.superExerciseName3 && !filteredExercises.some(ex => ex.name === item.superExerciseName3) && (
-                  <option value={item.superExerciseName3}>{item.superExerciseName3}</option>
+              <select value={item.superExerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, 2)} className="w-full bg-indigo-50/30 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold appearance-none focus:outline-none focus:border-indigo-500 text-base pr-8" style={{ fontSize: '16px' }}>
+                <option value="" disabled>スーパーセットの種目 (2種目目)</option>
+                {item.superExerciseName && !filteredExercises.some(ex => ex.name === item.superExerciseName) && (
+                  <option value={item.superExerciseName}>{item.superExerciseName}</option>
                 )}
                 {filteredExercises.filter(ex => ex.weightType !== 'cardio').map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
               </select>
               <div className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-300 pointer-events-none text-xs">▼</div>
             </div>
+          ) : (
+            <div className="w-full bg-indigo-50/30 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold text-base">
+              {item.superExerciseName || "スーパーセット種目"}
+            </div>
+          )}
+          
+          {!isJointPartner ? (
+            item.superExerciseName && (
+              <div className="relative w-full">
+                <select value={item.superExerciseName3 || ''} onChange={(e) => updateExerciseName(e.target.value, 3)} className="w-full bg-indigo-50/30 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold appearance-none focus:outline-none focus:border-indigo-500 text-base pr-8" style={{ fontSize: '16px' }}>
+                  <option value="">ジャイアントセット (3種目目・任意)</option>
+                  {item.superExerciseName3 && !filteredExercises.some(ex => ex.name === item.superExerciseName3) && (
+                    <option value={item.superExerciseName3}>{item.superExerciseName3}</option>
+                  )}
+                  {filteredExercises.filter(ex => ex.weightType !== 'cardio').map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-300 pointer-events-none text-xs">▼</div>
+              </div>
+            )
+          ) : (
+            item.superExerciseName3 && (
+              <div className="w-full bg-indigo-50/30 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold text-base">
+                {item.superExerciseName3}
+              </div>
+            )
           )}
         </div>
       )}
@@ -1551,7 +1574,7 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
               ) : (
                 <>
                   {renderInputRow(set, item.weightType, 'main', false)}
-                  <button onClick={() => removeSet(item.id, set.id)} disabled={item.sets.length === 1} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 disabled:opacity-30 flex justify-center"><X size={18} /></button>
+                  {!isJointPartner && <button onClick={() => removeSet(item.id, set.id)} disabled={item.sets.length === 1} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 disabled:opacity-30 flex justify-center"><X size={18} /></button>}
                 </>
               )}
             </div>
@@ -1562,11 +1585,11 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
                   <div key={ds.id} className="border-l-2 border-orange-200 dark:border-orange-800 pl-2 flex items-center gap-1.5 ml-3 mt-2">
                     <TrendingDown size={14} className="text-orange-400 flex-shrink-0" />
                     {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'dropSets' }, item.weightType, 'main', true, ds.id)}
-                    <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'dropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={16} /></button>
+                    {!isJointPartner && <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'dropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={16} /></button>}
                   </div>
                 ))}
 
-                {item.isDropSet && item.weightType !== 'cardio' && (
+                {!isJointPartner && item.isDropSet && item.weightType !== 'cardio' && (
                   <button onClick={() => addDropSet(item.id, set.id, 'dropSets')} className="ml-5 mt-2 text-[10px] text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900 border border-orange-200 dark:border-orange-800 px-2 py-1 rounded transition-colors font-bold flex items-center gap-1 w-max"><Plus size={10}/>ドロップ追加</button>
                 )}
 
@@ -1583,7 +1606,7 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
                       <div key={`super2-old-ds-${ds.id}`} className="flex items-center gap-1.5 pl-4 border-l-2 border-orange-300 dark:border-orange-700 ml-4 mt-2">
                         <TrendingDown size={12} className="text-orange-400 flex-shrink-0" />
                         {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'dropSets' }, item.superWeightType || 'total', 'super2', true, ds.id)}
-                        <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'dropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={16} /></button>
+                        {!isJointPartner && <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'dropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={16} /></button>}
                       </div>
                       ) : null
                     ))}
@@ -1592,11 +1615,11 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
                       <div key={`super2-ds-${ds.id}`} className="flex items-center gap-1.5 pl-4 border-l-2 border-orange-300 dark:border-orange-700 ml-4 mt-2">
                         <TrendingDown size={12} className="text-orange-400 flex-shrink-0" />
                         {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'superDropSets' }, item.superWeightType || 'total', 'super2', true, ds.id)}
-                        <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'superDropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={16} /></button>
+                        {!isJointPartner && <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'superDropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={16} /></button>}
                       </div>
                     ))}
                     
-                    {item.isDropSet && (
+                    {!isJointPartner && item.isDropSet && (
                       <button onClick={() => addDropSet(item.id, set.id, 'superDropSets')} className="ml-8 mt-1 text-[10px] text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900 border border-orange-200 dark:border-orange-800 px-2 py-1 rounded transition-colors font-bold flex items-center gap-1 w-max"><Plus size={10}/>ドロップ追加</button>
                     )}
                   </div>
@@ -1615,7 +1638,7 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
                       <div key={`super3-old-ds-${ds.id}`} className="flex items-center gap-1.5 pl-4 border-l-2 border-orange-300 dark:border-orange-700 ml-4 mt-2">
                         <TrendingDown size={12} className="text-orange-400 flex-shrink-0" />
                         {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'dropSets' }, item.superWeightType3 || 'total', 'super3', true, ds.id)}
-                        <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'dropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={16} /></button>
+                        {!isJointPartner && <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'dropSets')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={16} /></button>}
                       </div>
                       ) : null
                     ))}
@@ -1624,11 +1647,11 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
                       <div key={`super3-ds-${ds.id}`} className="flex items-center gap-1.5 pl-4 border-l-2 border-orange-300 dark:border-orange-700 ml-4 mt-2">
                         <TrendingDown size={12} className="text-orange-400 flex-shrink-0" />
                         {renderInputRow({ ...ds, _parentId: set.id, _targetArray: 'superDropSets3' }, item.superWeightType3 || 'total', 'super3', true, ds.id)}
-                        <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'superDropSets3')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={16} /></button>
+                        {!isJointPartner && <button onClick={() => removeDropSet(item.id, set.id, ds.id, 'superDropSets3')} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 flex justify-center"><X size={16} /></button>}
                       </div>
                     ))}
                     
-                    {item.isDropSet && (
+                    {!isJointPartner && item.isDropSet && (
                       <button onClick={() => addDropSet(item.id, set.id, 'superDropSets3')} className="ml-8 mt-1 text-[10px] text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/50 hover:bg-orange-100 dark:hover:bg-orange-900 border border-orange-200 dark:border-orange-800 px-2 py-1 rounded transition-colors font-bold flex items-center gap-1 w-max"><Plus size={10}/>ドロップ追加</button>
                     )}
                   </div>
@@ -1639,15 +1662,20 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
         ))}
       </div>
 
+      {!isJointPartner && (
       <button onClick={() => addSet(item.id)} className="w-full py-3 border border-dashed border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors mb-4 bg-white dark:bg-slate-900">
         <Plus size={18} /> セットを追加
       </button>
+      )}
 
+      {!isJointPartner && (
       <div>
         <textarea value={item.memo || ''} onChange={(e) => updateItem(item.id, { memo: e.target.value })} placeholder="種目ごとのメモ（オプション）" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm text-slate-700 dark:text-slate-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none resize-none" style={{ fontSize: '16px' }} rows={2} />
       </div>
+      )}
       </div>
       
+      {!isJointPartner && (
       <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
         <button
           onClick={() => updateItem(item.id, { isConfirmed: !item.isConfirmed })}
@@ -1660,6 +1688,7 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
           {isConfirmed ? <><Edit2 size={18} /> 編集に戻す</> : <><CheckCircle size={18} /> この種目を確定する</>}
         </button>
       </div>
+      )}
 
       </div>
     </div>
@@ -3355,7 +3384,7 @@ if (timerState.y === 'top') {
             </div>
             <button onClick={() => setShowProfileModal(true)} className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
               <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-xs overflow-hidden border border-emerald-200 dark:border-emerald-800">
-                {myInfo.photoUrl ? <img src={myInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : myInfo.displayName ? myInfo.displayName.charAt(0).toUpperCase() : currentUser.charAt(0).toUpperCase()}
+                {myInfo.photoUrl ? <img src={myInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : (myInfo.displayName || currentUser || '?').charAt(0).toUpperCase()}
               </div>
               <span className="text-sm font-bold text-slate-700 dark:text-slate-200 hidden sm:inline">
                 {renderUsernameWithBadge(currentUser, myInfo.displayName, accountsInfo, "font-bold text-slate-700 dark:text-slate-200")}
@@ -5234,7 +5263,22 @@ ${importText}`;
     }
   };
 
-  const updateItem = (itemId, data) => { setWorkoutItems(prev => prev.map(item => item.id === itemId ? { ...item, ...data } : item)); };
+  const updateItem = (itemId, data) => {
+    setWorkoutItems(prev => {
+      const index = prev.findIndex(item => item.id === itemId);
+      if (index === -1) return prev;
+      const newItems = [...prev];
+      newItems[index] = { ...newItems[index], ...data };
+      if (jointPartnerId) {
+         const newPItems = [...partnerItems];
+         if (newPItems[index]) {
+            newPItems[index] = { ...newPItems[index], ...data };
+            setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newPItems }, { merge: true });
+         }
+      }
+      return newItems;
+    });
+  };
   
   const addExerciseItem = (insertAfterIndex = null, defaultName = '') => {
     const defaultEx = availableExercises.find(ex => ex.name === defaultName);
@@ -5302,37 +5346,101 @@ ${importText}`;
   };
 
   const addSet = (itemId) => {
-    setWorkoutItems(prev => prev.map(item => {
-      if (item.id === itemId) {
-        const lastSet = (item.sets && item.sets.length > 0) ? item.sets[item.sets.length - 1] : {};
-        if (item.weightType === 'cardio') {
-           return { ...item, sets: [...(item.sets || []), { id: generateId(), distance: lastSet.distance || '', time: lastSet.time || '', calories: lastSet.calories || '' }]};
-        }
-        return { ...item, sets: [...(item.sets || []), { 
-          id: generateId(), 
-          weight: lastSet.weight || '', 
-          reps: lastSet.reps || '', 
-          lReps: lastSet.lReps || '', 
-          rReps: lastSet.rReps || '',
+    setWorkoutItems(prev => {
+      const index = prev.findIndex(item => item.id === itemId);
+      if (index === -1) return prev;
+      const newItems = [...prev];
+      const item = newItems[index];
+      const lastSet = (item.sets && item.sets.length > 0) ? item.sets[item.sets.length - 1] : {};
+      
+      let newSet;
+      if (item.weightType === 'cardio') {
+         newSet = { id: generateId(), distance: lastSet.distance || '', time: lastSet.time || '', calories: lastSet.calories || '' };
+      } else {
+         newSet = { 
+          id: generateId(), weight: lastSet.weight || '', reps: lastSet.reps || '', lReps: lastSet.lReps || '', rReps: lastSet.rReps || '',
           dropSets: lastSet.dropSets ? lastSet.dropSets.map(ds => ({ ...ds, id: generateId() })) : undefined,
           superDropSets: lastSet.superDropSets ? lastSet.superDropSets.map(ds => ({ ...ds, id: generateId() })) : undefined,
           superDropSets3: lastSet.superDropSets3 ? lastSet.superDropSets3.map(ds => ({ ...ds, id: generateId() })) : undefined
-        }]};
+        };
       }
-      return item;
-    }));
+      newItems[index] = { ...item, sets: [...(item.sets || []), newSet] };
+
+      if (jointPartnerId) {
+         const newPItems = [...partnerItems];
+         if (newPItems[index]) {
+            const pItem = newPItems[index];
+            const pLastSet = (pItem.sets && pItem.sets.length > 0) ? pItem.sets[pItem.sets.length - 1] : {};
+            let pNewSet;
+            if (pItem.weightType === 'cardio') {
+               pNewSet = { id: generateId(), distance: pLastSet.distance || '', time: pLastSet.time || '', calories: pLastSet.calories || '' };
+            } else {
+               pNewSet = { 
+                id: generateId(), weight: pLastSet.weight || '', reps: pLastSet.reps || '', lReps: pLastSet.lReps || '', rReps: pLastSet.rReps || '',
+                dropSets: pLastSet.dropSets ? pLastSet.dropSets.map(ds => ({ ...ds, id: generateId() })) : undefined,
+                superDropSets: pLastSet.superDropSets ? pLastSet.superDropSets.map(ds => ({ ...ds, id: generateId() })) : undefined,
+                superDropSets3: pLastSet.superDropSets3 ? pLastSet.superDropSets3.map(ds => ({ ...ds, id: generateId() })) : undefined
+              };
+            }
+            newPItems[index] = { ...pItem, sets: [...(pItem.sets || []), pNewSet] };
+            setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newPItems }, { merge: true });
+         }
+      }
+      return newItems;
+    });
   };
 
-  const removeSet = (itemId, setId) => setWorkoutItems(prev => prev.map(item => item.id === itemId ? { ...item, sets: item.sets.filter(s => s.id !== setId) } : item));
+  const removeSet = (itemId, setId) => {
+    setWorkoutItems(prev => {
+      const index = prev.findIndex(item => item.id === itemId);
+      if (index === -1) return prev;
+      const newItems = [...prev];
+      const item = newItems[index];
+      const setIndex = item.sets.findIndex(s => s.id === setId);
+      if (setIndex === -1) return prev;
+      newItems[index] = { ...item, sets: item.sets.filter(s => s.id !== setId) };
+
+      if (jointPartnerId) {
+         const newPItems = [...partnerItems];
+         if (newPItems[index]) {
+            const pItem = newPItems[index];
+            const newPSets = [...(pItem.sets || [])];
+            if (setIndex < newPSets.length) {
+                newPSets.splice(setIndex, 1);
+                newPItems[index] = { ...pItem, sets: newPSets };
+                setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newPItems }, { merge: true });
+            }
+         }
+      }
+      return newItems;
+    });
+  };
   
   const reorderSet = (itemId, dragIndex, dropIndex) => {
-    setWorkoutItems(prev => prev.map(item => {
-      if (item.id !== itemId) return item;
+    setWorkoutItems(prev => {
+      const index = prev.findIndex(item => item.id === itemId);
+      if (index === -1) return prev;
+      const newItems = [...prev];
+      const item = newItems[index];
+      
       const newSets = [...(item.sets || [])];
       const [dragged] = newSets.splice(dragIndex, 1);
       newSets.splice(dropIndex, 0, dragged);
-      return { ...item, sets: newSets };
-    }));
+      newItems[index] = { ...item, sets: newSets };
+
+      if (jointPartnerId) {
+         const newPItems = [...partnerItems];
+         if (newPItems[index]) {
+            const pItem = newPItems[index];
+            const pNewSets = [...(pItem.sets || [])];
+            const [pDragged] = pNewSets.splice(dragIndex, 1);
+            pNewSets.splice(dropIndex, 0, pDragged);
+            newPItems[index] = { ...pItem, sets: pNewSets };
+            setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newPItems }, { merge: true });
+         }
+      }
+      return newItems;
+    });
   };
 
   const updateSetField = (itemId, setId, field, value) => {
@@ -5342,6 +5450,10 @@ ${importText}`;
     }));
   };
 
+  const updatePartnerItem = (itemId, data) => {
+    const newItems = partnerItems.map(item => item.id === itemId ? { ...item, ...data } : item);
+    setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newItems }, { merge: true });
+  };
   const addPartnerSet = (itemId) => {
     const newItems = partnerItems.map(item => {
       if (item.id === itemId) {
@@ -5422,22 +5534,71 @@ ${importText}`;
   };
 
   const addDropSet = (itemId, parentSetId, targetArray = 'dropSets') => {
-    setWorkoutItems(prev => prev.map(item => {
-      if (item.id !== itemId) return item;
-      return { ...item, sets: item.sets.map(set => {
+    setWorkoutItems(prev => {
+      const index = prev.findIndex(item => item.id === itemId);
+      if (index === -1) return prev;
+      const newItems = [...prev];
+      const item = newItems[index];
+      const setIndex = item.sets.findIndex(s => s.id === parentSetId);
+      if (setIndex === -1) return prev;
+      
+      newItems[index] = { ...item, sets: item.sets.map(set => {
         if (set.id !== parentSetId) return set;
         return { ...set, [targetArray]: [...(set[targetArray] || []), { id: generateId(), weight: '', reps: '', lReps: '', rReps: '' }]};
       })};
-    }));
+
+      if (jointPartnerId) {
+         const newPItems = [...partnerItems];
+         if (newPItems[index]) {
+            const pItem = newPItems[index];
+            if (pItem.sets && pItem.sets[setIndex]) {
+               newPItems[index] = { ...pItem, sets: pItem.sets.map((pSet, sIdx) => {
+                  if (sIdx !== setIndex) return pSet;
+                  return { ...pSet, [targetArray]: [...(pSet[targetArray] || []), { id: generateId(), weight: '', reps: '', lReps: '', rReps: '' }]};
+               })};
+               setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newPItems }, { merge: true });
+            }
+         }
+      }
+      return newItems;
+    });
   }
   const removeDropSet = (itemId, parentSetId, dropId, targetArray = 'dropSets') => {
-    setWorkoutItems(prev => prev.map(item => {
-      if (item.id !== itemId) return item;
-      return { ...item, sets: item.sets.map(set => {
+    setWorkoutItems(prev => {
+      const index = prev.findIndex(item => item.id === itemId);
+      if (index === -1) return prev;
+      const newItems = [...prev];
+      const item = newItems[index];
+      const setIndex = item.sets.findIndex(s => s.id === parentSetId);
+      if (setIndex === -1) return prev;
+      const dropIndex = item.sets[setIndex][targetArray]?.findIndex(ds => ds.id === dropId);
+      if (dropIndex === -1 || dropIndex === undefined) return prev;
+
+      newItems[index] = { ...item, sets: item.sets.map(set => {
         if (set.id !== parentSetId) return set;
         return { ...set, [targetArray]: (set[targetArray] || []).filter(ds => ds.id !== dropId) };
       })};
-    }));
+
+      if (jointPartnerId) {
+         const newPItems = [...partnerItems];
+         if (newPItems[index]) {
+            const pItem = newPItems[index];
+            if (pItem.sets && pItem.sets[setIndex]) {
+               const pTargetArr = pItem.sets[setIndex][targetArray] || [];
+               if (dropIndex < pTargetArr.length) {
+                  newPItems[index] = { ...pItem, sets: pItem.sets.map((pSet, sIdx) => {
+                     if (sIdx !== setIndex) return pSet;
+                     const newPDrops = [...(pSet[targetArray] || [])];
+                     newPDrops.splice(dropIndex, 1);
+                     return { ...pSet, [targetArray]: newPDrops };
+                  })};
+                  setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newPItems }, { merge: true });
+               }
+            }
+         }
+      }
+      return newItems;
+    });
   }
   const updateDropSetField = (itemId, parentSetId, dropId, field, value, targetArray = 'dropSets') => {
     setWorkoutItems(prev => prev.map(item => {
@@ -5647,7 +5808,9 @@ ${importText}`;
                   <div className="flex gap-2 overflow-x-auto pb-1">
                     {friendsInSameGym.map(f => (
                       <button key={f} onClick={() => handleStartJointTraining(f)} className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-orange-200 dark:border-orange-800 text-orange-600 dark:text-orange-400 px-3 py-2 rounded-xl text-xs font-bold shrink-0 hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors shadow-sm">
-                        <div className="w-5 h-5 rounded-full overflow-hidden shrink-0"><img src={accountsInfo[f]?.photoUrl || ''} className="w-full h-full object-cover" /></div>
+                        <div className="w-5 h-5 rounded-full overflow-hidden shrink-0 bg-orange-200 text-orange-600 flex items-center justify-center text-[10px] font-bold">
+                           {accountsInfo[f]?.photoUrl ? <img src={accountsInfo[f]?.photoUrl} className="w-full h-full object-cover" /> : (accountsInfo[f]?.displayName || f || '?').charAt(0).toUpperCase()}
+                        </div>
                         {accountsInfo[f]?.displayName || f} と合トレ開始
                       </button>
                     ))}
@@ -5744,7 +5907,7 @@ ${importText}`;
                  {jointPartnerId && pItem ? (
                    <div className="relative opacity-90 scale-[0.98]">
                      <div className="absolute -top-3 left-4 z-10 bg-orange-500 text-white px-2 py-0.5 rounded-full shadow-sm text-[10px] font-bold flex items-center gap-1">
-                       {accountsInfo[jointPartnerId]?.photoUrl ? <img src={accountsInfo[jointPartnerId]?.photoUrl} className="w-3 h-3 rounded-full object-cover bg-white"/> : <div className="w-3 h-3 rounded-full bg-white text-orange-500 flex items-center justify-center">{accountsInfo[jointPartnerId]?.displayName?.charAt(0)}</div>}
+                       {accountsInfo[jointPartnerId]?.photoUrl ? <img src={accountsInfo[jointPartnerId]?.photoUrl} className="w-3 h-3 rounded-full object-cover bg-white"/> : <div className="w-3 h-3 rounded-full bg-white text-orange-500 flex items-center justify-center">{(accountsInfo[jointPartnerId]?.displayName || jointPartnerId || '?').charAt(0).toUpperCase()}</div>}
                        {accountsInfo[jointPartnerId]?.displayName || jointPartnerId}
                      </div>
                      <WorkoutItemForm 
@@ -5765,6 +5928,7 @@ ${importText}`;
                        isDragging={false}
                        isAnyDragging={false}
                        dragHandleProps={{}}
+                       isJointPartner={true}
                      />
                    </div>
                  ) : jointPartnerId && !pItem ? (
@@ -7445,7 +7609,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.5, 13:34, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.5, 13:41, updated)</p>
       </div>
     </div>
   );
