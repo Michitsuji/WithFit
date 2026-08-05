@@ -2408,80 +2408,16 @@ if (timerState.y === 'top') {
   }, [currentUser, db]);
 
   useEffect(() => {
-    if (!currentUser || !myInfo?.jointPartnerId || !myInfo?.currentWorkoutItems || !isDraftLoaded) return;
-    const remoteItems = myInfo.currentWorkoutItems;
-    const localItems = draftWorkoutItems;
-    let needsUpdate = false;
-    if (remoteItems.length !== localItems.length) {
-       needsUpdate = true;
-    } else {
-       for (let i = 0; i < remoteItems.length; i++) {
-          const r = remoteItems[i];
-          const l = localItems[i];
-          if (r.id !== l.id || r.exerciseName !== l.exerciseName || r.category !== l.category || r.weightType !== l.weightType || r.superExerciseName !== l.superExerciseName || r.superWeightType !== l.superWeightType || r.superExerciseName3 !== l.superExerciseName3 || r.superWeightType3 !== l.superWeightType3) {
-             needsUpdate = true;
-             break;
+    const myAcc = accountsInfo[currentUser];
+    if (myAcc && myAcc.jointPartnerId && myAcc.currentWorkoutItems && myAcc.lastUpdater !== currentUser) {
+       setDraftWorkoutItems(prev => {
+          if (JSON.stringify(prev) !== JSON.stringify(myAcc.currentWorkoutItems)) {
+             return myAcc.currentWorkoutItems;
           }
-          if ((r.sets || []).length !== (l.sets || []).length) {
-             needsUpdate = true;
-             break;
-          }
-       }
-    }
-    if (needsUpdate) {
-       const newLocalItems = remoteItems.map(rItem => {
-          const lItem = localItems.find(l => l.id === rItem.id);
-          if (!lItem) return rItem;
-          const newSets = (rItem.sets || []).map(rSet => {
-             const lSet = (lItem.sets || []).find(s => s.id === rSet.id);
-             return lSet ? lSet : rSet;
-          });
-          return {
-             ...rItem,
-             memo: lItem.memo || '',
-             isSuperSet: lItem.isSuperSet || false,
-             isDropSet: lItem.isDropSet || false,
-             isForcedReps: lItem.isForcedReps || false,
-             sets: newSets
-          };
+          return prev;
        });
-       setDraftWorkoutItems(newLocalItems);
     }
-  }, [myInfo?.currentWorkoutItems, currentUser, isDraftLoaded]);
-
-  useEffect(() => {
-    if (!currentUser || !myInfo?.jointPartnerId || !myInfo?.currentWorkoutItems || !isDraftLoaded) return;
-    const remoteItems = myInfo.currentWorkoutItems;
-    const localItems = draftWorkoutItems;
-    let needsUpdate = false;
-    if (remoteItems.length !== localItems.length) {
-       needsUpdate = true;
-    } else {
-       for (let i = 0; i < remoteItems.length; i++) {
-          const r = remoteItems[i];
-          const l = localItems[i];
-          if (r.id !== l.id || r.exerciseName !== l.exerciseName || r.category !== l.category || r.weightType !== l.weightType || r.superExerciseName !== l.superExerciseName || r.superWeightType !== l.superWeightType || r.superExerciseName3 !== l.superExerciseName3 || r.superWeightType3 !== l.superWeightType3) {
-             needsUpdate = true;
-             break;
-          }
-       }
-    }
-    if (needsUpdate) {
-       const newLocalItems = remoteItems.map((rItem, i) => {
-          const lItem = localItems.find(l => l.id === rItem.id) || localItems[i];
-          if (!lItem) return rItem;
-          return {
-             ...rItem,
-             memo: lItem.memo || '',
-             isSuperSet: lItem.isSuperSet || false,
-             isDropSet: lItem.isDropSet || false,
-             isForcedReps: lItem.isForcedReps || false,
-             sets: lItem.sets || []
-          };
-       });
-       setDraftWorkoutItems(newLocalItems);
-    }
-  }, [myInfo?.currentWorkoutItems, currentUser, isDraftLoaded]);
+  }, [accountsInfo[currentUser]?.currentWorkoutItems, accountsInfo[currentUser]?.lastUpdater, currentUser]);
 
   useEffect(() => {
     if (currentUser && db && isDraftLoaded) {
@@ -2494,7 +2430,8 @@ if (timerState.y === 'top') {
           setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { 
             currentWorkoutItems: draftWorkoutItems,
             currentSelectedCategories: selectedCategories,
-            draftUpdatedAt: now
+            draftUpdatedAt: now,
+            lastUpdater: currentUser
           }, { merge: true }).catch(()=>{});
         } else {
           localStorage.removeItem(`withfit_draft_${currentUser}`);
@@ -2940,15 +2877,51 @@ if (timerState.y === 'top') {
     try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', postId)); } catch (e) {}
   };
 
+  const handleRequestJointTraining = async (partnerId) => {
+    if (!window.confirm(`${accountsInfo[partnerId]?.displayName || partnerId}さんに合トレを申請しますか？`)) return;
+    const targetRequests = accountsInfo[partnerId]?.jointTrainingRequests || [];
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', partnerId), { jointTrainingRequests: [...new Set([...targetRequests, currentUser])] }, { merge: true });
+    alert('申請を送信しました。');
+  };
+
+  const handleAcceptJointTraining = async (requesterId) => {
+    const pItems = accountsInfo[requesterId]?.currentWorkoutItems || [];
+    let mItems = draftWorkoutItems;
+    const maxLen = Math.max(mItems.length, pItems.length);
+    const newMItems = [...mItems];
+    const newPItems = [...pItems];
+    for(let i=0; i<maxLen; i++) {
+      if(!newMItems[i]) newMItems[i] = { id: generateId(), exerciseName: newPItems[i]?.exerciseName || '', weightType: newPItems[i]?.weightType || 'total', category: newPItems[i]?.category || 'その他', sets: [{id: generateId(), weight:'', reps:''}] };
+      if(!newPItems[i]) newPItems[i] = { id: generateId(), exerciseName: newMItems[i]?.exerciseName || '', weightType: newMItems[i]?.weightType || 'total', category: newMItems[i]?.category || 'その他', sets: [{id: generateId(), weight:'', reps:''}] };
+    }
+    setDraftWorkoutItems(newMItems);
+    const myRequests = myInfo.jointTrainingRequests || [];
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { jointPartnerId: requesterId, currentWorkoutItems: newMItems, jointTrainingRequests: myRequests.filter(id => id !== requesterId) }, { merge: true });
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', requesterId), { jointPartnerId: currentUser, currentWorkoutItems: newPItems }, { merge: true });
+  };
+
+  const handleRejectJointTraining = async (requesterId) => {
+    const myRequests = myInfo.jointTrainingRequests || [];
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { jointTrainingRequests: myRequests.filter(id => id !== requesterId) }, { merge: true });
+  };
+
+  const handleCancelJointTraining = async () => {
+    if (!window.confirm("合トレを解除しますか？（現在の記録はそれぞれ保持されます）")) return;
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { jointPartnerId: null }, { merge: true });
+    if (myInfo.jointPartnerId) {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', myInfo.jointPartnerId), { jointPartnerId: null }, { merge: true });
+    }
+  };
+
   const handleCancelTraining = async () => {
     if (!window.confirm("現在の記録を破棄して終了しますか？")) return;
     if (!currentUser || !db) return;
     try { 
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now(), jointPartnerId: null, currentWorkoutItems: deleteField() }, { merge: true }); 
-      setDraftWorkoutItems([]); setSelectedCategories([]); setCurrentTab('timeline'); 
-      if (myInfo?.jointPartnerId) {
+      if (myInfo.jointPartnerId) {
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', myInfo.jointPartnerId), { jointPartnerId: null }, { merge: true });
       }
+      setDraftWorkoutItems([]); setSelectedCategories([]); setCurrentTab('timeline'); 
     } catch (e) {}
   };
 
@@ -3656,7 +3629,7 @@ if (timerState.y === 'top') {
         )}
         {currentTab === 'timeline' && <TimelineView posts={visiblePosts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} scrollToPostId={scrollToPostId} setScrollToPostId={setScrollToPostId} />}
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} currentUser={currentUser} myInfo={myInfo} setCurrentTab={setCurrentTab} onSendRequest={handleSendFriendRequest} />}
-        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} />}
+        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} onRequestJointTraining={handleRequestJointTraining} onAcceptJointTraining={handleAcceptJointTraining} onRejectJointTraining={handleRejectJointTraining} onCancelJointTraining={handleCancelJointTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} />}
         {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onSendPartnerRequest={handleSendPartnerRequest} onAcceptPartnerRequest={handleAcceptPartnerRequest} onRejectPartnerRequest={handleRejectPartnerRequest} onRemovePartner={handleRemovePartner} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} posts={posts} targetFriendTab={targetFriendTab} setTargetFriendTab={setTargetFriendTab} onSendTestPush={async (targetUser, message) => {
           if (!db) return;
@@ -5005,7 +4978,7 @@ function ActiveProgramDisplay({ program, onApply, onToggleComplete, onDelete }) 
   );
 }
 
-function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workoutItems, setWorkoutItems, selectedCategories, setSelectedCategories, posts, currentUser, isManual, setIsManual, onActiveExerciseChange, accountsInfo }) {
+function RecordView({ onStart, onPost, onCancel, onRequestJointTraining, onAcceptJointTraining, onRejectJointTraining, onCancelJointTraining, myInfo, gyms, exercises, workoutItems, setWorkoutItems, selectedCategories, setSelectedCategories, posts, currentUser, isManual, setIsManual, onActiveExerciseChange, accountsInfo }) {
   const joinedGyms = myInfo.joinedGyms || ['common'];
   const jointPartnerId = myInfo.jointPartnerId;
   const partnerItems = jointPartnerId ? (accountsInfo[jointPartnerId]?.currentWorkoutItems || []) : [];
@@ -5364,7 +5337,7 @@ ${importText}`;
          const newPItems = [...partnerItems];
          if (newPItems[index]) {
             newPItems[index] = { ...newPItems[index], ...syncData };
-            setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newPItems }, { merge: true });
+            setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newPItems, lastUpdater: currentUser }, { merge: true });
          }
       }
       return newItems;
@@ -5543,7 +5516,7 @@ ${importText}`;
 
   const updatePartnerItem = (itemId, data) => {
     const newItems = partnerItems.map(item => item.id === itemId ? { ...item, ...data } : item);
-    setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newItems }, { merge: true });
+    setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newItems, lastUpdater: currentUser }, { merge: true });
   };
   const addPartnerSet = (itemId) => {
     const newItems = partnerItems.map(item => {
@@ -5608,63 +5581,7 @@ ${importText}`;
     setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newItems }, { merge: true });
   };
 
-  const handleRequestJointTraining = async (partnerId) => {
-    if (!window.confirm(`${accountsInfo[partnerId]?.displayName || partnerId}さんに合トレを申請しますか？`)) return;
-    const pData = accountsInfo[partnerId];
-    const reqs = pData?.jointRequests || [];
-    if (reqs.includes(currentUser)) { alert("申請済みです。"); return; }
-    try {
-       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', partnerId), { jointRequests: [...reqs, currentUser] }, { merge: true });
-       alert("合トレ申請を送信しました。");
-    } catch(e) {}
-  };
 
-  const handleAcceptJointTraining = async (requesterId) => {
-    const myReqs = myInfo.jointRequests || [];
-    const mItems = workoutItems;
-    const pItems = accountsInfo[requesterId]?.currentWorkoutItems || [];
-    const maxLen = Math.max(mItems.length, pItems.length);
-    const newMItems = [...mItems];
-    const newPItems = [...pItems];
-    for(let i=0; i<maxLen; i++) {
-      if(!newMItems[i]) newMItems[i] = { id: generateId(), exerciseName: newPItems[i]?.exerciseName || '', weightType: newPItems[i]?.weightType || 'total', category: newPItems[i]?.category || 'その他', isSuperSet: false, isDropSet: false, isForcedReps: false, memo: '', sets: [{id: generateId(), weight:'', reps:'', lReps:'', rReps:''}] };
-      if(!newPItems[i]) newPItems[i] = { id: generateId(), exerciseName: newMItems[i]?.exerciseName || '', weightType: newMItems[i]?.weightType || 'total', category: newMItems[i]?.category || 'その他', isSuperSet: false, isDropSet: false, isForcedReps: false, memo: '', sets: [{id: generateId(), weight:'', reps:'', lReps:'', rReps:''}] };
-      newMItems[i].id = newPItems[i].id = newMItems[i].id || newPItems[i].id || generateId();
-    }
-    setWorkoutItems(newMItems);
-
-    try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { 
-         jointRequests: myReqs.filter(id => id !== requesterId),
-         jointPartnerId: requesterId,
-         currentWorkoutItems: newMItems
-      }, { merge: true });
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', requesterId), {
-         jointPartnerId: currentUser,
-         currentWorkoutItems: newPItems
-      }, { merge: true });
-      alert(`${accountsInfo[requesterId]?.displayName || requesterId}さんとの合トレを開始しました！`);
-    } catch(e) {}
-  };
-
-  const handleRejectJointTraining = async (requesterId) => {
-    const myReqs = myInfo.jointRequests || [];
-    try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { 
-         jointRequests: myReqs.filter(id => id !== requesterId)
-      }, { merge: true });
-    } catch(e) {}
-  };
-
-  const handleEndJointTraining = async () => {
-    if (!window.confirm("合トレを解除しますか？\n互いの記録は保持されたまま、個別記録に戻ります。")) return;
-    try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { jointPartnerId: null }, { merge: true });
-      if (jointPartnerId) {
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { jointPartnerId: null }, { merge: true });
-      }
-    } catch(e) {}
-  };
 
   const addDropSet = (itemId, parentSetId, targetArray = 'dropSets') => {
     setWorkoutItems(prev => prev.map(item => {
@@ -5890,16 +5807,39 @@ ${importText}`;
                 <div className="mb-6 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900 rounded-2xl p-4 shadow-sm">
                   <h3 className="text-xs font-bold text-orange-600 dark:text-orange-400 mb-2 flex items-center gap-1"><Flame size={14}/> 同じジムにいるフレンド</h3>
                   <div className="flex gap-2 overflow-x-auto pb-1">
-                    {friendsInSameGym.map(f => (
-                      <button key={f} onClick={() => handleStartJointTraining(f)} className="flex items-center gap-1.5 bg-white dark:bg-slate-900 border border-orange-200 dark:border-orange-800 text-orange-600 dark:text-orange-400 px-3 py-2 rounded-xl text-xs font-bold shrink-0 hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors shadow-sm">
+                    {friendsInSameGym.map(f => {
+                      const hasRequested = (accountsInfo[f]?.jointTrainingRequests || []).includes(currentUser);
+                      return (
+                      <button key={f} onClick={() => !hasRequested && onRequestJointTraining(f)} disabled={hasRequested} className={`flex items-center gap-1.5 bg-white dark:bg-slate-900 border text-xs font-bold px-3 py-2 rounded-xl shrink-0 transition-colors shadow-sm ${hasRequested ? 'border-slate-200 text-slate-400 cursor-not-allowed' : 'border-orange-200 text-orange-600 hover:bg-orange-100'}`}>
                         <div className="w-5 h-5 rounded-full overflow-hidden shrink-0 bg-orange-200 text-orange-600 flex items-center justify-center text-[10px] font-bold">
                            {accountsInfo[f]?.photoUrl ? <img src={accountsInfo[f]?.photoUrl} className="w-full h-full object-cover" /> : (accountsInfo[f]?.displayName || f || '?').charAt(0).toUpperCase()}
                         </div>
-                        {accountsInfo[f]?.displayName || f} と合トレ開始
+                        {accountsInfo[f]?.displayName || f} {hasRequested ? '申請済み' : 'に合トレ申請'}
                       </button>
-                    ))}
+                    )})}
                   </div>
                 </div>
+              )}
+              {myInfo.jointTrainingRequests && myInfo.jointTrainingRequests.length > 0 && !jointPartnerId && !isManual && (
+                 <div className="mb-6 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 rounded-2xl p-4 shadow-sm">
+                    <h3 className="text-xs font-bold text-emerald-600 dark:text-emerald-400 mb-2 flex items-center gap-1"><UserPlus size={14}/> 合トレの申請が届いています</h3>
+                    <div className="space-y-2">
+                       {myInfo.jointTrainingRequests.map(reqId => (
+                          <div key={reqId} className="flex items-center justify-between bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 p-2 rounded-xl shadow-sm">
+                             <div className="flex items-center gap-2">
+                               <div className="w-6 h-6 rounded-full overflow-hidden shrink-0 bg-emerald-200 text-emerald-600 flex items-center justify-center text-xs font-bold">
+                                 {accountsInfo[reqId]?.photoUrl ? <img src={accountsInfo[reqId]?.photoUrl} className="w-full h-full object-cover" /> : (accountsInfo[reqId]?.displayName || reqId || '?').charAt(0).toUpperCase()}
+                               </div>
+                               <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{accountsInfo[reqId]?.displayName || reqId}</span>
+                             </div>
+                             <div className="flex gap-1">
+                               <button onClick={() => onAcceptJointTraining(reqId)} className="bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm">承諾</button>
+                               <button onClick={() => onRejectJointTraining(reqId)} className="bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold px-3 py-1.5 rounded-lg">拒否</button>
+                             </div>
+                          </div>
+                       ))}
+                    </div>
+                 </div>
               )}
               {jointPartnerId && (
                 <div className="mb-6 flex flex-col gap-2 bg-gradient-to-r from-orange-500 to-rose-500 text-white px-4 py-3 rounded-2xl shadow-lg shadow-orange-500/30">
@@ -5907,7 +5847,7 @@ ${importText}`;
                     <div className="flex items-center gap-2">
                       <Flame size={18} className="animate-pulse"/> {accountsInfo[jointPartnerId]?.displayName || jointPartnerId} と合トレ中！
                     </div>
-                    <button onClick={() => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { jointPartnerId: null }, { merge: true })} className="text-[10px] bg-black/20 hover:bg-black/40 px-2 py-1 rounded-lg transition-colors">解除</button>
+                    <button onClick={onCancelJointTraining} className="text-[10px] bg-black/20 hover:bg-black/40 px-2 py-1 rounded-lg transition-colors">解除</button>
                   </div>
                   <p className="text-[10px] text-orange-100 font-bold">相手のカードも編集可能です。完了時に二人分の投稿が作成されます。</p>
                 </div>
@@ -5919,7 +5859,7 @@ ${importText}`;
 
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-lg font-bold text-slate-900 dark:text-white">{isManual ? '記録内容' : 'ワークアウト中'}</h2>
-        {workoutItems.length > 1 && !jointPartnerId && (
+        {workoutItems.length > 1 && (
           <button onClick={() => setShowReorderModal(true)} className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 flex items-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-colors shadow-sm">
             <ArrowUp size={14} /><ArrowDown size={14} className="-ml-2" /> 並び替え
           </button>
@@ -5945,7 +5885,7 @@ ${importText}`;
           .hide-scrollbar::-webkit-scrollbar { display: none; }
           .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         `}</style>
-      <div id="workout-items-container" ref={handleContainerRef} onScroll={handleScroll} className="flex overflow-x-auto gap-3 sm:gap-4 pb-6 pt-8 -mx-4 px-4 hide-scrollbar items-start snap-x snap-mandatory">
+      <div id="workout-items-container" ref={handleContainerRef} onScroll={handleScroll} className="flex overflow-x-auto gap-3 sm:gap-4 pb-6 pt-5 -mx-4 px-4 hide-scrollbar items-start snap-x snap-mandatory">
         {workoutItems.length === 0 ? (
           <div className="snap-center shrink-0 w-[88%] sm:w-[320px] flex flex-col justify-center h-full min-h-[200px]">
             <button onClick={() => addExerciseItem(null)} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
@@ -6026,6 +5966,14 @@ ${importText}`;
                </div>
              );
           })
+        )}
+        {jointPartnerId && (
+           <div className="snap-center shrink-0 w-[88%] sm:w-[320px] flex flex-col justify-center h-full min-h-[200px] pb-6">
+             <button onClick={() => addExerciseItem(null)} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
+               <div className="bg-white dark:bg-slate-800 p-3 rounded-full shadow-sm"><ListPlus size={24} className="text-orange-500" /></div>
+               <span>ふたりで種目を追加</span>
+             </button>
+           </div>
         )}
       </div>
 
@@ -6289,7 +6237,7 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
             .hide-scrollbar::-webkit-scrollbar { display: none; }
             .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
           `}</style>
-          <div id="edit-workout-items-container" className="flex overflow-x-auto gap-3 sm:gap-4 pb-6 pt-8 -mx-4 px-4 hide-scrollbar items-start snap-x snap-mandatory">
+          <div id="edit-workout-items-container" className="flex overflow-x-auto gap-3 sm:gap-4 pb-6 pt-5 -mx-4 px-4 hide-scrollbar items-start snap-x snap-mandatory">
             {workoutItems.length === 0 ? (
               <div className="snap-center shrink-0 w-[88%] sm:w-[320px] flex flex-col justify-center h-full min-h-[200px]">
                 <button onClick={() => addExerciseItem(null)} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
@@ -6338,15 +6286,7 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
         <ReorderItemsModal 
           items={workoutItems} 
           onClose={() => setShowReorderModal(false)} 
-          onSave={(newItems) => { 
-            const newOrderIndices = newItems.map(item => workoutItems.findIndex(i => i.id === item.id));
-            setWorkoutItems(newItems); 
-            if (jointPartnerId) {
-               const newPItems = newOrderIndices.map(idx => partnerItems[idx] || null).filter(Boolean);
-               setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newPItems }, { merge: true });
-            }
-            setShowReorderModal(false); 
-          }}
+          onSave={(newItems) => { setWorkoutItems(newItems); setShowReorderModal(false); }}
         />
       )}
     </div>
@@ -7699,7 +7639,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.5, 14:03, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.5, 14:08, updated)</p>
       </div>
     </div>
   );
