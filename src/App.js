@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus, EyeOff, Bell, Download, CheckCircle, Handshake, MessageCircle, Send, Volume2, VolumeX, Music, ChevronLeft, ChevronRight, Search, MoreVertical, FileText } from 'lucide-react';
+import { Heart, Home, PlusCircle, Users, Dumbbell, LogOut, Activity, Flame, Lock, Settings, Trash2, Plus, X, ListPlus, MapPin, Clock, Play, Circle, Edit2, KeyRound, AlignLeft, Scale, Calendar as CalendarIcon, Zap, TrendingDown, Copy, Moon, Sun, Target, Trophy, ArrowUp, ArrowDown, Award, Droplet, Sparkles, GripVertical, UserPlus, EyeOff, Bell, Download, CheckCircle, Handshake, MessageCircle, Send, Volume2, VolumeX, Music, ChevronLeft, ChevronRight, Search, MoreVertical, FileText, AlertTriangle } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signInWithCredential } from 'firebase/auth';
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, enableIndexedDbPersistence, getDoc, deleteField, limit, query, orderBy, getDocs, where, documentId } from 'firebase/firestore';
@@ -3126,8 +3126,7 @@ if (timerState.y === 'top') {
 
   const handleDeleteAccount = async () => {
     if (!currentUser || !db) return;
-    if (!window.confirm("アカウントを完全に削除しますか？この操作は取り消せません。")) return;
-    if (!window.confirm("本当に削除しますか？すべてのトレーニング記録やフレンド関係が消失します。")) return;
+    if (!window.confirm("【最終確認】\n本当にアカウントを削除しますか？\nこの操作は取り消せません。")) return;
 
     try {
       const myPosts = posts.filter(p => p.author === currentUser);
@@ -3624,6 +3623,9 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
   const [notifyComment, setNotifyComment] = useState(userInfo?.notifyComment !== false);
   const [notifyLike, setNotifyLike] = useState(userInfo?.notifyLike !== false);
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteAgreed, setDeleteAgreed] = useState(false);
+
   const [cropImageSrc, setCropImageSrc] = useState(null);
   const [cropScale, setCropScale] = useState(1);
   const [cropPosition, setCropPosition] = useState({ x: 0, y: 0 });
@@ -3664,6 +3666,8 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
       setNotifyLike(userInfo?.notifyLike !== false);
       setCropImageSrc(null);
       setImageObj(null);
+      setShowDeleteConfirm(false);
+      setDeleteAgreed(false);
       if (typeof window !== 'undefined') {
         const checkModalPermission = async () => {
           let current = 'default';
@@ -3945,9 +3949,26 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
         </div>
         
         <div className="mt-8 pt-4 border-t border-slate-200 dark:border-slate-800">
-           <button onClick={onDeleteAccount} className="w-full bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-900 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 py-3 rounded-xl font-bold text-sm transition-colors">
-              アカウントを削除する
-           </button>
+           {!showDeleteConfirm ? (
+             <button onClick={() => setShowDeleteConfirm(true)} className="w-full bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-900 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 py-3 rounded-xl font-bold text-sm transition-colors">
+                アカウントを削除する
+             </button>
+           ) : (
+             <div className="bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 rounded-xl p-4 animate-in fade-in zoom-in-95 duration-200">
+               <h3 className="text-sm font-bold text-rose-600 dark:text-rose-400 mb-2 flex items-center gap-1.5"><AlertTriangle size={16}/> 本当に削除しますか？</h3>
+               <p className="text-xs font-bold text-rose-600/80 dark:text-rose-400/80 leading-relaxed mb-4">
+                 アカウントを削除すると、すべてのトレーニング記録、フレンド関係、画像データが完全に消去され、復元することはできません。
+               </p>
+               <label className="flex items-start gap-2 mb-4 cursor-pointer">
+                 <input type="checkbox" checked={deleteAgreed} onChange={(e) => setDeleteAgreed(e.target.checked)} className="mt-0.5 w-4 h-4 text-rose-600 rounded border-rose-300 focus:ring-rose-500" />
+                 <span className="text-xs font-bold text-rose-700 dark:text-rose-300">上記の内容を理解し、アカウントの完全削除に同意します。</span>
+               </label>
+               <div className="flex gap-2">
+                 <button onClick={() => { setShowDeleteConfirm(false); setDeleteAgreed(false); }} className="flex-1 py-2.5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold transition-colors hover:bg-slate-50 dark:hover:bg-slate-700">キャンセル</button>
+                 <button onClick={() => { setShowDeleteConfirm(false); setDeleteAgreed(false); onDeleteAccount(); }} disabled={!deleteAgreed} className="flex-1 py-2.5 bg-rose-600 text-white rounded-lg text-sm font-bold transition-colors disabled:opacity-50 shadow-sm hover:bg-rose-700">削除を実行する</button>
+               </div>
+             </div>
+           )}
         </div>
       </div>
     </div>
@@ -7185,7 +7206,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.5, 12:27, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.5, 12:29, updated)</p>
       </div>
     </div>
   );
