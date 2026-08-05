@@ -2450,6 +2450,40 @@ if (timerState.y === 'top') {
   }, [myInfo?.currentWorkoutItems, currentUser, isDraftLoaded]);
 
   useEffect(() => {
+    if (!currentUser || !myInfo?.jointPartnerId || !myInfo?.currentWorkoutItems || !isDraftLoaded) return;
+    const remoteItems = myInfo.currentWorkoutItems;
+    const localItems = draftWorkoutItems;
+    let needsUpdate = false;
+    if (remoteItems.length !== localItems.length) {
+       needsUpdate = true;
+    } else {
+       for (let i = 0; i < remoteItems.length; i++) {
+          const r = remoteItems[i];
+          const l = localItems[i];
+          if (r.id !== l.id || r.exerciseName !== l.exerciseName || r.category !== l.category || r.weightType !== l.weightType || r.superExerciseName !== l.superExerciseName || r.superWeightType !== l.superWeightType || r.superExerciseName3 !== l.superExerciseName3 || r.superWeightType3 !== l.superWeightType3) {
+             needsUpdate = true;
+             break;
+          }
+       }
+    }
+    if (needsUpdate) {
+       const newLocalItems = remoteItems.map((rItem, i) => {
+          const lItem = localItems.find(l => l.id === rItem.id) || localItems[i];
+          if (!lItem) return rItem;
+          return {
+             ...rItem,
+             memo: lItem.memo || '',
+             isSuperSet: lItem.isSuperSet || false,
+             isDropSet: lItem.isDropSet || false,
+             isForcedReps: lItem.isForcedReps || false,
+             sets: lItem.sets || []
+          };
+       });
+       setDraftWorkoutItems(newLocalItems);
+    }
+  }, [myInfo?.currentWorkoutItems, currentUser, isDraftLoaded]);
+
+  useEffect(() => {
     if (currentUser && db && isDraftLoaded) {
       try {
         if (draftWorkoutItems.length > 0 || selectedCategories.length > 0) {
@@ -5574,20 +5608,62 @@ ${importText}`;
     setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newItems }, { merge: true });
   };
 
-  const handleStartJointTraining = async (partnerId) => {
-    if (!window.confirm(`${accountsInfo[partnerId]?.displayName || partnerId}さんと合トレを開始しますか？\nお互いの記録がリアルタイムで同期されます。`)) return;
-    const pItems = accountsInfo[partnerId]?.currentWorkoutItems || [];
-    let mItems = workoutItems;
+  const handleRequestJointTraining = async (partnerId) => {
+    if (!window.confirm(`${accountsInfo[partnerId]?.displayName || partnerId}さんに合トレを申請しますか？`)) return;
+    const pData = accountsInfo[partnerId];
+    const reqs = pData?.jointRequests || [];
+    if (reqs.includes(currentUser)) { alert("申請済みです。"); return; }
+    try {
+       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', partnerId), { jointRequests: [...reqs, currentUser] }, { merge: true });
+       alert("合トレ申請を送信しました。");
+    } catch(e) {}
+  };
+
+  const handleAcceptJointTraining = async (requesterId) => {
+    const myReqs = myInfo.jointRequests || [];
+    const mItems = workoutItems;
+    const pItems = accountsInfo[requesterId]?.currentWorkoutItems || [];
     const maxLen = Math.max(mItems.length, pItems.length);
     const newMItems = [...mItems];
     const newPItems = [...pItems];
     for(let i=0; i<maxLen; i++) {
-      if(!newMItems[i]) newMItems[i] = { id: generateId(), exerciseName: newPItems[i]?.exerciseName || '', weightType: newPItems[i]?.weightType || 'total', category: newPItems[i]?.category || 'その他', sets: [{id: generateId(), weight:'', reps:''}] };
-      if(!newPItems[i]) newPItems[i] = { id: generateId(), exerciseName: newMItems[i]?.exerciseName || '', weightType: newMItems[i]?.weightType || 'total', category: newMItems[i]?.category || 'その他', sets: [{id: generateId(), weight:'', reps:''}] };
+      if(!newMItems[i]) newMItems[i] = { id: generateId(), exerciseName: newPItems[i]?.exerciseName || '', weightType: newPItems[i]?.weightType || 'total', category: newPItems[i]?.category || 'その他', isSuperSet: false, isDropSet: false, isForcedReps: false, memo: '', sets: [{id: generateId(), weight:'', reps:'', lReps:'', rReps:''}] };
+      if(!newPItems[i]) newPItems[i] = { id: generateId(), exerciseName: newMItems[i]?.exerciseName || '', weightType: newMItems[i]?.weightType || 'total', category: newMItems[i]?.category || 'その他', isSuperSet: false, isDropSet: false, isForcedReps: false, memo: '', sets: [{id: generateId(), weight:'', reps:'', lReps:'', rReps:''}] };
+      newMItems[i].id = newPItems[i].id = newMItems[i].id || newPItems[i].id || generateId();
     }
     setWorkoutItems(newMItems);
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { jointPartnerId: partnerId, currentWorkoutItems: newMItems }, { merge: true });
-    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', partnerId), { jointPartnerId: currentUser, currentWorkoutItems: newPItems }, { merge: true });
+
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { 
+         jointRequests: myReqs.filter(id => id !== requesterId),
+         jointPartnerId: requesterId,
+         currentWorkoutItems: newMItems
+      }, { merge: true });
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', requesterId), {
+         jointPartnerId: currentUser,
+         currentWorkoutItems: newPItems
+      }, { merge: true });
+      alert(`${accountsInfo[requesterId]?.displayName || requesterId}さんとの合トレを開始しました！`);
+    } catch(e) {}
+  };
+
+  const handleRejectJointTraining = async (requesterId) => {
+    const myReqs = myInfo.jointRequests || [];
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { 
+         jointRequests: myReqs.filter(id => id !== requesterId)
+      }, { merge: true });
+    } catch(e) {}
+  };
+
+  const handleEndJointTraining = async () => {
+    if (!window.confirm("合トレを解除しますか？\n互いの記録は保持されたまま、個別記録に戻ります。")) return;
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { jointPartnerId: null }, { merge: true });
+      if (jointPartnerId) {
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { jointPartnerId: null }, { merge: true });
+      }
+    } catch(e) {}
   };
 
   const addDropSet = (itemId, parentSetId, targetArray = 'dropSets') => {
@@ -5943,23 +6019,13 @@ ${importText}`;
                    <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-4 opacity-50 flex items-center justify-center min-h-[150px]"><span className="text-xs font-bold text-slate-400">相手の種目なし</span></div>
                  ) : null}
                  
-                 {!jointPartnerId && (
-                   <button onClick={() => addExerciseItem(index)} className="w-full py-3 bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 rounded-xl text-sm font-bold flex flex-col items-center justify-center gap-1 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm -mt-2">
-                     <ListPlus size={16} className="text-emerald-500" />
-                     <span>この次に種目を追加</span>
-                   </button>
-                 )}
+                 <button onClick={() => addExerciseItem(index)} className="w-full py-3 bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 rounded-xl text-sm font-bold flex flex-col items-center justify-center gap-1 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm -mt-2">
+                   <ListPlus size={16} className="text-emerald-500" />
+                   <span>この次に種目を追加</span>
+                 </button>
                </div>
              );
           })
-        )}
-        {jointPartnerId && (
-           <div className="snap-center shrink-0 w-[88%] sm:w-[320px] flex flex-col justify-center h-full min-h-[200px] pb-6">
-             <button onClick={() => addExerciseItem(null)} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
-               <div className="bg-white dark:bg-slate-800 p-3 rounded-full shadow-sm"><ListPlus size={24} className="text-orange-500" /></div>
-               <span>ふたりで種目を追加</span>
-             </button>
-           </div>
         )}
       </div>
 
@@ -7633,7 +7699,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.5, 14:00, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.5, 14:03, updated)</p>
       </div>
     </div>
   );
