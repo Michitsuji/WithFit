@@ -3287,6 +3287,17 @@ if (timerState.y === 'top') {
           .theme-pop .bg-slate-100, .theme-pop .bg-slate-800, .theme-pop .bg-slate-50 {
             background-color: #e0f2fe !important;
           }
+          .theme-pop .nav-primary-btn.inactive {
+            background-color: #0ea5e9 !important;
+            border-color: #ffffff !important;
+          }
+          .theme-pop .nav-primary-btn.active {
+            background-color: #ec4899 !important;
+            box-shadow: 0 10px 15px -3px rgba(236, 72, 153, 0.4) !important;
+          }
+          .theme-pop .nav-primary-label.active {
+            color: #ec4899 !important;
+          }
         `}</style>
       )}
       <header className="fixed top-0 left-0 right-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-30 shadow-sm flex flex-col transition-colors">
@@ -7206,7 +7217,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.5, 12:29, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.5, 12:31, updated)</p>
       </div>
     </div>
   );
@@ -7332,8 +7343,8 @@ function NavButton({ icon, label, isActive, onClick, isPrimary, isTraining }) {
   if (isPrimary) {
     return (
       <button onClick={onClick} className="flex flex-col items-center justify-center -mt-8 relative group">
-        <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 text-white ${isTraining ? 'bg-amber-500 shadow-amber-500/40 scale-110' : isActive ? 'bg-indigo-500 shadow-indigo-500/40 scale-110' : 'bg-slate-800 dark:bg-slate-700 border-4 border-white dark:border-slate-800 group-hover:bg-slate-700 dark:group-hover:bg-slate-600'}`}><div>{icon}</div></div>
-        <span className={`text-[10px] mt-1 font-bold transition-colors ${isTraining ? 'text-amber-500' : isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 dark:text-slate-400'}`}>{label}</span>
+        <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 text-white nav-primary-btn ${isTraining ? 'bg-amber-500 shadow-amber-500/40 scale-110 is-training' : isActive ? 'bg-indigo-500 shadow-indigo-500/40 scale-110 active' : 'bg-slate-800 dark:bg-slate-700 border-4 border-white dark:border-slate-800 group-hover:bg-slate-700 dark:group-hover:bg-slate-600 inactive'}`}><div>{icon}</div></div>
+        <span className={`text-[10px] mt-1 font-bold transition-colors nav-primary-label ${isTraining ? 'text-amber-500 is-training' : isActive ? 'text-indigo-600 dark:text-indigo-400 active' : 'text-slate-500 dark:text-slate-400 inactive'}`}>{label}</span>
       </button>
     );
   }
