@@ -43,6 +43,7 @@ try {
 }
 
 const MASTER_USER = 'ゆうた';
+let globalRecordHorizontalScroll = 0;
 
 const renderUsernameWithBadge = (username, displayName, accountsInfo, className = "font-bold text-slate-800 dark:text-slate-100 truncate") => {
   const isUserMaster = username === MASTER_USER;
@@ -4847,6 +4848,18 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const [aiErrorMsg, setAiErrorMsg] = useState(null);
   const [importProgress, setImportProgress] = useState(0);
 
+  const handleContainerRef = (node) => {
+    if (node) {
+      setTimeout(() => {
+        node.scrollTo({ left: globalRecordHorizontalScroll, behavior: 'auto' });
+      }, 50);
+    }
+  };
+
+  const handleScroll = (e) => {
+    globalRecordHorizontalScroll = e.target.scrollLeft;
+  };
+
   const round25 = (val) => Math.round(val / 2.5) * 2.5;
 
   const activeProgramsList = myInfo.activePrograms || (myInfo.activeProgram ? [myInfo.activeProgram] : []);
@@ -5289,12 +5302,14 @@ ${importText}`;
       } else {
          await onPost(gym ? gym.name : '不明なジム', workoutItems, Number(bodyWeight), Number(bodyFat));
       }
+      globalRecordHorizontalScroll = 0;
     } finally {
       setBodyWeight(''); setBodyFat(''); setIsSubmitting(false);
     }
   };
 
   const handleCancel = () => {
+      globalRecordHorizontalScroll = 0;
       if (isManual) {
           setWorkoutItems([]);
           setSelectedCategories([]);
@@ -5477,7 +5492,7 @@ ${importText}`;
           .hide-scrollbar::-webkit-scrollbar { display: none; }
           .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         `}</style>
-      <div id="workout-items-container" className="flex overflow-x-auto gap-3 sm:gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start snap-x snap-mandatory">
+      <div id="workout-items-container" ref={handleContainerRef} onScroll={handleScroll} className="flex overflow-x-auto gap-3 sm:gap-4 pb-6 pt-2 -mx-4 px-4 hide-scrollbar items-start snap-x snap-mandatory">
         {workoutItems.length === 0 ? (
           <div className="snap-center shrink-0 w-[88%] sm:w-[320px] flex flex-col justify-center h-full min-h-[200px]">
             <button onClick={() => addExerciseItem(null)} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
@@ -7163,7 +7178,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.4, 23:25, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.5, 12:23, updated)</p>
       </div>
     </div>
   );
