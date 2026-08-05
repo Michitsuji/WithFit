@@ -1165,7 +1165,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 }
 
 // --- 共通コンポーネント：ワークアウト入力フォーム ---
-function WorkoutItemForm({ item, index, availableExercises, updateItem, removeItem, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet, reorderSet, myPastPosts, onActive, isDragging, isAnyDragging, dragHandleProps }) {
+function WorkoutItemForm({ item, index, availableExercises, updateItem, removeItem, addSet, removeSet, updateSet, addDropSet, removeDropSet, updateDropSet, reorderSet, myPastPosts, onActive, isDragging, isAnyDragging, dragHandleProps, isPartnerCard }) {
   const [localFilters, setLocalFilters] = useState([]);
   const [draggedSetIndex, setDraggedSetIndex] = useState(null);
   const [dragOverSetIndex, setDragOverSetIndex] = useState(null);
@@ -1437,7 +1437,7 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-start gap-1.5 flex-1 min-w-0">
           <div className={`flex flex-col flex-1 min-w-0 gap-2 ${isConfirmed ? 'pointer-events-none opacity-60' : ''}`}>
-            {!isAnyDragging && (
+            {!isAnyDragging && !isPartnerCard && (
               <div className="flex flex-wrap bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg gap-1">
                 <button onClick={() => toggleFilter('gym')} disabled={isConfirmed} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilters.includes('gym') ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>マシン等</button>
                 <button onClick={() => toggleFilter('barbell')} disabled={isConfirmed} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilters.includes('barbell') ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>バーベル</button>
@@ -1446,18 +1446,28 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
               </div>
             )}
             <div className="relative w-full">
-              <select value={item.exerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, 0)} disabled={isConfirmed} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base pr-8" style={{ fontSize: '16px' }}>
-                <option value="" disabled>{filteredExercises.length === 0 ? (availableExercises.length === 0 ? "上の部位を選択してください" : "該当する種目がありません") : "種目を選択"}</option>
-                {item.exerciseName && !filteredExercises.some(ex => ex.name === item.exerciseName) && (
-                  <option value={item.exerciseName}>{item.exerciseName}</option>
-                )}
-                {filteredExercises.map(ex => <option key={ex.id} value={ex.name}>{ex.name}{ex.maker ? `（${ex.maker}）` : ''}</option>)}
-              </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
+              {isPartnerCard ? (
+                <div className="w-full bg-slate-100/50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50 rounded-xl px-3 py-2.5 text-slate-700 dark:text-slate-300 font-bold text-base">
+                  {item.exerciseName || "種目未選択"}
+                </div>
+              ) : (
+                <>
+                  <select value={item.exerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, 0)} disabled={isConfirmed} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base pr-8" style={{ fontSize: '16px' }}>
+                    <option value="" disabled>{filteredExercises.length === 0 ? (availableExercises.length === 0 ? "上の部位を選択してください" : "該当する種目がありません") : "種目を選択"}</option>
+                    {item.exerciseName && !filteredExercises.some(ex => ex.name === item.exerciseName) && (
+                      <option value={item.exerciseName}>{item.exerciseName}</option>
+                    )}
+                    {filteredExercises.map(ex => <option key={ex.id} value={ex.name}>{ex.name}{ex.maker ? `（${ex.maker}）` : ''}</option>)}
+                  </select>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
+                </>
+              )}
             </div>
           </div>
         </div>
-        <button onClick={() => removeItem(item.id)} disabled={isConfirmed} className={`ml-2 text-slate-400 hover:text-rose-500 p-2 flex-shrink-0 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors mt-2 ${isConfirmed ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''}`}><Trash2 size={18} /></button>
+        {!isPartnerCard && (
+          <button onClick={() => removeItem(item.id)} disabled={isConfirmed} className={`ml-2 text-slate-400 hover:text-rose-500 p-2 flex-shrink-0 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors mt-2 ${isConfirmed ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''}`}><Trash2 size={18} /></button>
+        )}
       </div>
 
       <div className={`transition-all overflow-hidden ${isAnyDragging ? 'h-0 opacity-0' : 'h-auto opacity-100'}`}>
@@ -1478,7 +1488,7 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
         </div>
       )}
 
-      {item.weightType !== 'cardio' && (
+      {item.weightType !== 'cardio' && !isPartnerCard && (
         <div className="flex gap-2 mb-5 overflow-x-auto scrollbar-hide py-1 pl-8">
           <button onClick={() => updateItem(item.id, { isSuperSet: !item.isSuperSet })} className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${item.isSuperSet ? 'bg-indigo-50 dark:bg-indigo-950 border-indigo-300 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>スーパー</button>
           <button onClick={() => updateItem(item.id, { isDropSet: !item.isDropSet })} className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${item.isDropSet ? 'bg-orange-50 dark:bg-orange-950 border-orange-300 dark:border-orange-800 text-orange-700 dark:text-orange-300' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>ドロップ</button>
@@ -1488,27 +1498,42 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
 
       {item.isSuperSet && item.weightType !== 'cardio' && (
         <div className="mb-5 pl-8 border-l-2 border-indigo-300 dark:border-indigo-600 space-y-3">
-          <div className="relative w-full">
-            <select value={item.superExerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, 2)} className="w-full bg-indigo-50/30 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold appearance-none focus:outline-none focus:border-indigo-500 text-base pr-8" style={{ fontSize: '16px' }}>
-              <option value="" disabled>スーパーセットの種目 (2種目目)</option>
-              {item.superExerciseName && !filteredExercises.some(ex => ex.name === item.superExerciseName) && (
-                <option value={item.superExerciseName}>{item.superExerciseName}</option>
+          {isPartnerCard ? (
+            <>
+              <div className="w-full bg-indigo-50/20 dark:bg-indigo-950/20 border border-indigo-100/50 dark:border-indigo-800/50 rounded-lg px-3 py-2 text-indigo-700 dark:text-indigo-300 font-bold text-base">
+                {item.superExerciseName || 'スーパーセット(未選択)'}
+              </div>
+              {item.superExerciseName3 && (
+                <div className="w-full bg-indigo-50/20 dark:bg-indigo-950/20 border border-indigo-100/50 dark:border-indigo-800/50 rounded-lg px-3 py-2 text-indigo-700 dark:text-indigo-300 font-bold text-base">
+                  {item.superExerciseName3 || 'ジャイアントセット(未選択)'}
+                </div>
               )}
-              {filteredExercises.filter(ex => ex.weightType !== 'cardio').map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
-            </select>
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-300 pointer-events-none text-xs">▼</div>
-          </div>
-          {item.superExerciseName && (
-            <div className="relative w-full">
-              <select value={item.superExerciseName3 || ''} onChange={(e) => updateExerciseName(e.target.value, 3)} className="w-full bg-indigo-50/30 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold appearance-none focus:outline-none focus:border-indigo-500 text-base pr-8" style={{ fontSize: '16px' }}>
-                <option value="">ジャイアントセット (3種目目・任意)</option>
-                {item.superExerciseName3 && !filteredExercises.some(ex => ex.name === item.superExerciseName3) && (
-                  <option value={item.superExerciseName3}>{item.superExerciseName3}</option>
-                )}
-                {filteredExercises.filter(ex => ex.weightType !== 'cardio').map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
-              </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-300 pointer-events-none text-xs">▼</div>
-            </div>
+            </>
+          ) : (
+            <>
+              <div className="relative w-full">
+                <select value={item.superExerciseName || ''} onChange={(e) => updateExerciseName(e.target.value, 2)} className="w-full bg-indigo-50/30 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold appearance-none focus:outline-none focus:border-indigo-500 text-base pr-8" style={{ fontSize: '16px' }}>
+                  <option value="" disabled>スーパーセットの種目 (2種目目)</option>
+                  {item.superExerciseName && !filteredExercises.some(ex => ex.name === item.superExerciseName) && (
+                    <option value={item.superExerciseName}>{item.superExerciseName}</option>
+                  )}
+                  {filteredExercises.filter(ex => ex.weightType !== 'cardio').map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
+                </select>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-300 pointer-events-none text-xs">▼</div>
+              </div>
+              {item.superExerciseName && (
+                <div className="relative w-full">
+                  <select value={item.superExerciseName3 || ''} onChange={(e) => updateExerciseName(e.target.value, 3)} className="w-full bg-indigo-50/30 dark:bg-indigo-950/50 border border-indigo-100 dark:border-indigo-800 rounded-lg px-3 py-2 text-indigo-800 dark:text-indigo-300 font-bold appearance-none focus:outline-none focus:border-indigo-500 text-base pr-8" style={{ fontSize: '16px' }}>
+                    <option value="">ジャイアントセット (3種目目・任意)</option>
+                    {item.superExerciseName3 && !filteredExercises.some(ex => ex.name === item.superExerciseName3) && (
+                      <option value={item.superExerciseName3}>{item.superExerciseName3}</option>
+                    )}
+                    {filteredExercises.filter(ex => ex.weightType !== 'cardio').map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
+                  </select>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-300 pointer-events-none text-xs">▼</div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
@@ -1648,6 +1673,7 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
       </div>
       </div>
       
+      {!isPartnerCard && (
       <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
         <button
           onClick={() => updateItem(item.id, { isConfirmed: !item.isConfirmed })}
@@ -1660,6 +1686,7 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
           {isConfirmed ? <><Edit2 size={18} /> 編集に戻す</> : <><CheckCircle size={18} /> この種目を確定する</>}
         </button>
       </div>
+      )}
 
       </div>
     </div>
@@ -4900,6 +4927,8 @@ function RecordView({ onStart, onPost, onCancel, myInfo, gyms, exercises, workou
   const joinedGyms = myInfo.joinedGyms || ['common'];
   const jointPartnerId = myInfo.jointPartnerId;
   const partnerItems = jointPartnerId ? (accountsInfo[jointPartnerId]?.currentWorkoutItems || []) : [];
+  const jointPartnerId = myInfo.jointPartnerId;
+  const partnerItems = jointPartnerId ? (accountsInfo[jointPartnerId]?.currentWorkoutItems || []) : [];
   const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (gyms.filter(g => joinedGyms.includes(g.id) && g.id !== 'common')[0]?.id || ''));
   const [showReorderModal, setShowReorderModal] = useState(false);
   const [showProgramModal, setShowProgramModal] = useState(false);
@@ -5234,7 +5263,33 @@ ${importText}`;
     }
   };
 
-  const updateItem = (itemId, data) => { setWorkoutItems(prev => prev.map(item => item.id === itemId ? { ...item, ...data } : item)); };
+  const saveMyItemsToDB = (items) => {
+    if (jointPartnerId) {
+      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { currentWorkoutItems: items }, { merge: true });
+    }
+  };
+
+  const updateItem = (itemId, data) => {
+    setWorkoutItems(prev => {
+      const newItems = prev.map(item => item.id === itemId ? { ...item, ...data } : item);
+      saveMyItemsToDB(newItems);
+      return newItems;
+    });
+    if (jointPartnerId) {
+       const index = workoutItems.findIndex(i => i.id === itemId);
+       if (index !== -1 && partnerItems[index]) {
+          const syncData = { ...data };
+          delete syncData.sets;
+          delete syncData.isConfirmed;
+          delete syncData.memo;
+          if (Object.keys(syncData).length > 0) {
+             const newPItems = [...partnerItems];
+             newPItems[index] = { ...newPItems[index], ...syncData };
+             setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newPItems }, { merge: true });
+          }
+       }
+    }
+  };
   
   const addExerciseItem = (insertAfterIndex = null, defaultName = '') => {
     const defaultEx = availableExercises.find(ex => ex.name === defaultName);
@@ -7449,7 +7504,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.5, 13:23, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.5, 13:31, updated)</p>
       </div>
     </div>
   );
