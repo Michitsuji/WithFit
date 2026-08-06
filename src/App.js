@@ -4530,14 +4530,21 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
 
   const handleMonthChange = (direction) => {
     let offset = 0;
+    let scrollParent = window;
     if (calendarCardRef.current) {
       offset = calendarCardRef.current.getBoundingClientRect().top;
+      const modal = calendarCardRef.current.closest('.overflow-y-auto');
+      if (modal) scrollParent = modal;
     }
     setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + direction, 1));
     setTimeout(() => {
       if (calendarCardRef.current) {
          const newOffset = calendarCardRef.current.getBoundingClientRect().top;
-         window.scrollBy(0, newOffset - offset);
+         if (scrollParent === window) {
+            window.scrollBy(0, newOffset - offset);
+         } else {
+            scrollParent.scrollTop += (newOffset - offset);
+         }
       }
     }, 0);
   };
@@ -7639,7 +7646,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.5, 14:08, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.6, 09:52, updated)</p>
       </div>
     </div>
   );
