@@ -1053,7 +1053,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 
               return (
                 <div key={comment.id} className="flex gap-2.5">
-                  <UserAvatar userId={comment.author} accountsInfo={accountsInfo} size={32} className="mt-1" onClick={onUserClick} />
+                  <UserAvatar userId={comment.author} accountsInfo={accountsInfo} size={32} className="mt-1" />
                   <div className="flex-1 group min-w-0">
                     <div className="flex items-stretch gap-2">
                       <div className="bg-slate-50 dark:bg-slate-950/50 p-2.5 rounded-2xl rounded-tl-none border border-slate-100 dark:border-slate-800 relative inline-block max-w-[85%]">
@@ -1173,8 +1173,8 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                   const uInfo = accountsInfo && accountsInfo[u];
                   return (
                     <div key={u} className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-xl transition-colors">
-                      <UserAvatar userId={u} accountsInfo={accountsInfo} size={40} onClick={(uid) => { if (onUserClick) { onUserClick(uid); setShowLikesModal(false); } }} />
-                      <span className={`font-bold text-slate-800 dark:text-slate-200 text-sm ${onUserClick ? 'cursor-pointer hover:underline' : ''}`} onClick={(e) => { e.stopPropagation(); if (onUserClick) { onUserClick(u); setShowLikesModal(false); } }}>{uInfo?.displayName || u}</span>
+                      <UserAvatar userId={u} accountsInfo={accountsInfo} size={40} />
+                      <span className="font-bold text-slate-800 dark:text-slate-200 text-sm">{uInfo?.displayName || u}</span>
                     </div>
                   );
                 })
@@ -3516,7 +3516,7 @@ if (timerState.y === 'top') {
                      return (
                        <div key={notif.id} onClick={() => handleNotificationClick(notif)} className={`flex gap-3 items-center p-2 rounded-xl cursor-pointer transition-colors ${isUnread ? 'bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-100/50 dark:hover:bg-emerald-950/40' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                           <div className="relative shrink-0 mt-0.5">
-                             <UserAvatar userId={notif.fromUser} accountsInfo={accountsInfo} size={36} onClick={setSelectedUserProfile} className="border-transparent" />
+                             <UserAvatar userId={notif.fromUser} accountsInfo={accountsInfo} size={36} className="border-transparent" />
                              {notif.type === 'like' && (
                                 <div className="absolute -bottom-0.5 -right-0.5 bg-rose-500 text-white w-4 h-4 rounded-full flex items-center justify-center border-[1.5px] border-white dark:border-slate-900 shadow-sm">
                                    <Heart size={7} fill="currentColor" />
@@ -3649,8 +3649,8 @@ if (timerState.y === 'top') {
           </div>
         )}
         {currentTab === 'timeline' && <TimelineView posts={visiblePosts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} scrollToPostId={scrollToPostId} setScrollToPostId={setScrollToPostId} />}
-        {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} currentUser={currentUser} myInfo={myInfo} setCurrentTab={setCurrentTab} onSendRequest={handleSendFriendRequest} />}
-        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} onRequestJointTraining={handleRequestJointTraining} onAcceptJointTraining={handleAcceptJointTraining} onRejectJointTraining={handleRejectJointTraining} onCancelJointTraining={handleCancelJointTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} onUserClick={setSelectedUserProfile} />}
+        {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} currentUser={currentUser} myInfo={myInfo} setCurrentTab={setCurrentTab} onSendRequest={handleSendFriendRequest} onUserClick={setSelectedUserProfile} />}
+        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} onRequestJointTraining={handleRequestJointTraining} onAcceptJointTraining={handleAcceptJointTraining} onRejectJointTraining={handleRejectJointTraining} onCancelJointTraining={handleCancelJointTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} />}
         {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onSendPartnerRequest={handleSendPartnerRequest} onAcceptPartnerRequest={handleAcceptPartnerRequest} onRejectPartnerRequest={handleRejectPartnerRequest} onRemovePartner={handleRemovePartner} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} posts={posts} targetFriendTab={targetFriendTab} setTargetFriendTab={setTargetFriendTab} onSendTestPush={async (targetUser, message) => {
           if (!db) return;
@@ -3746,7 +3746,7 @@ if (timerState.y === 'top') {
       )}
 
       <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} userInfo={myInfo} onSave={handleSaveProfile} currentUser={currentUser} onLinkGoogle={handleLinkGoogle} onDeleteAccount={handleDeleteAccount} onTogglePush={handleTogglePushPermission} />
-      <UserProfileModal isOpen={!!selectedUserProfile} onClose={() => setSelectedUserProfile(null)} targetUser={selectedUserProfile} accountsInfo={accountsInfo} currentUser={currentUser} onSendRequest={handleSendFriendRequest} onUserClick={setSelectedUserProfile} />
+      <UserProfileModal isOpen={!!selectedUserProfile} onClose={() => setSelectedUserProfile(null)} targetUser={selectedUserProfile} accountsInfo={accountsInfo} currentUser={currentUser} onSendRequest={handleSendFriendRequest} />
     </div>
   );
 }
@@ -4133,7 +4133,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
 }
 
 // --- ユーザープロフィールモーダル ---
-function UserProfileModal({ isOpen, onClose, targetUser, accountsInfo, currentUser, onSendRequest, onUserClick }) {
+function UserProfileModal({ isOpen, onClose, targetUser, accountsInfo, currentUser, onSendRequest }) {
   const [view, setView] = useState('profile');
 
   useEffect(() => {
@@ -4199,8 +4199,8 @@ function UserProfileModal({ isOpen, onClose, targetUser, accountsInfo, currentUs
                   return (
                     <div key={fId} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
                       <div className="flex items-center gap-3">
-                        <UserAvatar userId={fId} accountsInfo={accountsInfo} size={40} onClick={onUserClick} />
-                        <span className={`font-bold text-slate-800 dark:text-slate-200 text-sm truncate ${onUserClick ? 'cursor-pointer hover:underline' : ''}`} onClick={() => onUserClick && onUserClick(fId)}>{fInfo?.displayName || fId}</span>
+                        <UserAvatar userId={fId} accountsInfo={accountsInfo} size={40} />
+                        <span className="font-bold text-slate-800 dark:text-slate-200 text-sm truncate">{fInfo?.displayName || fId}</span>
                       </div>
                       {!isMe && !isMyFriend && !hasRequested && (
                         <button onClick={() => onSendRequest(fId)} className="shrink-0 text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition-colors">
@@ -4375,7 +4375,7 @@ function TimelineView({ posts, onToggleLike, onImport, currentUser, onDelete, on
 }
 
 // --- 月間レポートコンポーネント ---
-function MonthlyReport({ monthDate, posts, userName, accountsInfo, onUserClick }) {
+function MonthlyReport({ monthDate, posts, userName, accountsInfo }) {
   const year = monthDate.getFullYear();
   const month = monthDate.getMonth();
   const monthPosts = posts.filter(p => {
@@ -4410,8 +4410,8 @@ function MonthlyReport({ monthDate, posts, userName, accountsInfo, onUserClick }
   return (
     <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm animate-in fade-in">
       <div className="flex items-center gap-3 mb-5">
-         <UserAvatar userId={userName} accountsInfo={accountsInfo} size={32} onClick={onUserClick} />
-         <h3 className={`font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1 ${onUserClick ? 'cursor-pointer hover:underline' : ''}`} onClick={() => onUserClick && onUserClick(userName)}>{renderUsernameWithBadge(userName, accountsInfo[userName]?.displayName, accountsInfo, "font-bold text-slate-800 dark:text-slate-100")} のレポート</h3>
+         <UserAvatar userId={userName} accountsInfo={accountsInfo} size={32} />
+         <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1">{renderUsernameWithBadge(userName, accountsInfo[userName]?.displayName, accountsInfo, "font-bold text-slate-800 dark:text-slate-100")} のレポート</h3>
       </div>
       
       {!hasData ? (
@@ -4718,7 +4718,7 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
 
       <div>
         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">月間レポート ({month + 1}月)</h3>
-        <MonthlyReport monthDate={currentMonth} posts={posts} userName={displayUser} accountsInfo={accountsInfo} onUserClick={onUserClick} />
+        <MonthlyReport monthDate={currentMonth} posts={posts} userName={displayUser} accountsInfo={accountsInfo} />
       </div>
 
       <div ref={calendarCardRef} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
@@ -5007,7 +5007,7 @@ function ActiveProgramDisplay({ program, onApply, onToggleComplete, onDelete }) 
   );
 }
 
-function RecordView({ onStart, onPost, onCancel, onRequestJointTraining, onAcceptJointTraining, onRejectJointTraining, onCancelJointTraining, myInfo, gyms, exercises, workoutItems, setWorkoutItems, selectedCategories, setSelectedCategories, posts, currentUser, isManual, setIsManual, onActiveExerciseChange, accountsInfo, onUserClick }) {
+function RecordView({ onStart, onPost, onCancel, onRequestJointTraining, onAcceptJointTraining, onRejectJointTraining, onCancelJointTraining, myInfo, gyms, exercises, workoutItems, setWorkoutItems, selectedCategories, setSelectedCategories, posts, currentUser, isManual, setIsManual, onActiveExerciseChange, accountsInfo }) {
   const joinedGyms = myInfo.joinedGyms || ['common'];
   const jointPartnerId = myInfo.jointPartnerId;
   const partnerItems = jointPartnerId ? (accountsInfo[jointPartnerId]?.currentWorkoutItems || []) : [];
@@ -5854,8 +5854,8 @@ ${importText}`;
                        {myInfo.jointTrainingRequests.map(reqId => (
                           <div key={reqId} className="flex items-center justify-between bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 p-2 rounded-xl shadow-sm">
                              <div className="flex items-center gap-2">
-                               <UserAvatar userId={reqId} accountsInfo={accountsInfo} size={24} onClick={onUserClick} className="border-transparent" />
-                               <span className={`text-sm font-bold text-slate-800 dark:text-slate-100 ${onUserClick ? 'cursor-pointer hover:underline' : ''}`} onClick={() => onUserClick && onUserClick(reqId)}>{accountsInfo[reqId]?.displayName || reqId}</span>
+                               <UserAvatar userId={reqId} accountsInfo={accountsInfo} size={24} className="border-transparent" />
+                               <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{accountsInfo[reqId]?.displayName || reqId}</span>
                              </div>
                              <div className="flex gap-1">
                                <button onClick={() => onAcceptJointTraining(reqId)} className="bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm">承諾</button>
@@ -6460,7 +6460,7 @@ function ExerciseChartModal({ exercise, posts, accountsInfo, onClose, currentUse
 }
 
 // --- 種目・ジム管理画面 ---
-function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myInfo, setCurrentTab, onSendRequest }) {
+function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myInfo, setCurrentTab, onSendRequest, onUserClick }) {
   const isAdmin = currentUser === MASTER_USER;
   const joinedGyms = myInfo?.joinedGyms || ['common'];
   const mutedExercises = myInfo?.mutedExercises || [];
@@ -7664,7 +7664,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.6, 10:02, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.6, 10:08, updated)</p>
       </div>
     </div>
   );
