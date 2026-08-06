@@ -2820,6 +2820,26 @@ if (timerState.y === 'top') {
     }
   };
 
+  const handleSecretLogin = async (friendCode, birthDate) => {
+    if (!db || !friendCode || !birthDate) return false;
+    try {
+      const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'accounts'), where('friendCode', '==', friendCode), limit(1));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const userData = snap.docs[0].data();
+        if (userData.birthDate === birthDate) {
+          const username = snap.docs[0].id;
+          setCurrentUser(username);
+          localStorage.setItem('withfit_login_session', JSON.stringify({ userId: username, lastActive: Date.now() }));
+          const joinedGyms = userData.joinedGyms || ['common'];
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username), { lastActive: Date.now(), isAppOnline: true, joinedGyms }, { merge: true });
+          return true;
+        }
+      }
+      return false;
+    } catch (e) { return false; }
+  };
+
   const handleLogout = async () => { 
     if (!window.confirm("ログアウトしますか？")) return;
     if (currentUser && db) {
@@ -3382,7 +3402,7 @@ if (timerState.y === 'top') {
   }
 
   if (!currentUser) {
-    return <LoginScreen onLogin={handleLogin} onGoogleLogin={handleGoogleLogin} isOnline={isOnline} />;
+    return <LoginScreen onLogin={handleLogin} onGoogleLogin={handleGoogleLogin} onSecretLogin={handleSecretLogin} isOnline={isOnline} />;
   }
 
   const myFriends = myInfo.friends || [];
@@ -4240,8 +4260,34 @@ function UserProfileModal({ isOpen, onClose, targetUser, accountsInfo, currentUs
 }
 
 // --- ログイン・登録画面 ---
-function LoginScreen({ onLogin, onGoogleLogin, isOnline }) {
+function LoginScreen({ onLogin, onGoogleLogin, onSecretLogin, isOnline }) {
   const [agreed, setAgreed] = useState(false);
+  const [secretTapCount, setSecretTapCount] = useState(0);
+  const [showSecretLogin, setShowSecretLogin] = useState(false);
+  const [secretCode, setSecretCode] = useState('');
+  const [secretBirthDate, setSecretBirthDate] = useState('');
+  const [secretError, setSecretError] = useState('');
+  const [isSecretSubmitting, setIsSecretSubmitting] = useState(false);
+  
+  const handleOnlineTap = () => {
+    const newCount = secretTapCount + 1;
+    setSecretTapCount(newCount);
+    if (newCount >= 10) {
+      setShowSecretLogin(true);
+      setSecretTapCount(0);
+    }
+  };
+
+  const handleSecretSubmit = async (e) => {
+    e.preventDefault();
+    setIsSecretSubmitting(true);
+    setSecretError('');
+    const success = await onSecretLogin(secretCode, secretBirthDate);
+    if (!success) {
+      setSecretError('フレンドコードまたは生年月日が正しくありません。');
+    }
+    setIsSecretSubmitting(false);
+  };
 
   const termsText = `【WithFit 利用規約】
 本アプリは「ゆうた」とその友人達でトレーニング記録を共有し、モチベーションを高め合うクローズドな個人開発アプリです。友達同士で安心して使えるよう、以下の内容をご確認ください。
@@ -4261,7 +4307,7 @@ function LoginScreen({ onLogin, onGoogleLogin, isOnline }) {
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-slate-50 flex flex-col items-center justify-center p-6 relative overscroll-none touch-none">
-      <div className="absolute top-6 left-6 z-10 flex items-center gap-1.5 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full border border-slate-200 shadow-sm">
+      <div onClick={handleOnlineTap} className="absolute top-6 left-6 z-10 flex items-center gap-1.5 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full border border-slate-200 shadow-sm cursor-pointer select-none">
         <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-[#10b981] shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`}></div>
         <span className="text-[10px] font-bold text-slate-500">{isOnline ? 'オンライン' : 'オフライン'}</span>
       </div>
@@ -4272,50 +4318,73 @@ function LoginScreen({ onLogin, onGoogleLogin, isOnline }) {
           <p className="text-sm text-slate-500 font-bold mt-1">みんなで鍛える、記録アプリ</p>
         </div>
         <div className="w-full bg-white p-6 rounded-3xl border border-slate-200 shadow-xl flex flex-col items-center">
-           <div className="w-full mb-4">
-             <div className="text-[10px] text-slate-500 bg-slate-50 border border-slate-100 rounded-xl p-3 h-28 overflow-y-auto whitespace-pre-wrap leading-relaxed select-text font-bold">
-               {termsText}
-             </div>
-             <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
-               <input 
-                 type="checkbox" 
-                 checked={agreed} 
-                 onChange={(e) => setAgreed(e.target.checked)} 
-                 className="w-4 h-4 text-emerald-500 rounded border-slate-300 focus:ring-emerald-500" 
-               />
-               <span className="text-xs font-bold text-slate-600">利用規約に同意する</span>
-             </label>
-             <div className="mt-4">
-               <AdBanner />
-             </div>
-           </div>
-           <button 
-             disabled={!agreed}
-             onClick={() => { 
-               const isWebView = typeof window !== 'undefined' && window.ReactNativeWebView;
-               if (isWebView) {
-                 window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'REQUEST_GOOGLE_LOGIN' }));
-               } else {
-                 const provider = new GoogleAuthProvider(); 
-                 provider.setCustomParameters({ prompt: 'select_account' }); 
-                 if (navigator.userAgent.includes('Edg')) {
-                   signInWithRedirect(getAuth(), provider);
-                 } else {
-                   signInWithPopup(getAuth(), provider).then((result) => { 
-                     onGoogleLogin(result.user); 
-                   }).catch((err) => {
-                     console.error(err);
-                     if (err.code !== 'auth/popup-closed-by-user') {
+           {!showSecretLogin ? (
+             <>
+               <div className="w-full mb-4">
+                 <div className="text-[10px] text-slate-500 bg-slate-50 border border-slate-100 rounded-xl p-3 h-28 overflow-y-auto whitespace-pre-wrap leading-relaxed select-text font-bold">
+                   {termsText}
+                 </div>
+                 <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
+                   <input 
+                     type="checkbox" 
+                     checked={agreed} 
+                     onChange={(e) => setAgreed(e.target.checked)} 
+                     className="w-4 h-4 text-emerald-500 rounded border-slate-300 focus:ring-emerald-500" 
+                   />
+                   <span className="text-xs font-bold text-slate-600">利用規約に同意する</span>
+                 </label>
+                 <div className="mt-4">
+                   <AdBanner />
+                 </div>
+               </div>
+               <button 
+                 disabled={!agreed}
+                 onClick={() => { 
+                   const isWebView = typeof window !== 'undefined' && window.ReactNativeWebView;
+                   if (isWebView) {
+                     window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'REQUEST_GOOGLE_LOGIN' }));
+                   } else {
+                     const provider = new GoogleAuthProvider(); 
+                     provider.setCustomParameters({ prompt: 'select_account' }); 
+                     if (navigator.userAgent.includes('Edg')) {
                        signInWithRedirect(getAuth(), provider);
+                     } else {
+                       signInWithPopup(getAuth(), provider).then((result) => { 
+                         onGoogleLogin(result.user); 
+                       }).catch((err) => {
+                         console.error(err);
+                         if (err.code !== 'auth/popup-closed-by-user') {
+                           signInWithRedirect(getAuth(), provider);
+                         }
+                       }); 
                      }
-                   }); 
-                 }
-               }
-             }} 
-             className={`w-full font-bold py-3 rounded-xl shadow-sm flex items-center justify-center gap-2 transition-colors border ${agreed ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'}`}
-           > 
-             Googleでログイン / 登録
-           </button>
+                   }
+                 }} 
+                 className={`w-full font-bold py-3 rounded-xl shadow-sm flex items-center justify-center gap-2 transition-colors border ${agreed ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'}`}
+               > 
+                 Googleでログイン / 登録
+               </button>
+             </>
+           ) : (
+             <form onSubmit={handleSecretSubmit} className="w-full space-y-4">
+               <h3 className="font-bold text-slate-800 text-center mb-2">直接ログイン</h3>
+               {secretError && <p className="text-xs font-bold text-rose-500 bg-rose-50 p-2 rounded-lg text-center">{secretError}</p>}
+               <div>
+                 <label className="block text-xs font-bold text-slate-500 mb-1">フレンドコード</label>
+                 <input type="text" value={secretCode} onChange={e => setSecretCode(e.target.value)} required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500" />
+               </div>
+               <div>
+                 <label className="block text-xs font-bold text-slate-500 mb-1">生年月日</label>
+                 <input type="date" value={secretBirthDate} onChange={e => setSecretBirthDate(e.target.value)} required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-indigo-500" />
+               </div>
+               <button type="submit" disabled={isSecretSubmitting} className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-sm transition-colors mt-2">
+                 {isSecretSubmitting ? 'ログイン中...' : 'ログイン'}
+               </button>
+               <button type="button" onClick={() => setShowSecretLogin(false)} className="w-full text-slate-500 font-bold py-3 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors mt-2">
+                 戻る
+               </button>
+             </form>
+           )}
         </div>
       </div>
     </div>
@@ -7627,7 +7696,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.6, 10:19, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.6, 11:06, updated)</p>
       </div>
     </div>
   );
