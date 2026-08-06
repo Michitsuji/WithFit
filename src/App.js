@@ -1854,6 +1854,41 @@ function useAutoScrollDisable() {
   }, []);
 }
 
+function ToggleSwitch({ label, checked, onChange }) {
+  return (
+    <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-lg">
+      <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{label}</span>
+      <label className="relative inline-flex items-center cursor-pointer">
+        <input type="checkbox" checked={checked} onChange={onChange} className="sr-only peer" />
+        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-emerald-500"></div>
+      </label>
+    </div>
+  );
+}
+
+function CategoryFilterGrid({ selectedCategories, toggleCategory }) {
+  return (
+    <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-6">
+      {MUSCLE_CATEGORIES.map(cat => {
+        const isSelected = selectedCategories.includes(cat);
+        return <button key={cat} onClick={() => toggleCategory(cat)} className={`py-2.5 px-1 rounded-xl text-sm font-bold transition-all border ${getCategoryTabColor(cat, isSelected)}`}>{cat}</button>;
+      })}
+    </div>
+  );
+}
+
+function FormInput({ label, type, value, onChange, placeholder, unit, className = "" }) {
+  return (
+    <div className={`min-w-0 overflow-hidden w-full ${className}`}>
+      {label && <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">{label}</label>}
+      <div className="relative">
+        <input type={type} inputMode={type === 'number' ? 'decimal' : undefined} step={type === 'number' ? '0.1' : undefined} value={value} onChange={onChange} placeholder={placeholder} className={`w-full max-w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2 sm:px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 box-border ${unit ? 'pr-8' : ''}`} style={{ fontSize: '16px' }} />
+        {unit && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">{unit}</span>}
+      </div>
+    </div>
+  );
+}
+
 // === メインアプリケーション ===
 export default function App() {
   useAutoScrollDisable();
@@ -4064,27 +4099,9 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
             )}
             
             <div className={`space-y-3 ${(osPermission === 'denied' || (!isPushEnabled && osPermission === 'default')) ? 'opacity-50 pointer-events-none' : ''}`}>
-              <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-lg">
-                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">フレンドのトレーニング完了</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" checked={notifyPost} onChange={e => setNotifyPost(e.target.checked)} className="sr-only peer" />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-emerald-500"></div>
-                </label>
-              </div>
-              <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-lg">
-                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">コメントの受信</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" checked={notifyComment} onChange={e => setNotifyComment(e.target.checked)} className="sr-only peer" />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-emerald-500"></div>
-                </label>
-              </div>
-              <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 rounded-lg">
-                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">ナイス！の受信</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" checked={notifyLike} onChange={e => setNotifyLike(e.target.checked)} className="sr-only peer" />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-emerald-500"></div>
-                </label>
-              </div>
+              <ToggleSwitch label="フレンドのトレーニング完了" checked={notifyPost} onChange={e => setNotifyPost(e.target.checked)} />
+              <ToggleSwitch label="コメントの受信" checked={notifyComment} onChange={e => setNotifyComment(e.target.checked)} />
+              <ToggleSwitch label="ナイス！の受信" checked={notifyLike} onChange={e => setNotifyLike(e.target.checked)} />
               <p className="text-[10px] text-slate-400 font-bold mt-2">※すべての通知を完全に停止する場合は、iPhoneの設定アプリから通知をオフにしてください。</p>
             </div>
           </div>
@@ -5700,23 +5717,11 @@ ${importText}`;
        <div className="space-y-6 animate-in fade-in duration-300">
           <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">体重・体脂肪率を記録</h2>
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-4">
-             <div className="min-w-0 overflow-hidden w-full">
-               <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">日付</label>
-               <input type="date" value={manualDate} onChange={e => setManualDate(e.target.value)} className="w-full max-w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2 sm:px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 box-border" style={{ fontSize: '16px' }} />
-             </div>
-             <div className="min-w-0 overflow-hidden w-full">
-               <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">時間</label>
-               <input type="time" value={manualStartTime} onChange={e => setManualStartTime(e.target.value)} className="w-full max-w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2 sm:px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 box-border" style={{ fontSize: '16px' }} />
-             </div>
+             <FormInput label="日付" type="date" value={manualDate} onChange={e => setManualDate(e.target.value)} />
+             <FormInput label="時間" type="time" value={manualStartTime} onChange={e => setManualStartTime(e.target.value)} />
              <div className="flex gap-4 pt-2">
-               <div className="flex-1 relative">
-                 <input type="number" inputMode="decimal" step="0.1" value={bodyWeight} onChange={(e) => setBodyWeight(e.target.value)} placeholder="体重" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }}/>
-                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">kg</span>
-               </div>
-               <div className="flex-1 relative">
-                 <input type="number" inputMode="decimal" step="0.1" value={bodyFat} onChange={(e) => setBodyFat(e.target.value)} placeholder="体脂肪率" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }}/>
-                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">%</span>
-               </div>
+               <FormInput type="number" value={bodyWeight} onChange={(e) => setBodyWeight(e.target.value)} placeholder="体重" unit="kg" className="flex-1" />
+               <FormInput type="number" value={bodyFat} onChange={(e) => setBodyFat(e.target.value)} placeholder="体脂肪率" unit="%" className="flex-1" />
              </div>
              <button onClick={handleMetricsOnlySubmit} disabled={isSubmitting || (!bodyWeight && !bodyFat)} className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-md mt-6 transition-colors disabled:opacity-50 flex justify-center items-center gap-2">
                {isSubmitting ? <Activity className="animate-spin" size={20} /> : <><Scale size={18} /> 記録を保存する</>}
@@ -5810,19 +5815,10 @@ ${importText}`;
                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">▼</div>
              </div>
            </div>
-           <div className="min-w-0 overflow-hidden w-full">
-             <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">日付</label>
-             <input type="date" value={manualDate} onChange={e => setManualDate(e.target.value)} className="w-full max-w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-2 sm:px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 box-border" style={{ fontSize: '16px' }} />
-           </div>
+           <FormInput label="日付" type="date" value={manualDate} onChange={e => setManualDate(e.target.value)} />
            <div className="flex gap-2 sm:gap-3 w-full">
-             <div className="flex-1 min-w-0 overflow-hidden">
-               <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">開始時間</label>
-               <input type="time" value={manualStartTime} onChange={e => setManualStartTime(e.target.value)} className="w-full max-w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-1 sm:px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 box-border" style={{ fontSize: '16px' }} />
-             </div>
-             <div className="flex-1 min-w-0 overflow-hidden">
-               <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">終了時間</label>
-               <input type="time" value={manualEndTime} onChange={e => setManualEndTime(e.target.value)} className="w-full max-w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-1 sm:px-3 py-2 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 box-border" style={{ fontSize: '16px' }} />
-             </div>
+             <FormInput label="開始時間" type="time" value={manualStartTime} onChange={e => setManualStartTime(e.target.value)} className="flex-1" />
+             <FormInput label="終了時間" type="time" value={manualEndTime} onChange={e => setManualEndTime(e.target.value)} className="flex-1" />
            </div>
         </div>
       )}
@@ -5891,12 +5887,7 @@ ${importText}`;
         )}
       </div>
 
-      <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-6">
-        {MUSCLE_CATEGORIES.map(cat => {
-          const isSelected = selectedCategories.includes(cat);
-          return <button key={cat} onClick={() => toggleCategory(cat)} className={`py-2.5 px-1 rounded-xl text-sm font-bold transition-all border ${getCategoryTabColor(cat, isSelected)}`}>{cat}</button>;
-        })}
-      </div>
+      <CategoryFilterGrid selectedCategories={selectedCategories} toggleCategory={toggleCategory} />
 
       {selectedCategories.length > 0 && availableExercises.length === 0 && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-center shadow-sm mb-4">
@@ -6005,14 +5996,8 @@ ${importText}`;
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm mt-6">
           <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2"><Activity size={16} /> 本日の体組成（任意）</h3>
           <div className="flex gap-4">
-            <div className="flex-1 relative">
-              <input type="number" inputMode="decimal" step="0.1" value={bodyWeight} onChange={(e) => setBodyWeight(e.target.value)} placeholder="体重" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }}/>
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">kg</span>
-            </div>
-            <div className="flex-1 relative">
-              <input type="number" inputMode="decimal" step="0.1" value={bodyFat} onChange={(e) => setBodyFat(e.target.value)} placeholder="体脂肪率" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }}/>
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">%</span>
-            </div>
+            <FormInput type="number" value={bodyWeight} onChange={(e) => setBodyWeight(e.target.value)} placeholder="体重" unit="kg" className="flex-1" />
+            <FormInput type="number" value={bodyFat} onChange={(e) => setBodyFat(e.target.value)} placeholder="体脂肪率" unit="%" className="flex-1" />
           </div>
         </div>
 
@@ -6207,31 +6192,16 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
             </h3>
             
             <div className="space-y-4">
-              <div className="min-w-0 overflow-hidden w-full">
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">日付</label>
-                <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} className="w-full max-w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 sm:px-3 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500 box-border" style={{ fontSize: '16px' }} />
-              </div>
+              <FormInput label="日付" type="date" value={editDate} onChange={e => setEditDate(e.target.value)} />
               
               <div className="flex gap-2 sm:gap-3 w-full">
-                <div className="flex-1 min-w-0 overflow-hidden">
-                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">開始</label>
-                  <input type="time" value={editStartTime} onChange={e => setEditStartTime(e.target.value)} className="w-full max-w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-1 sm:px-2 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500 box-border" style={{ fontSize: '16px' }} />
-                </div>
-                <div className="flex-1 min-w-0 overflow-hidden">
-                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">終了</label>
-                  <input type="time" value={editEndTime} onChange={e => setEditEndTime(e.target.value)} className="w-full max-w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-1 sm:px-2 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500 box-border" style={{ fontSize: '16px' }} />
-                </div>
+                <FormInput label="開始" type="time" value={editStartTime} onChange={e => setEditStartTime(e.target.value)} className="flex-1" />
+                <FormInput label="終了" type="time" value={editEndTime} onChange={e => setEditEndTime(e.target.value)} className="flex-1" />
               </div>
 
               <div className="flex gap-2 sm:gap-3">
-                <div className="flex-1 min-w-0 overflow-hidden">
-                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">体重 (kg)</label>
-                  <input type="number" inputMode="decimal" step="0.1" value={editBodyWeight} onChange={e => setEditBodyWeight(e.target.value)} className="w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 sm:px-3 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
-                </div>
-                <div className="flex-1 min-w-0 overflow-hidden">
-                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">体脂肪率 (%)</label>
-                  <input type="number" inputMode="decimal" step="0.1" value={editBodyFat} onChange={e => setEditBodyFat(e.target.value)} className="w-full min-w-0 block appearance-none bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2 sm:px-3 py-2 text-base font-bold text-slate-700 dark:text-slate-100 focus:outline-none focus:border-emerald-500" style={{ fontSize: '16px' }} />
-                </div>
+                <FormInput label="体重" type="number" value={editBodyWeight} onChange={e => setEditBodyWeight(e.target.value)} unit="kg" className="flex-1" />
+                <FormInput label="体脂肪率" type="number" value={editBodyFat} onChange={e => setEditBodyFat(e.target.value)} unit="%" className="flex-1" />
               </div>
             </div>
           </div>
@@ -6244,12 +6214,7 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
               </button>
             )}
           </div>
-          <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-6">
-            {MUSCLE_CATEGORIES.map(cat => {
-              const isSelected = selectedCategories.includes(cat);
-              return <button key={cat} onClick={() => toggleCategory(cat)} className={`py-2.5 px-1 rounded-xl text-sm font-bold transition-all border ${getCategoryTabColor(cat, isSelected)}`}>{cat}</button>;
-            })}
-          </div>
+          <CategoryFilterGrid selectedCategories={selectedCategories} toggleCategory={toggleCategory} />
 
           {selectedCategories.length > 0 && availableExercises.length === 0 && (
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-center shadow-sm mb-4">
@@ -7662,7 +7627,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.6, 10:13, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.6, 10:19, updated)</p>
       </div>
     </div>
   );
