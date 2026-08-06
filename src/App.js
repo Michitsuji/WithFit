@@ -1888,11 +1888,25 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
   const [isOpen, setIsOpen] = useState(false);
   const [hovered, setHovered] = useState(null);
   const wrapperRef = useRef(null);
+  const isTouch = useRef(false);
 
   const updateHover = (e) => {
     if (!wrapperRef.current) return;
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    
+    let clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else if (e.changedTouches && e.changedTouches.length > 0) {
+      clientX = e.changedTouches[0].clientX;
+      clientY = e.changedTouches[0].clientY;
+    } else if (e.clientX !== undefined) {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    } else {
+      return;
+    }
+
     const rect = wrapperRef.current.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
@@ -1901,7 +1915,6 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
     const dy = centerY - clientY; 
     const dist = Math.sqrt(dx * dx + dy * dy);
     
-    // 指を少し上にスライドさせた場合のみ選択と判定する
     if (dist > 30 && dy > -10) {
       if (dx < 0) setHovered('left');
       else setHovered('right');
@@ -1911,33 +1924,31 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
   };
 
   const handleStart = (e) => {
+    if (!myInfo?.isTraining) return;
+    if (e.type === 'touchstart') isTouch.current = true;
+    if (e.type === 'mousedown' && isTouch.current) return;
     setIsOpen(true);
     updateHover(e);
   };
   const handleMove = (e) => {
-    if (!isOpen) return;
+    if (!isOpen || !myInfo?.isTraining) return;
     updateHover(e);
   };
   const handleEnd = (e) => {
+    if (!myInfo?.isTraining) return;
+    if (e.type === 'mouseup' && isTouch.current) {
+      isTouch.current = false;
+      return;
+    }
     if (!isOpen) return;
     setIsOpen(false);
     
-    // 選択された方向に応じてイベントを発行
     if (hovered === 'left') {
       if (currentTab !== 'record') setCurrentTab('record');
       window.dispatchEvent(new CustomEvent('showRecordDashboard'));
     } else if (hovered === 'right') {
       if (currentTab !== 'record') setCurrentTab('record');
       window.dispatchEvent(new CustomEvent('returnToRecordInput'));
-    } else {
-      // スワイプせずにただタップした場合のデフォルトの挙動
-      if (currentTab === 'record') { 
-        window.scrollTo({top:0, behavior:'smooth'}); 
-        window.dispatchEvent(new CustomEvent('showRecordDashboard')); 
-      } else { 
-        setCurrentTab('record'); 
-        window.dispatchEvent(new CustomEvent('showRecordDashboard')); 
-      }
     }
     setHovered(null);
   };
@@ -1945,7 +1956,7 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
   return (
     <div 
       ref={wrapperRef}
-      className="relative flex flex-col items-center touch-none select-none z-50"
+      className={`relative flex flex-col items-center ${myInfo?.isTraining ? 'touch-none select-none z-50' : ''}`}
       onMouseDown={handleStart}
       onMouseMove={handleMove}
       onMouseUp={handleEnd}
@@ -1955,30 +1966,28 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
       onTouchEnd={handleEnd}
       onTouchCancel={handleEnd}
     >
-       {/* ホイールメニュー（半円） */}
-       <div 
-         className={`absolute bottom-full mb-1 left-1/2 -translate-x-1/2 flex transition-all duration-200 pointer-events-none ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}
-         style={{ transformOrigin: 'bottom center' }}
-       >
-         {/* 左側：メニューへ */}
-         <div className={`relative w-28 h-28 bg-indigo-500/95 backdrop-blur-md rounded-tl-full flex items-center justify-center border-[3px] border-r-[1.5px] border-indigo-300 dark:border-indigo-700 transition-transform duration-200 ${hovered === 'left' ? 'scale-110 bg-indigo-500 z-10 shadow-[0_0_20px_rgba(99,102,241,0.6)]' : 'opacity-70'} origin-bottom-right`}>
-           <div className="flex flex-col items-center justify-center text-white mr-4 mt-6">
-             <AlignLeft size={28} />
-             <span className="text-xs font-bold mt-1 tracking-wider">メニュー</span>
+       {myInfo?.isTraining && (
+         <div 
+           className={`absolute bottom-full mb-1 left-1/2 -translate-x-1/2 flex transition-all duration-200 pointer-events-none ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}
+           style={{ transformOrigin: 'bottom center' }}
+         >
+           <div className={`relative w-28 h-28 bg-indigo-500/95 backdrop-blur-md rounded-tl-full flex items-center justify-center border-[3px] border-r-[1.5px] border-indigo-300 dark:border-indigo-700 transition-transform duration-200 ${hovered === 'left' ? 'scale-110 bg-indigo-500 z-10 shadow-[0_0_20px_rgba(99,102,241,0.6)]' : 'opacity-70'} origin-bottom-right`}>
+             <div className="flex flex-col items-center justify-center text-white mr-4 mt-6">
+               <AlignLeft size={28} />
+               <span className="text-xs font-bold mt-1 tracking-wider">メニュー</span>
+             </div>
+           </div>
+           <div className={`relative w-28 h-28 bg-emerald-500/95 backdrop-blur-md rounded-tr-full flex items-center justify-center border-[3px] border-l-[1.5px] border-emerald-300 dark:border-emerald-700 transition-transform duration-200 ${hovered === 'right' ? 'scale-110 bg-emerald-500 z-10 shadow-[0_0_20px_rgba(16,185,129,0.6)]' : 'opacity-70'} origin-bottom-left`}>
+             <div className="flex flex-col items-center justify-center text-white ml-4 mt-6">
+               <Edit2 size={28} />
+               <span className="text-xs font-bold mt-1 tracking-wider">記録画面</span>
+             </div>
            </div>
          </div>
-         {/* 右側：記録画面へ */}
-         <div className={`relative w-28 h-28 bg-emerald-500/95 backdrop-blur-md rounded-tr-full flex items-center justify-center border-[3px] border-l-[1.5px] border-emerald-300 dark:border-emerald-700 transition-transform duration-200 ${hovered === 'right' ? 'scale-110 bg-emerald-500 z-10 shadow-[0_0_20px_rgba(16,185,129,0.6)]' : 'opacity-70'} origin-bottom-left`}>
-           <div className="flex flex-col items-center justify-center text-white ml-4 mt-6">
-             <Edit2 size={28} />
-             <span className="text-xs font-bold mt-1 tracking-wider">記録画面</span>
-           </div>
-         </div>
-       </div>
+       )}
 
-       {/* ボタン本体（タッチイベントが競合しないようにラップ） */}
-       <div className={`transition-transform duration-200 ${isOpen ? 'scale-90 opacity-80' : 'scale-100'}`}>
-         <div className="pointer-events-none">
+       <div className={`transition-transform duration-200 ${isOpen && myInfo?.isTraining ? 'scale-90 opacity-80' : 'scale-100'}`}>
+         <div className={myInfo?.isTraining ? "pointer-events-none" : ""}>
            {children}
          </div>
        </div>
@@ -3880,7 +3889,7 @@ if (timerState.y === 'top') {
           <NavButton icon={<Home size={22} />} label="ホーム" isActive={currentTab === 'timeline'} onClick={() => { if(currentTab === 'timeline') window.scrollTo({top:0, behavior:'smooth'}); else setCurrentTab('timeline'); }} />
           <NavButton icon={<Dumbbell size={22} />} label="種目" isActive={currentTab === 'exercises'} onClick={() => { if(currentTab === 'exercises') window.scrollTo({top:0, behavior:'smooth'}); else setCurrentTab('exercises'); }} />
           <RecordWheelWrapper myInfo={myInfo} currentTab={currentTab} setCurrentTab={setCurrentTab}>
-            <NavButton icon={myInfo.isTraining ? <Clock className="animate-pulse" size={28}/> : <PlusCircle size={28} />} label={myInfo.isTraining ? "記録中" : "記録"} isActive={currentTab === 'record'} onClick={() => {}} isPrimary isTraining={myInfo.isTraining} />
+            <NavButton icon={myInfo.isTraining ? <Clock className="animate-pulse" size={28}/> : <PlusCircle size={28} />} label={myInfo.isTraining ? "記録中" : "記録"} isActive={currentTab === 'record'} onClick={() => { if (!myInfo?.isTraining) { if(currentTab === 'record') { window.scrollTo({top:0, behavior:'smooth'}); window.dispatchEvent(new CustomEvent('showRecordDashboard')); } else { setCurrentTab('record'); window.dispatchEvent(new CustomEvent('showRecordDashboard')); } } }} isPrimary isTraining={myInfo.isTraining} />
           </RecordWheelWrapper>
           <NavButton icon={<CalendarIcon size={22} />} label="データ" isActive={currentTab === 'data'} onClick={() => { if(currentTab === 'data') window.scrollTo({top:0, behavior:'smooth'}); else setCurrentTab('data'); }} />
           <NavButton icon={<Users size={22} />} label="フレンド" isActive={currentTab === 'friends'} onClick={() => { if(currentTab === 'friends') window.scrollTo({top:0, behavior:'smooth'}); else setCurrentTab('friends'); }} />
@@ -7864,7 +7873,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.6, 23:26, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.6, 23:31, updated)</p>
       </div>
     </div>
   );
