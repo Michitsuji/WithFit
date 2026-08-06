@@ -3631,6 +3631,7 @@ if (timerState.y === 'top') {
               if (currentTab !== 'record' && !e.target.closest('button, select')) {
                 setCurrentTab('record');
               }
+              window.dispatchEvent(new CustomEvent('returnToRecordInput'));
             }}
             onTouchStart={handleTimerTouchStart}
             onTouchMove={handleTimerTouchMove}
@@ -5136,6 +5137,21 @@ function RecordView({ onStart, onPost, onCancel, onRequestJointTraining, onAccep
   const [importText, setImportText] = useState('');
   const [aiErrorMsg, setAiErrorMsg] = useState(null);
   const [importProgress, setImportProgress] = useState(0);
+  const [showDashboard, setShowDashboard] = useState(!myInfo?.isTraining && !isManual);
+
+  useEffect(() => {
+    if (!myInfo?.isTraining && !isManual) {
+      setShowDashboard(true);
+    }
+  }, [myInfo?.isTraining, isManual]);
+
+  useEffect(() => {
+    const handleReturn = () => {
+      setShowDashboard(false);
+    };
+    window.addEventListener('returnToRecordInput', handleReturn);
+    return () => window.removeEventListener('returnToRecordInput', handleReturn);
+  }, []);
 
   const handleContainerRef = (node) => {
     if (node) {
@@ -5396,7 +5412,10 @@ ${importText}`;
        memo: memoText,
        sets
     };
-    setWorkoutItems(prev => [...prev, newItem]);
+    setWorkoutItems(prev => {
+      const hasOnlyEmpty = prev.length === 1 && !prev[0].exerciseName && prev[0].sets.length === 1 && !prev[0].sets[0].weight && !prev[0].sets[0].reps;
+      return hasOnlyEmpty ? [newItem] : [...prev, newItem];
+    });
     alert("今日のメニューに追加しました！そのまま「トレーニング開始」を押して記録できます。");
   };
 
@@ -5451,6 +5470,7 @@ ${importText}`;
     if (workoutItems.length === 0) {
        addExerciseItem('');
     }
+    setShowDashboard(false);
   };
 
   const updateItem = (itemId, data) => {
@@ -5823,23 +5843,34 @@ ${importText}`;
      );
   }
 
-  if (!isTraining && !isManual) {
+  if (showDashboard) {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">ワークアウトを開始</h2>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+          {myInfo?.isTraining ? 'メニュー' : 'ワークアウトを開始'}
+        </h2>
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col items-center">
           <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4"><MapPin size={28} className="text-slate-400 dark:text-slate-500" /></div>
-          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 text-center">本日のトレーニング場所を選択してください</label>
+          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 text-center">
+            {myInfo?.isTraining ? 'トレーニング中のジム' : '本日のトレーニング場所を選択してください'}
+          </label>
           <div className="w-full relative mb-6">
-            <select value={selectedGymId} onChange={(e) => setSelectedGymId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
+            <select value={selectedGymId} onChange={(e) => setSelectedGymId(e.target.value)} disabled={myInfo?.isTraining} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base disabled:opacity-70" style={{ fontSize: '16px' }}>
               <option value="" disabled>ジムを選択</option>
               {gyms.filter(g => joinedGyms.includes(g.id) && g.id !== 'common').map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
             </select>
             <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">▼</div>
           </div>
-          <button onClick={handleStart} className="w-full py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all shadow-md bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30 mb-3">
-            <Play fill="currentColor" size={20} /> トレーニング開始
-          </button>
+          
+          {myInfo?.isTraining ? (
+            <button onClick={() => setShowDashboard(false)} className="w-full py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all shadow-md bg-indigo-500 hover:bg-indigo-600 shadow-indigo-500/30 mb-3">
+              <Dumbbell fill="currentColor" size={20} /> 記録画面に戻る
+            </button>
+          ) : (
+            <button onClick={handleStart} className="w-full py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all shadow-md bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30 mb-3">
+              <Play fill="currentColor" size={20} /> トレーニング開始
+            </button>
+          )}
           
           <div className="grid grid-cols-2 gap-3 w-full">
             <button onClick={() => {setIsManual(true); if(workoutItems.length === 0) addExerciseItem('');}} className="w-full py-3 rounded-xl font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex flex-col items-center justify-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-all">
@@ -5971,11 +6002,18 @@ ${importText}`;
 
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-lg font-bold text-slate-900 dark:text-white">{isManual ? '記録内容' : 'ワークアウト中'}</h2>
-        {workoutItems.length > 1 && (
-          <button onClick={() => setShowReorderModal(true)} className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 flex items-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-colors shadow-sm">
-            <ArrowUp size={14} /><ArrowDown size={14} className="-ml-2" /> 並び替え
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {!isManual && (
+            <button onClick={() => setShowDashboard(true)} className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800 transition-colors shadow-sm">
+              メニュー
+            </button>
+          )}
+          {workoutItems.length > 1 && (
+            <button onClick={() => setShowReorderModal(true)} className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 flex items-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-colors shadow-sm">
+              <ArrowUp size={14} /><ArrowDown size={14} className="-ml-2" /> 並び替え
+            </button>
+          )}
+        </div>
       </div>
 
       <CategoryFilterGrid selectedCategories={selectedCategories} toggleCategory={toggleCategory} />
@@ -7718,7 +7756,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.6, 23:05, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.6, 23:13, updated)</p>
       </div>
     </div>
   );
