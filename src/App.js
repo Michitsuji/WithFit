@@ -1892,6 +1892,13 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
   const isOpenRef = useRef(false);
   const isTouchRef = useRef(false);
 
+  const latestCurrentTab = useRef(currentTab);
+  const latestSetCurrentTab = useRef(setCurrentTab);
+  useEffect(() => {
+    latestCurrentTab.current = currentTab;
+    latestSetCurrentTab.current = setCurrentTab;
+  }, [currentTab, setCurrentTab]);
+
   const calculateHover = (clientX, clientY) => {
     if (!wrapperRef.current) return null;
     const rect = wrapperRef.current.getBoundingClientRect();
@@ -1967,21 +1974,41 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
     setHovered(null);
 
     if (finalSelected === 'left') {
-      if (currentTab !== 'record') {
-        setCurrentTab('record');
+      if (latestCurrentTab.current !== 'record') {
+        latestSetCurrentTab.current('record');
       }
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('showRecordDashboard'));
       }, 10);
     } else if (finalSelected === 'right') {
-      if (currentTab !== 'record') {
-        setCurrentTab('record');
+      if (latestCurrentTab.current !== 'record') {
+        latestSetCurrentTab.current('record');
       }
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('returnToRecordInput'));
       }, 10);
     }
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onGlobalMove = (e) => {
+      if (e.cancelable) e.preventDefault();
+      handleMove(e);
+    };
+    document.addEventListener('mousemove', onGlobalMove, { passive: false });
+    document.addEventListener('mouseup', handleEnd);
+    document.addEventListener('touchmove', onGlobalMove, { passive: false });
+    document.addEventListener('touchend', handleEnd);
+    document.addEventListener('touchcancel', handleEnd);
+    return () => {
+      document.removeEventListener('mousemove', onGlobalMove);
+      document.removeEventListener('mouseup', handleEnd);
+      document.removeEventListener('touchmove', onGlobalMove);
+      document.removeEventListener('touchend', handleEnd);
+      document.removeEventListener('touchcancel', handleEnd);
+    };
+  }, [isOpen]);
 
   return (
     <div 
@@ -1990,7 +2017,6 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
       onMouseDown={handleStart}
       onMouseMove={handleMove}
       onMouseUp={handleEnd}
-      onMouseLeave={handleEnd}
       onTouchStart={handleStart}
       onTouchMove={handleMove}
       onTouchEnd={handleEnd}
@@ -3206,9 +3232,27 @@ if (timerState.y === 'top') {
        }
     }
 
-    const newItems = (post.items || []).map(item => ({
+    const targetGymId = isManual ? gymId : (myInfo.isTraining ? myInfo.currentGymId : gymId);
+    const allGymExercises = exercises.filter(ex => {
+      if (ex.gymId !== targetGymId && ex.gymId !== 'common') return false; 
+      if (myInfo?.mutedExercises?.includes(ex.name)) return false;
+      if (ex.gymId === 'common') {
+         if (ex.author && ex.author !== currentUser && ex.author !== MASTER_USER) return false;
+      } else {
+         const gymObj = gyms.find(g => g.id === ex.gymId);
+         if (gymObj && ex.author && ex.author !== gymObj.owner && ex.author !== currentUser && ex.author !== MASTER_USER) return false;
+      }
+      return true;
+    });
+
+    const newItems = (post.items || []).map(item => {
+      const matchedEx = allGymExercises.find(ex => ex.name === item.exerciseName);
+      return {
       ...item,
       id: generateId(),
+      exerciseName: matchedEx ? matchedEx.name : item.exerciseName,
+      category: matchedEx ? (matchedEx.category || 'その他') : (item.category || 'その他'),
+      weightType: matchedEx ? (matchedEx.weightType || 'total') : (item.weightType || 'total'),
       sets: (item.sets || []).map(set => ({ 
          ...set, 
          id: generateId(),
@@ -5384,10 +5428,25 @@ ${importText}`;
       textResponse = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsedItems = JSON.parse(textResponse);
 
+      const allGymExercises = exercises.filter(ex => {
+        if (ex.gymId !== selectedGymId && ex.gymId !== 'common') return false; 
+        if (mutedExercises.includes(ex.name)) return false;
+        if (ex.gymId === 'common') {
+           if (ex.author && ex.author !== currentUser && ex.author !== MASTER_USER) return false;
+        } else {
+           const gym = gyms.find(g => g.id === ex.gymId);
+           if (gym && ex.author && ex.author !== gym.owner && ex.author !== currentUser && ex.author !== MASTER_USER) return false;
+        }
+        return true;
+      });
+
+      const additionalCategories = new Set();
       const newItems = parsedItems.map(item => {
-        const matchedEx = availableExercises.find(ex => ex.name.includes(item.exerciseName) || (item.exerciseName && item.exerciseName.includes(ex.name)));
-        if (matchedEx && !selectedCategories.includes(matchedEx.category)) {
-           toggleCategory(matchedEx.category);
+        const matchedEx = allGymExercises.find(ex => ex.name.includes(item.exerciseName) || (item.exerciseName && item.exerciseName.includes(ex.name)));
+        if (matchedEx) {
+           additionalCategories.add(matchedEx.category || 'その他');
+        } else if (item.category) {
+           additionalCategories.add(item.category);
         }
         return {
           id: generateId(),
@@ -5447,6 +5506,7 @@ ${importText}`;
       if (newItems.length > 0) {
          clearInterval(progressInterval);
          setImportProgress(100);
+         setSelectedCategories(prev => [...new Set([...prev, ...Array.from(additionalCategories)])]);
          setTimeout(() => {
            setWorkoutItems(prev => {
              const hasOnlyEmpty = prev.length === 1 && !prev[0].exerciseName && prev[0].sets.length === 1 && !prev[0].sets[0].weight && !prev[0].sets[0].reps;
@@ -5540,7 +5600,19 @@ ${importText}`;
   };
 
   const handleApplyProgramToMenu = (program, dayData) => {
-    const targetEx = availableExercises.find(ex => ex.name === program.exerciseName) || { category: 'その他', weightType: 'total' };
+    const allGymExercises = exercises.filter(ex => {
+      if (ex.gymId !== selectedGymId && ex.gymId !== 'common') return false; 
+      if (mutedExercises.includes(ex.name)) return false;
+      if (ex.gymId === 'common') {
+         if (ex.author && ex.author !== currentUser && ex.author !== MASTER_USER) return false;
+      } else {
+         const gym = gyms.find(g => g.id === ex.gymId);
+         if (gym && ex.author && ex.author !== gym.owner && ex.author !== currentUser && ex.author !== MASTER_USER) return false;
+      }
+      return true;
+    });
+
+    const targetEx = allGymExercises.find(ex => ex.name === program.exerciseName) || { name: program.exerciseName, category: 'その他', weightType: 'total' };
     
     if (!selectedCategories.includes(targetEx.category)) {
       setSelectedCategories(prev => [...prev, targetEx.category]);
@@ -7903,7 +7975,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.6, 23:35, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.6, 23:46, updated)</p>
       </div>
     </div>
   );
