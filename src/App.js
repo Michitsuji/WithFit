@@ -3777,7 +3777,7 @@ if (timerState.y === 'top') {
         <div className="flex justify-around items-center p-2 max-w-md mx-auto">
           <NavButton icon={<Home size={22} />} label="ホーム" isActive={currentTab === 'timeline'} onClick={() => { if(currentTab === 'timeline') window.scrollTo({top:0, behavior:'smooth'}); else setCurrentTab('timeline'); }} />
           <NavButton icon={<Dumbbell size={22} />} label="種目" isActive={currentTab === 'exercises'} onClick={() => { if(currentTab === 'exercises') window.scrollTo({top:0, behavior:'smooth'}); else setCurrentTab('exercises'); }} />
-          <NavButton icon={myInfo.isTraining ? <Clock className="animate-pulse" size={28}/> : <PlusCircle size={28} />} label={myInfo.isTraining ? "記録中" : "記録"} isActive={currentTab === 'record'} onClick={() => { if(currentTab === 'record') window.scrollTo({top:0, behavior:'smooth'}); else setCurrentTab('record'); }} isPrimary isTraining={myInfo.isTraining} />
+          <NavButton icon={myInfo.isTraining ? <Clock className="animate-pulse" size={28}/> : <PlusCircle size={28} />} label={myInfo.isTraining ? "記録中" : "記録"} isActive={currentTab === 'record'} onClick={() => { if(currentTab === 'record') { window.scrollTo({top:0, behavior:'smooth'}); window.dispatchEvent(new CustomEvent('showRecordDashboard')); } else { setCurrentTab('record'); window.dispatchEvent(new CustomEvent('showRecordDashboard')); } }} isPrimary isTraining={myInfo.isTraining} />
           <NavButton icon={<CalendarIcon size={22} />} label="データ" isActive={currentTab === 'data'} onClick={() => { if(currentTab === 'data') window.scrollTo({top:0, behavior:'smooth'}); else setCurrentTab('data'); }} />
           <NavButton icon={<Users size={22} />} label="フレンド" isActive={currentTab === 'friends'} onClick={() => { if(currentTab === 'friends') window.scrollTo({top:0, behavior:'smooth'}); else setCurrentTab('friends'); }} />
         </div>
@@ -5149,8 +5149,15 @@ function RecordView({ onStart, onPost, onCancel, onRequestJointTraining, onAccep
     const handleReturn = () => {
       setShowDashboard(false);
     };
+    const handleShowDashboard = () => {
+      setShowDashboard(true);
+    };
     window.addEventListener('returnToRecordInput', handleReturn);
-    return () => window.removeEventListener('returnToRecordInput', handleReturn);
+    window.addEventListener('showRecordDashboard', handleShowDashboard);
+    return () => {
+      window.removeEventListener('returnToRecordInput', handleReturn);
+      window.removeEventListener('showRecordDashboard', handleShowDashboard);
+    };
   }, []);
 
   const handleContainerRef = (node) => {
@@ -5867,24 +5874,26 @@ ${importText}`;
               <Dumbbell fill="currentColor" size={20} /> 記録画面に戻る
             </button>
           ) : (
-            <button onClick={handleStart} className="w-full py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all shadow-md bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30 mb-3">
-              <Play fill="currentColor" size={20} /> トレーニング開始
-            </button>
+            <>
+              <button onClick={handleStart} className="w-full py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all shadow-md bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30 mb-3">
+                <Play fill="currentColor" size={20} /> トレーニング開始
+              </button>
+              
+              <div className="grid grid-cols-2 gap-3 w-full">
+                <button onClick={() => {setIsManual(true); if(workoutItems.length === 0) addExerciseItem('');}} className="w-full py-3 rounded-xl font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex flex-col items-center justify-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-all">
+                  <CalendarIcon size={18} /> 過去の記録を追加
+                </button>
+                <button onClick={() => { 
+                   const d = new Date();
+                   setManualDate(formatDateFromTimestamp(d.getTime()));
+                   setManualStartTime(`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`);
+                   setIsMetricsOnlyMode(true); 
+                }} className="w-full py-3 rounded-xl font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-950/50 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 flex flex-col items-center justify-center gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-all">
+                  <Scale size={18} /> 体組成のみ記録
+                </button>
+              </div>
+            </>
           )}
-          
-          <div className="grid grid-cols-2 gap-3 w-full">
-            <button onClick={() => {setIsManual(true); if(workoutItems.length === 0) addExerciseItem('');}} className="w-full py-3 rounded-xl font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex flex-col items-center justify-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-all">
-              <CalendarIcon size={18} /> 過去の記録を追加
-            </button>
-            <button onClick={() => { 
-               const d = new Date();
-               setManualDate(formatDateFromTimestamp(d.getTime()));
-               setManualStartTime(`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`);
-               setIsMetricsOnlyMode(true); 
-            }} className="w-full py-3 rounded-xl font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-950/50 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 flex flex-col items-center justify-center gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-all">
-              <Scale size={18} /> 体組成のみ記録
-            </button>
-          </div>
 
         </div>
         
@@ -6003,11 +6012,6 @@ ${importText}`;
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-lg font-bold text-slate-900 dark:text-white">{isManual ? '記録内容' : 'ワークアウト中'}</h2>
         <div className="flex items-center gap-2">
-          {!isManual && (
-            <button onClick={() => setShowDashboard(true)} className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800 transition-colors shadow-sm">
-              メニュー
-            </button>
-          )}
           {workoutItems.length > 1 && (
             <button onClick={() => setShowReorderModal(true)} className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 flex items-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-colors shadow-sm">
               <ArrowUp size={14} /><ArrowDown size={14} className="-ml-2" /> 並び替え
@@ -7756,7 +7760,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.6, 23:13, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.6, 23:18, updated)</p>
       </div>
     </div>
   );
