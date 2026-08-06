@@ -1888,11 +1888,27 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
   const [isOpen, setIsOpen] = useState(false);
   const [hovered, setHovered] = useState(null);
   const wrapperRef = useRef(null);
-  const isTouch = useRef(false);
+  const hoveredRef = useRef(null);
+  const isOpenRef = useRef(false);
+  const isTouchRef = useRef(false);
+
+  const calculateHover = (clientX, clientY) => {
+    if (!wrapperRef.current) return null;
+    const rect = wrapperRef.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    
+    const dx = clientX - centerX;
+    const dy = centerY - clientY; 
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    if (dist > 30 && dy > -10) {
+      return dx < 0 ? 'left' : 'right';
+    }
+    return null;
+  };
 
   const updateHover = (e) => {
-    if (!wrapperRef.current) return;
-    
     let clientX, clientY;
     if (e.touches && e.touches.length > 0) {
       clientX = e.touches[0].clientX;
@@ -1907,50 +1923,64 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
       return;
     }
 
-    const rect = wrapperRef.current.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    
-    const dx = clientX - centerX;
-    const dy = centerY - clientY; 
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    
-    if (dist > 30 && dy > -10) {
-      if (dx < 0) setHovered('left');
-      else setHovered('right');
-    } else {
-      setHovered(null);
-    }
+    const nextHover = calculateHover(clientX, clientY);
+    hoveredRef.current = nextHover;
+    setHovered(nextHover);
   };
 
   const handleStart = (e) => {
     if (!myInfo?.isTraining) return;
-    if (e.type === 'touchstart') isTouch.current = true;
-    if (e.type === 'mousedown' && isTouch.current) return;
+    if (e.type === 'touchstart') {
+      isTouchRef.current = true;
+    } else if (e.type === 'mousedown' && isTouchRef.current) {
+      return;
+    }
+    
+    isOpenRef.current = true;
     setIsOpen(true);
     updateHover(e);
   };
+
   const handleMove = (e) => {
-    if (!isOpen || !myInfo?.isTraining) return;
+    if (!isOpenRef.current || !myInfo?.isTraining) return;
+    if (e.cancelable && e.type === 'touchmove') {
+      e.preventDefault();
+    }
     updateHover(e);
   };
+
   const handleEnd = (e) => {
     if (!myInfo?.isTraining) return;
-    if (e.type === 'mouseup' && isTouch.current) {
-      isTouch.current = false;
+    if (e.type === 'mouseup' && isTouchRef.current) {
+      isTouchRef.current = false;
       return;
     }
-    if (!isOpen) return;
-    setIsOpen(false);
+    if (!isOpenRef.current) return;
     
-    if (hovered === 'left') {
-      if (currentTab !== 'record') setCurrentTab('record');
-      window.dispatchEvent(new CustomEvent('showRecordDashboard'));
-    } else if (hovered === 'right') {
-      if (currentTab !== 'record') setCurrentTab('record');
-      window.dispatchEvent(new CustomEvent('returnToRecordInput'));
-    }
+    updateHover(e);
+    
+    const finalSelected = hoveredRef.current;
+    
+    isOpenRef.current = false;
+    setIsOpen(false);
+    hoveredRef.current = null;
     setHovered(null);
+
+    if (finalSelected === 'left') {
+      if (currentTab !== 'record') {
+        setCurrentTab('record');
+      }
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('showRecordDashboard'));
+      }, 10);
+    } else if (finalSelected === 'right') {
+      if (currentTab !== 'record') {
+        setCurrentTab('record');
+      }
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('returnToRecordInput'));
+      }, 10);
+    }
   };
 
   return (
@@ -7873,7 +7903,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.6, 23:31, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.6, 23:35, updated)</p>
       </div>
     </div>
   );
