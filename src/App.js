@@ -1348,6 +1348,13 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
       if (type === 'super3') fieldName = 'super' + f.charAt(0).toUpperCase() + f.slice(1) + '3';
       return setObj[fieldName] || '';
     };
+
+    const targetVal = (f) => {
+      let fieldName = f;
+      if (type === 'super2') fieldName = 'super' + f.charAt(0).toUpperCase() + f.slice(1);
+      if (type === 'super3') fieldName = 'super' + f.charAt(0).toUpperCase() + f.slice(1) + '3';
+      return setObj['target' + fieldName.charAt(0).toUpperCase() + fieldName.slice(1)];
+    };
     
     const update = (f, v) => {
       let fieldName = f;
@@ -1403,17 +1410,17 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
               <input type="number" inputMode="decimal" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder={getWeightPlaceholder(wType)} className="w-[48px] sm:w-[60px] shrink-0 text-center text-sm font-bold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded focus:outline-none focus:border-emerald-500 py-1.5 px-0" style={{ fontSize: '16px' }}/>
               <div className="flex flex-1 items-center gap-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-1 min-w-0">
                 <span className="text-[10px] text-slate-400 font-bold shrink-0">L:</span>
-                <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('lReps')} onChange={(e) => update('lReps', e.target.value)} placeholder="0" className="w-full text-center text-sm font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0 px-0" style={{ fontSize: '16px' }}/>
+                <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('lReps')} onChange={(e) => update('lReps', e.target.value)} placeholder={targetVal('lReps') || "0"} className="w-full text-center text-sm font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0 px-0" style={{ fontSize: '16px' }}/>
               </div>
               <div className="flex flex-1 items-center gap-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-1 min-w-0">
                 <span className="text-[10px] text-slate-400 font-bold shrink-0">R:</span>
-                <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('rReps')} onChange={(e) => update('rReps', e.target.value)} placeholder="0" className="w-full text-center text-sm font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0 px-0" style={{ fontSize: '16px' }}/>
+                <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('rReps')} onChange={(e) => update('rReps', e.target.value)} placeholder={targetVal('rReps') || "0"} className="w-full text-center text-sm font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0 px-0" style={{ fontSize: '16px' }}/>
               </div>
             </>
           ) : (
             <>
               <input type="number" inputMode="decimal" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder={getWeightPlaceholder(wType)} className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-1.5 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-sm" style={{ fontSize: '16px' }}/>
-              <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('reps')} onChange={(e) => update('reps', e.target.value)} placeholder="回数" className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-1.5 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-sm" style={{ fontSize: '16px' }}/>
+              <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('reps')} onChange={(e) => update('reps', e.target.value)} placeholder={targetVal('reps') || "回数"} className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-1.5 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-sm" style={{ fontSize: '16px' }}/>
             </>
           )}
           {item.isForcedReps && (
@@ -3064,7 +3071,22 @@ if (timerState.y === 'top') {
       sets: (item.sets || []).map(set => ({ 
          ...set, 
          id: generateId(),
-         dropSets: set.dropSets ? set.dropSets.map(ds => ({ ...ds, id: generateId() })) : [] 
+         targetReps: set.reps, targetLReps: set.lReps, targetRReps: set.rReps,
+         targetSuperReps: set.superReps, targetSuperLReps: set.superLReps, targetSuperRReps: set.superRReps,
+         targetSuperReps3: set.superReps3, targetSuperLReps3: set.superLReps3, targetSuperRReps3: set.superRReps3,
+         reps: '', lReps: '', rReps: '',
+         superReps: '', superLReps: '', superRReps: '',
+         superReps3: '', superLReps3: '', superRReps3: '',
+         dropSets: set.dropSets ? set.dropSets.map(ds => ({ 
+             ...ds, 
+             id: generateId(),
+             targetReps: ds.reps, targetLReps: ds.lReps, targetRReps: ds.rReps,
+             targetSuperReps: ds.superReps, targetSuperLReps: ds.superLReps, targetSuperRReps: ds.superRReps,
+             targetSuperReps3: ds.superReps3, targetSuperLReps3: ds.superLReps3, targetSuperRReps3: ds.superRReps3,
+             reps: '', lReps: '', rReps: '',
+             superReps: '', superLReps: '', superRReps: '',
+             superReps3: '', superLReps3: '', superRReps3: ''
+         })) : [] 
       }))
     }));
     
@@ -5217,39 +5239,39 @@ ${importText}`;
           sets: (item.sets || []).map(set => ({
             id: generateId(),
             weight: set.weight || '',
-            reps: set.reps || '',
-            lReps: set.lReps || '',
-            rReps: set.rReps || '',
+            reps: '', targetReps: set.reps || '',
+            lReps: '', targetLReps: set.lReps || '',
+            rReps: '', targetRReps: set.rReps || '',
             forcedReps: set.forcedReps || '',
             distance: set.distance || '',
             time: set.time || '',
             calories: set.calories || '',
             superWeight: set.superWeight || '',
-            superReps: set.superReps || '',
-            superLReps: set.superLReps || '',
-            superRReps: set.superRReps || '',
+            superReps: '', targetSuperReps: set.superReps || '',
+            superLReps: '', targetSuperLReps: set.superLReps || '',
+            superRReps: '', targetSuperRReps: set.superRReps || '',
             superForcedReps: set.superForcedReps || '',
             superWeight3: set.superWeight3 || '',
-            superReps3: set.superReps3 || '',
-            superLReps3: set.superLReps3 || '',
-            superRReps3: set.superRReps3 || '',
+            superReps3: '', targetSuperReps3: set.superReps3 || '',
+            superLReps3: '', targetSuperLReps3: set.superLReps3 || '',
+            superRReps3: '', targetSuperRReps3: set.superRReps3 || '',
             superForcedReps3: set.superForcedReps3 || '',
             dropSets: (set.dropSets || []).map(ds => ({
                 id: generateId(),
                 weight: ds.weight || '',
-                reps: ds.reps || '',
-                lReps: ds.lReps || '',
-                rReps: ds.rReps || '',
+                reps: '', targetReps: ds.reps || '',
+                lReps: '', targetLReps: ds.lReps || '',
+                rReps: '', targetRReps: ds.rReps || '',
                 forcedReps: ds.forcedReps || '',
                 superWeight: ds.superWeight,
-                superReps: ds.superReps,
-                superLReps: ds.superLReps,
-                superRReps: ds.superRReps,
+                superReps: '', targetSuperReps: ds.superReps || '',
+                superLReps: '', targetSuperLReps: ds.superLReps || '',
+                superRReps: '', targetSuperRReps: ds.superRReps || '',
                 superForcedReps: ds.superForcedReps,
                 superWeight3: ds.superWeight3,
-                superReps3: ds.superReps3,
-                superLReps3: ds.superLReps3,
-                superRReps3: ds.superRReps3,
+                superReps3: '', targetSuperReps3: ds.superReps3 || '',
+                superLReps3: '', targetSuperLReps3: ds.superLReps3 || '',
+                superRReps3: '', targetSuperRReps3: ds.superRReps3 || '',
                 superForcedReps3: ds.superForcedReps3
             }))
           }))
@@ -5360,7 +5382,7 @@ ${importText}`;
 
     const cleanReps = dayData.reps.toString().replace('+', '');
     const sets = Array.from({ length: dayData.sets }).map(() => ({
-       id: generateId(), weight: dayData.weight.toString(), reps: cleanReps, lReps: '', rReps: ''
+       id: generateId(), weight: dayData.weight.toString(), reps: '', targetReps: cleanReps, lReps: '', rReps: ''
     }));
     
     const memoText = `${PROG_INFO[program.type]?.name} W${dayData.week} - ${dayData.type}${dayData.isAmrap ? ' (最終セット限界まで!)' : ''}`;
@@ -7696,7 +7718,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.6, 11:06, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.6, 23:05, updated)</p>
       </div>
     </div>
   );
