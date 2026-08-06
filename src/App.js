@@ -101,6 +101,51 @@ const getCategoryTabColor = (category, isSelected) => {
 const generateId = () => Date.now().toString() + Math.random().toString(36).substring(2, 9);
 const generateFriendCode = () => Math.floor(10000 + Math.random() * 90000).toString();
 
+const generateColor = (str) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 70%, 50%)`;
+};
+
+const UserAvatar = ({ userId, accountsInfo, size = 40, className = "", onClick = null, photoUrlOverride = undefined, displayNameOverride = undefined, colorOverride = undefined }) => {
+  const userInfo = accountsInfo ? accountsInfo[userId] : null;
+  const photoUrl = photoUrlOverride !== undefined && photoUrlOverride !== null ? photoUrlOverride : userInfo?.photoUrl;
+  const displayName = displayNameOverride !== undefined && displayNameOverride !== null ? displayNameOverride : (userInfo?.displayName || userId || '?');
+  const userColor = colorOverride !== undefined && colorOverride !== null ? colorOverride : (userInfo?.userColor || (userId ? generateColor(userId) : '#10b981'));
+  const initial = displayName ? displayName.charAt(0).toUpperCase() : '?';
+
+  const handleAvatarClick = (e) => {
+    if (onClick) {
+      e.stopPropagation();
+      e.preventDefault();
+      onClick(userId);
+    }
+  };
+
+  return (
+    <div 
+      className={`rounded-full flex items-center justify-center font-bold text-white shrink-0 overflow-hidden shadow-sm ${onClick ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''} ${className}`}
+      style={{ 
+        width: size, 
+        height: size, 
+        backgroundColor: userColor, 
+        border: size > 24 ? `2px solid ${userColor}` : `1px solid ${userColor}`,
+        fontSize: Math.max(10, size * 0.4)
+      }}
+      onClick={handleAvatarClick}
+    >
+      {photoUrl ? (
+        <img src={photoUrl} alt={displayName} className="w-full h-full object-cover bg-white" />
+      ) : (
+        initial
+      )}
+    </div>
+  );
+};
+
 const getRelativeTime = (timestamp) => {
   const diff = Math.max(0, Date.now() - timestamp);
   const m = Math.floor(diff / 60000);
@@ -502,14 +547,6 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
   const authorInfo = accountsInfo && accountsInfo[post.author];
   const hideMetrics = !isMyPost && authorInfo?.hideBodyMetrics;
   
-  const generateColor = (str) => {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const hue = Math.abs(hash) % 360;
-    return `hsl(${hue}, 70%, 50%)`;
-  };
   const authorColor = authorInfo?.userColor || (post.author ? generateColor(post.author) : '#10b981');
 
   const baseWeight = Number(post.bodyWeight) || Number(authorInfo?.weight) || 60;
@@ -804,17 +841,11 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
         <div className="flex items-start gap-3 w-full overflow-hidden">
           {post.jointWith ? (
             <div className="relative w-12 h-10 shrink-0">
-              <div className={`absolute top-0 left-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-white shadow-sm overflow-hidden z-10 ${onUserClick ? 'cursor-pointer hover:opacity-80' : ''}`} style={{ backgroundColor: authorColor, border: `2px solid ${authorColor}` }} onClick={(e) => { e.stopPropagation(); if (onUserClick) onUserClick(post.author); }}>
-                {authorInfo?.photoUrl ? <img src={authorInfo.photoUrl} alt={post.author} className="w-full h-full object-cover" /> : authorInfo?.displayName ? authorInfo.displayName.charAt(0).toUpperCase() : (post.author ? post.author.charAt(0).toUpperCase() : '?')}
-              </div>
-              <div className={`absolute bottom-0 right-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-white shadow-sm overflow-hidden z-0 ${onUserClick ? 'cursor-pointer hover:opacity-80' : ''}`} style={{ backgroundColor: '#f97316', border: `2px solid #fff` }} onClick={(e) => { e.stopPropagation(); if (onUserClick) onUserClick(post.jointWith); }}>
-                {accountsInfo && accountsInfo[post.jointWith]?.photoUrl ? <img src={accountsInfo[post.jointWith].photoUrl} alt={post.jointWith} className="w-full h-full object-cover" /> : accountsInfo && accountsInfo[post.jointWith]?.displayName ? accountsInfo[post.jointWith].displayName.charAt(0).toUpperCase() : post.jointWith.charAt(0).toUpperCase()}
-              </div>
+              <UserAvatar userId={post.author} accountsInfo={accountsInfo} size={32} className="absolute top-0 left-0 z-10" onClick={onUserClick} />
+              <UserAvatar userId={post.jointWith} accountsInfo={accountsInfo} size={32} className="absolute bottom-0 right-0 z-0 border-white dark:border-slate-900 border-2" onClick={onUserClick} />
             </div>
           ) : (
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm shrink-0 overflow-hidden ${onUserClick ? 'cursor-pointer hover:opacity-80' : ''}`} style={{ backgroundColor: authorColor, border: `2px solid ${authorColor}` }} onClick={(e) => { e.stopPropagation(); if (onUserClick) onUserClick(post.author); }}>
-              {authorInfo?.photoUrl ? <img src={authorInfo.photoUrl} alt={post.author} className="w-full h-full object-cover" /> : authorInfo?.displayName ? authorInfo.displayName.charAt(0).toUpperCase() : (post.author ? post.author.charAt(0).toUpperCase() : '?')}
-            </div>
+            <UserAvatar userId={post.author} accountsInfo={accountsInfo} size={40} onClick={onUserClick} />
           )}
           <div className="flex-1 min-w-0 pt-0.5">
             <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
@@ -1022,9 +1053,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 
               return (
                 <div key={comment.id} className="flex gap-2.5">
-                  <div className={`w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 text-xs shrink-0 overflow-hidden mt-1 ${onUserClick ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={(e) => { e.stopPropagation(); if (onUserClick) onUserClick(comment.author); }}>
-                     {cInfo?.photoUrl ? <img src={cInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : cInfo?.displayName ? cInfo.displayName.charAt(0).toUpperCase() : comment.author.charAt(0).toUpperCase()}
-                  </div>
+                  <UserAvatar userId={comment.author} accountsInfo={accountsInfo} size={32} className="mt-1" onClick={onUserClick} />
                   <div className="flex-1 group min-w-0">
                     <div className="flex items-stretch gap-2">
                       <div className="bg-slate-50 dark:bg-slate-950/50 p-2.5 rounded-2xl rounded-tl-none border border-slate-100 dark:border-slate-800 relative inline-block max-w-[85%]">
@@ -1097,9 +1126,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
               <div className="absolute bottom-full left-0 w-full mb-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg max-h-40 overflow-y-auto z-10">
                 {mentionCandidates.map(([uname, data]) => (
                   <div key={uname} onClick={() => insertMention(uname)} className="px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs overflow-hidden">
-                      {data.photoUrl ? <img src={data.photoUrl} alt="" className="w-full h-full object-cover" /> : (data.displayName || uname).charAt(0).toUpperCase()}
-                    </div>
+                    <UserAvatar userId={uname} accountsInfo={accountsInfo} size={24} />
                     <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{data.displayName || uname}</span>
                   </div>
                 ))}
@@ -1146,9 +1173,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                   const uInfo = accountsInfo && accountsInfo[u];
                   return (
                     <div key={u} className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-xl transition-colors">
-                      <div className={`w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500 dark:text-slate-400 overflow-hidden border border-slate-200 dark:border-slate-700 ${onUserClick ? 'cursor-pointer hover:opacity-80' : ''}`} onClick={(e) => { e.stopPropagation(); if (onUserClick) { onUserClick(u); setShowLikesModal(false); } }}>
-                        {uInfo?.photoUrl ? <img src={uInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : uInfo?.displayName ? uInfo.displayName.charAt(0).toUpperCase() : u.charAt(0).toUpperCase()}
-                      </div>
+                      <UserAvatar userId={u} accountsInfo={accountsInfo} size={40} onClick={(uid) => { if (onUserClick) { onUserClick(uid); setShowLikesModal(false); } }} />
                       <span className={`font-bold text-slate-800 dark:text-slate-200 text-sm ${onUserClick ? 'cursor-pointer hover:underline' : ''}`} onClick={(e) => { e.stopPropagation(); if (onUserClick) { onUserClick(u); setShowLikesModal(false); } }}>{uInfo?.displayName || u}</span>
                     </div>
                   );
@@ -3436,9 +3461,7 @@ if (timerState.y === 'top') {
               <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">{isOnline ? 'オンライン' : 'オフライン'}</span>
             </div>
             <button onClick={() => setShowProfileModal(true)} className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-              <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-xs overflow-hidden border border-emerald-200 dark:border-emerald-800">
-                {myInfo.photoUrl ? <img src={myInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : (myInfo.displayName || currentUser || '?').charAt(0).toUpperCase()}
-              </div>
+              <UserAvatar userId={currentUser} accountsInfo={accountsInfo} size={24} className="border-transparent" />
               <span className="text-sm font-bold text-slate-700 dark:text-slate-200 hidden sm:inline">
                 {renderUsernameWithBadge(currentUser, myInfo.displayName, accountsInfo, "font-bold text-slate-700 dark:text-slate-200")}
               </span>
@@ -3493,9 +3516,7 @@ if (timerState.y === 'top') {
                      return (
                        <div key={notif.id} onClick={() => handleNotificationClick(notif)} className={`flex gap-3 items-center p-2 rounded-xl cursor-pointer transition-colors ${isUnread ? 'bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-100/50 dark:hover:bg-emerald-950/40' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                           <div className="relative shrink-0 mt-0.5">
-                             <div className="w-9 h-9 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-bold text-xs overflow-hidden border border-slate-100 dark:border-slate-800">
-                                {accountsInfo[notif.fromUser]?.photoUrl ? <img src={accountsInfo[notif.fromUser].photoUrl} alt="" className="w-full h-full object-cover"/> : accountsInfo[notif.fromUser]?.displayName ? accountsInfo[notif.fromUser].displayName.charAt(0).toUpperCase() : notif.fromUser.charAt(0).toUpperCase()}
-                             </div>
+                             <UserAvatar userId={notif.fromUser} accountsInfo={accountsInfo} size={36} onClick={setSelectedUserProfile} className="border-transparent" />
                              {notif.type === 'like' && (
                                 <div className="absolute -bottom-0.5 -right-0.5 bg-rose-500 text-white w-4 h-4 rounded-full flex items-center justify-center border-[1.5px] border-white dark:border-slate-900 shadow-sm">
                                    <Heart size={7} fill="currentColor" />
@@ -3629,7 +3650,7 @@ if (timerState.y === 'top') {
         )}
         {currentTab === 'timeline' && <TimelineView posts={visiblePosts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} scrollToPostId={scrollToPostId} setScrollToPostId={setScrollToPostId} />}
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} currentUser={currentUser} myInfo={myInfo} setCurrentTab={setCurrentTab} onSendRequest={handleSendFriendRequest} />}
-        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} onRequestJointTraining={handleRequestJointTraining} onAcceptJointTraining={handleAcceptJointTraining} onRejectJointTraining={handleRejectJointTraining} onCancelJointTraining={handleCancelJointTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} />}
+        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} onRequestJointTraining={handleRequestJointTraining} onAcceptJointTraining={handleAcceptJointTraining} onRejectJointTraining={handleRejectJointTraining} onCancelJointTraining={handleCancelJointTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} onUserClick={setSelectedUserProfile} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} />}
         {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onSendPartnerRequest={handleSendPartnerRequest} onAcceptPartnerRequest={handleAcceptPartnerRequest} onRejectPartnerRequest={handleRejectPartnerRequest} onRemovePartner={handleRemovePartner} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} posts={posts} targetFriendTab={targetFriendTab} setTargetFriendTab={setTargetFriendTab} onSendTestPush={async (targetUser, message) => {
           if (!db) return;
@@ -3725,7 +3746,7 @@ if (timerState.y === 'top') {
       )}
 
       <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} userInfo={myInfo} onSave={handleSaveProfile} currentUser={currentUser} onLinkGoogle={handleLinkGoogle} onDeleteAccount={handleDeleteAccount} onTogglePush={handleTogglePushPermission} />
-      <UserProfileModal isOpen={!!selectedUserProfile} onClose={() => setSelectedUserProfile(null)} targetUser={selectedUserProfile} accountsInfo={accountsInfo} currentUser={currentUser} onSendRequest={handleSendFriendRequest} />
+      <UserProfileModal isOpen={!!selectedUserProfile} onClose={() => setSelectedUserProfile(null)} targetUser={selectedUserProfile} accountsInfo={accountsInfo} currentUser={currentUser} onSendRequest={handleSendFriendRequest} onUserClick={setSelectedUserProfile} />
     </div>
   );
 }
@@ -3951,9 +3972,16 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
           
         </div>
         <div className="flex flex-col items-center space-y-6">
-          <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800 border-4 overflow-hidden flex items-center justify-center relative font-bold text-2xl text-slate-500" style={{ borderColor: userColor }}>
-            {photoUrl ? <img src={photoUrl} alt="profile" className="w-full h-full object-cover" /> : displayName ? displayName.charAt(0).toUpperCase() : currentUser.charAt(0).toUpperCase()}
-            {isUploading && <div className="absolute inset-0 bg-white/60 dark:bg-slate-900/60 flex items-center justify-center"><Activity className="animate-spin text-emerald-500" size={24} /></div>}
+          <div className="relative">
+            <UserAvatar 
+              userId={currentUser} 
+              size={96} 
+              photoUrlOverride={photoUrl} 
+              displayNameOverride={displayName} 
+              colorOverride={userColor} 
+              className="border-4" 
+            />
+            {isUploading && <div className="absolute inset-0 rounded-full bg-white/60 dark:bg-slate-900/60 flex items-center justify-center"><Activity className="animate-spin text-emerald-500" size={24} /></div>}
           </div>
           
           <div className="flex gap-2 w-full">
@@ -4105,7 +4133,7 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
 }
 
 // --- ユーザープロフィールモーダル ---
-function UserProfileModal({ isOpen, onClose, targetUser, accountsInfo, currentUser, onSendRequest }) {
+function UserProfileModal({ isOpen, onClose, targetUser, accountsInfo, currentUser, onSendRequest, onUserClick }) {
   const [view, setView] = useState('profile');
 
   useEffect(() => {
@@ -4127,9 +4155,7 @@ function UserProfileModal({ isOpen, onClose, targetUser, accountsInfo, currentUs
               <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={20} /></button>
             </div>
             <div className="flex flex-col items-center space-y-4">
-              <div className="w-32 h-32 rounded-full bg-slate-100 dark:bg-slate-800 border-4 overflow-hidden flex items-center justify-center text-4xl font-bold text-slate-500 shadow-sm" style={{ borderColor: userInfo.userColor || '#10b981' }}>
-                {userInfo.photoUrl ? <img src={userInfo.photoUrl} alt="profile" className="w-full h-full object-cover" /> : userInfo.displayName ? userInfo.displayName.charAt(0).toUpperCase() : targetUser.charAt(0).toUpperCase()}
-              </div>
+              <UserAvatar userId={targetUser} accountsInfo={accountsInfo} size={128} className="border-4 shadow-sm" />
               <div className="text-center w-full">
                 <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{userInfo.displayName || targetUser}</div>
                 {userInfo.goal && (
@@ -4173,10 +4199,8 @@ function UserProfileModal({ isOpen, onClose, targetUser, accountsInfo, currentUs
                   return (
                     <div key={fId} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 overflow-hidden shrink-0" style={{ border: `2px solid ${userColor}` }}>
-                          {fInfo?.photoUrl ? <img src={fInfo.photoUrl} alt="" className="w-full h-full object-cover" /> : fInfo?.displayName ? fInfo.displayName.charAt(0).toUpperCase() : fId.charAt(0).toUpperCase()}
-                        </div>
-                        <span className="font-bold text-slate-800 dark:text-slate-200 text-sm truncate">{fInfo?.displayName || fId}</span>
+                        <UserAvatar userId={fId} accountsInfo={accountsInfo} size={40} onClick={onUserClick} />
+                        <span className={`font-bold text-slate-800 dark:text-slate-200 text-sm truncate ${onUserClick ? 'cursor-pointer hover:underline' : ''}`} onClick={() => onUserClick && onUserClick(fId)}>{fInfo?.displayName || fId}</span>
                       </div>
                       {!isMe && !isMyFriend && !hasRequested && (
                         <button onClick={() => onSendRequest(fId)} className="shrink-0 text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 transition-colors">
@@ -4351,7 +4375,7 @@ function TimelineView({ posts, onToggleLike, onImport, currentUser, onDelete, on
 }
 
 // --- 月間レポートコンポーネント ---
-function MonthlyReport({ monthDate, posts, userName, accountsInfo }) {
+function MonthlyReport({ monthDate, posts, userName, accountsInfo, onUserClick }) {
   const year = monthDate.getFullYear();
   const month = monthDate.getMonth();
   const monthPosts = posts.filter(p => {
@@ -4386,10 +4410,8 @@ function MonthlyReport({ monthDate, posts, userName, accountsInfo }) {
   return (
     <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm animate-in fade-in">
       <div className="flex items-center gap-3 mb-5">
-         <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center font-bold text-white text-xs bg-slate-600">
-            {accountsInfo[userName]?.photoUrl ? <img src={accountsInfo[userName].photoUrl} alt={userName} className="w-full h-full object-cover" /> : accountsInfo[userName]?.displayName ? accountsInfo[userName].displayName.charAt(0).toUpperCase() : userName.charAt(0).toUpperCase()}
-         </div>
-         <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1">{renderUsernameWithBadge(userName, accountsInfo[userName]?.displayName, accountsInfo, "font-bold text-slate-800 dark:text-slate-100")} のレポート</h3>
+         <UserAvatar userId={userName} accountsInfo={accountsInfo} size={32} onClick={onUserClick} />
+         <h3 className={`font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1 ${onUserClick ? 'cursor-pointer hover:underline' : ''}`} onClick={() => onUserClick && onUserClick(userName)}>{renderUsernameWithBadge(userName, accountsInfo[userName]?.displayName, accountsInfo, "font-bold text-slate-800 dark:text-slate-100")} のレポート</h3>
       </div>
       
       {!hasData ? (
@@ -4696,7 +4718,7 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
 
       <div>
         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">月間レポート ({month + 1}月)</h3>
-        <MonthlyReport monthDate={currentMonth} posts={posts} userName={displayUser} accountsInfo={accountsInfo} />
+        <MonthlyReport monthDate={currentMonth} posts={posts} userName={displayUser} accountsInfo={accountsInfo} onUserClick={onUserClick} />
       </div>
 
       <div ref={calendarCardRef} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
@@ -4985,7 +5007,7 @@ function ActiveProgramDisplay({ program, onApply, onToggleComplete, onDelete }) 
   );
 }
 
-function RecordView({ onStart, onPost, onCancel, onRequestJointTraining, onAcceptJointTraining, onRejectJointTraining, onCancelJointTraining, myInfo, gyms, exercises, workoutItems, setWorkoutItems, selectedCategories, setSelectedCategories, posts, currentUser, isManual, setIsManual, onActiveExerciseChange, accountsInfo }) {
+function RecordView({ onStart, onPost, onCancel, onRequestJointTraining, onAcceptJointTraining, onRejectJointTraining, onCancelJointTraining, myInfo, gyms, exercises, workoutItems, setWorkoutItems, selectedCategories, setSelectedCategories, posts, currentUser, isManual, setIsManual, onActiveExerciseChange, accountsInfo, onUserClick }) {
   const joinedGyms = myInfo.joinedGyms || ['common'];
   const jointPartnerId = myInfo.jointPartnerId;
   const partnerItems = jointPartnerId ? (accountsInfo[jointPartnerId]?.currentWorkoutItems || []) : [];
@@ -5818,9 +5840,7 @@ ${importText}`;
                       const hasRequested = (accountsInfo[f]?.jointTrainingRequests || []).includes(currentUser);
                       return (
                       <button key={f} onClick={() => !hasRequested && onRequestJointTraining(f)} disabled={hasRequested} className={`flex items-center gap-1.5 bg-white dark:bg-slate-900 border text-xs font-bold px-3 py-2 rounded-xl shrink-0 transition-colors shadow-sm ${hasRequested ? 'border-slate-200 text-slate-400 cursor-not-allowed' : 'border-orange-200 text-orange-600 hover:bg-orange-100'}`}>
-                        <div className="w-5 h-5 rounded-full overflow-hidden shrink-0 bg-orange-200 text-orange-600 flex items-center justify-center text-[10px] font-bold">
-                           {accountsInfo[f]?.photoUrl ? <img src={accountsInfo[f]?.photoUrl} className="w-full h-full object-cover" /> : (accountsInfo[f]?.displayName || f || '?').charAt(0).toUpperCase()}
-                        </div>
+                        <UserAvatar userId={f} accountsInfo={accountsInfo} size={20} className="border-transparent" />
                         {accountsInfo[f]?.displayName || f} {hasRequested ? '申請済み' : 'に合トレ申請'}
                       </button>
                     )})}
@@ -5834,10 +5854,8 @@ ${importText}`;
                        {myInfo.jointTrainingRequests.map(reqId => (
                           <div key={reqId} className="flex items-center justify-between bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 p-2 rounded-xl shadow-sm">
                              <div className="flex items-center gap-2">
-                               <div className="w-6 h-6 rounded-full overflow-hidden shrink-0 bg-emerald-200 text-emerald-600 flex items-center justify-center text-xs font-bold">
-                                 {accountsInfo[reqId]?.photoUrl ? <img src={accountsInfo[reqId]?.photoUrl} className="w-full h-full object-cover" /> : (accountsInfo[reqId]?.displayName || reqId || '?').charAt(0).toUpperCase()}
-                               </div>
-                               <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{accountsInfo[reqId]?.displayName || reqId}</span>
+                               <UserAvatar userId={reqId} accountsInfo={accountsInfo} size={24} onClick={onUserClick} className="border-transparent" />
+                               <span className={`text-sm font-bold text-slate-800 dark:text-slate-100 ${onUserClick ? 'cursor-pointer hover:underline' : ''}`} onClick={() => onUserClick && onUserClick(reqId)}>{accountsInfo[reqId]?.displayName || reqId}</span>
                              </div>
                              <div className="flex gap-1">
                                <button onClick={() => onAcceptJointTraining(reqId)} className="bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-sm">承諾</button>
@@ -5938,7 +5956,7 @@ ${importText}`;
                  {jointPartnerId && pItem ? (
                    <div className="relative opacity-90 scale-[0.98]">
                      <div className="absolute -top-3 left-4 z-10 bg-orange-500 text-white px-2 py-0.5 rounded-full shadow-sm text-[10px] font-bold flex items-center gap-1">
-                       {accountsInfo[jointPartnerId]?.photoUrl ? <img src={accountsInfo[jointPartnerId]?.photoUrl} className="w-3 h-3 rounded-full object-cover bg-white"/> : <div className="w-3 h-3 rounded-full bg-white text-orange-500 flex items-center justify-center">{(accountsInfo[jointPartnerId]?.displayName || jointPartnerId || '?').charAt(0).toUpperCase()}</div>}
+                       <UserAvatar userId={jointPartnerId} accountsInfo={accountsInfo} size={16} className="border-transparent" />
                        {accountsInfo[jointPartnerId]?.displayName || jointPartnerId}
                      </div>
                      <WorkoutItemForm 
@@ -7646,7 +7664,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.6, 09:52, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.6, 10:02, updated)</p>
       </div>
     </div>
   );
