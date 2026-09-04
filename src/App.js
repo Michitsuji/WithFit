@@ -4112,9 +4112,13 @@ function CoachChatModal({ isOpen, onClose, currentUser, accountsInfo, posts, app
     ).join('\n');
 
     const prompt = `あなたは私の専属トレーニングコーチです。
-ユーザーが設定した以下の【マスター台帳】を最優先のルール・文脈として厳守し、親しみやすくモチベーションが上がる言葉遣いで簡潔に回答してください。
+ユーザーからメッセージやトレーニング内容が送られます。
+以下の2つの要素を含むJSON形式で回答してください。JSON以外のテキストは一切含めないでください。
 
-【マスター台帳】
+1. "chatResponse": 送信されたメニューやメッセージに対する評価・アドバイス・励ましのみを親しみやすく簡潔な言葉で書いてください。（台帳の更新についての言及は不要です）
+2. "updatedLedger": 以下の【現在のマスター台帳】の内容をもとに、今回の会話内容から得られた新しい気づき、重量更新、フォームの課題、今後の目標などを反映し、整理・追記・更新した最新の台帳テキストを出力してください。
+
+【現在のマスター台帳】
 ${myInfo.coachLedger || 'まだ台帳が設定されていません。'}
 
 【私の現在の状態】
@@ -4135,8 +4139,18 @@ ${recentWorkoutText || 'まだ記録がありません'}
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
       
-      let aiResponse = data.candidates[0].content.parts[0].text;
-      setChatHistory(prev => [...prev, { role: 'assistant', text: aiResponse }]);
+      let textResponse = data.candidates[0].content.parts[0].text;
+      textResponse = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(textResponse);
+      
+      setChatHistory(prev => [...prev, { role: 'assistant', text: parsed.chatResponse }]);
+      
+      if (parsed.updatedLedger) {
+         setLedgerText(parsed.updatedLedger);
+         try {
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { coachLedger: parsed.updatedLedger }, { merge: true });
+         } catch(err) { console.error("Ledger auto-update failed", err); }
+      }
     } catch (e) {
       console.error(e);
       setChatHistory(prev => [...prev, { role: 'assistant', text: '申し訳ありません、エラーが発生しました。時間を置いて再度お試しください。' }]);
@@ -4201,13 +4215,13 @@ ${recentWorkoutText || 'まだ記録がありません'}
         ) : (
           <div className="flex-1 overflow-y-auto p-4 flex flex-col bg-slate-50 dark:bg-slate-950">
             <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-3">
-              AIが過去のチャットで生成した「マスター台帳」をここに貼り付けて保存してください。<br/>
-              コーチは常にこのルールと目標を元に指導を行います。
+              チャットをするたびにAIが自動で「マスター台帳」を整理・更新します。<br/>
+              コーチは常にこの情報を基準に指導を行います。手動で直接編集して保存することも可能です。
             </p>
             <textarea
               value={ledgerText}
               onChange={e => setLedgerText(e.target.value)}
-              placeholder="【長期進捗マスター台帳】&#10;・身長: 171cm&#10;・目標: ...&#10;などを貼り付け"
+              placeholder="【長期進捗マスター台帳】&#10;・身長: 171cm&#10;・目標: ...&#10;などを記述"
               className="flex-1 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:border-indigo-500 resize-none font-mono"
             />
             <button 
@@ -8166,7 +8180,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.9.5, 08:51, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.9.5, 08:54, updated)</p>
       </div>
     </div>
   );
