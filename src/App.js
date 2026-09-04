@@ -1983,7 +1983,7 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
         navigator.vibrate(50);
       }
-    }, 300);
+    }, 200);
   };
 
   const handleMove = (e) => {
@@ -4146,7 +4146,7 @@ ${recentWorkoutText || 'まだ記録がありません'}
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-[90] flex flex-col items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-sm h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800">
         <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
           <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
             <Sparkles size={18} className="text-indigo-500"/> AIコーチ
@@ -8166,7 +8166,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.9.5, 08:48, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.9.5, 08:51, updated)</p>
       </div>
     </div>
   );
