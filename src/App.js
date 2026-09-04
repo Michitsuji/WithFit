@@ -2127,6 +2127,8 @@ export default function App() {
   const [pushPromptType, setPushPromptType] = useState('request');
   const [osPermission, setOsPermission] = useState('default');
 
+  const [showCoachChat, setShowCoachChat] = useState(false);
+
   const [restDuration, setRestDuration] = useState(0);
   const [restTimerStart, setRestTimerStart] = useState(null);
   const [restTimeLeft, setRestTimeLeft] = useState(0);
@@ -3870,7 +3872,7 @@ if (timerState.y === 'top') {
         {currentTab === 'timeline' && <TimelineView posts={visiblePosts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} scrollToPostId={scrollToPostId} setScrollToPostId={setScrollToPostId} />}
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} currentUser={currentUser} myInfo={myInfo} setCurrentTab={setCurrentTab} onSendRequest={handleSendFriendRequest} onUserClick={setSelectedUserProfile} />}
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} onRequestJointTraining={handleRequestJointTraining} onAcceptJointTraining={handleAcceptJointTraining} onRejectJointTraining={handleRejectJointTraining} onCancelJointTraining={handleCancelJointTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} />}
-        {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} />}
+        {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} onOpenCoach={() => setShowCoachChat(true)} />}
         {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onSendPartnerRequest={handleSendPartnerRequest} onAcceptPartnerRequest={handleAcceptPartnerRequest} onRejectPartnerRequest={handleRejectPartnerRequest} onRemovePartner={handleRemovePartner} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} posts={posts} targetFriendTab={targetFriendTab} setTargetFriendTab={setTargetFriendTab} onSendTestPush={async (targetUser, message) => {
           if (!db) return;
           const targetToken = accountsInfo[targetUser]?.fcmToken;
@@ -3968,6 +3970,174 @@ if (timerState.y === 'top') {
 
       <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} userInfo={myInfo} onSave={handleSaveProfile} currentUser={currentUser} onLinkGoogle={handleLinkGoogle} onDeleteAccount={handleDeleteAccount} onTogglePush={handleTogglePushPermission} />
       <UserProfileModal isOpen={!!selectedUserProfile} onClose={() => setSelectedUserProfile(null)} targetUser={selectedUserProfile} accountsInfo={accountsInfo} currentUser={currentUser} onSendRequest={handleSendFriendRequest} />
+      <CoachChatModal isOpen={showCoachChat} onClose={() => setShowCoachChat(false)} currentUser={currentUser} accountsInfo={accountsInfo} posts={posts} appId={appId} />
+    </div>
+  );
+}
+
+// --- AIコーチ＆台帳モーダル ---
+function CoachChatModal({ isOpen, onClose, currentUser, accountsInfo, posts, appId }) {
+  const [activeTab, setActiveTab] = useState('chat');
+  const [message, setMessage] = useState('');
+  const [chatHistory, setChatHistory] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const myInfo = accountsInfo[currentUser] || {};
+  const [ledgerText, setLedgerText] = useState(myInfo.coachLedger || '');
+  const [isSavingLedger, setIsSavingLedger] = useState(false);
+  const chatEndRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setLedgerText(myInfo.coachLedger || '');
+      if (chatHistory.length === 0) {
+         setChatHistory([{ role: 'assistant', text: 'お疲れ様です！本日のトレーニング予定や、相談したいことはありますか？台帳の内容に沿ってサポートしますよ！' }]);
+      }
+    }
+  }, [isOpen, myInfo.coachLedger]);
+
+  useEffect(() => {
+    if (activeTab === 'chat') {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatHistory, activeTab]);
+
+  if (!isOpen) return null;
+
+  const handleSaveLedger = async () => {
+    if (!db || !currentUser) return;
+    setIsSavingLedger(true);
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { coachLedger: ledgerText }, { merge: true });
+      alert('台帳を保存しました！以降のAIコーチの回答はこの台帳を基準に行われます。');
+    } catch (e) {
+      console.error(e);
+      alert('保存に失敗しました');
+    }
+    setIsSavingLedger(false);
+  };
+
+  const handleSendMessage = async () => {
+    if (!message.trim() || isLoading) return;
+    const userMsg = message.trim();
+    setMessage('');
+    setChatHistory(prev => [...prev, { role: 'user', text: userMsg }]);
+    setIsLoading(true);
+
+    const myRecentPosts = posts.filter(p => p.author === currentUser).slice(0, 3);
+    const recentWorkoutText = myRecentPosts.map(p => 
+      `${p.date.substring(0,10)}: ${p.gymName || '不明なジム'} (総負荷量: ${p.volume}kg)`
+    ).join('\n');
+
+    const prompt = `あなたは私の専属トレーニングコーチです。
+ユーザーが設定した以下の【マスター台帳】を最優先のルール・文脈として厳守し、親しみやすくモチベーションが上がる言葉遣いで簡潔に回答してください。
+
+【マスター台帳】
+${myInfo.coachLedger || 'まだ台帳が設定されていません。'}
+
+【私の現在の状態】
+・表示名: ${myInfo.displayName || currentUser}
+・目標: ${myInfo.goal || '未設定'}
+・体重: ${myInfo.weight ? myInfo.weight + 'kg' : '未設定'}
+・直近のトレーニング:
+${recentWorkoutText || 'まだ記録がありません'}
+
+私のメッセージ:「${userMsg}」`;
+
+    try {
+      const response = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      
+      let aiResponse = data.candidates[0].content.parts[0].text;
+      setChatHistory(prev => [...prev, { role: 'assistant', text: aiResponse }]);
+    } catch (e) {
+      console.error(e);
+      setChatHistory(prev => [...prev, { role: 'assistant', text: '申し訳ありません、エラーが発生しました。時間を置いて再度お試しください。' }]);
+    }
+    setIsLoading(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-[90] flex flex-col items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
+        <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
+          <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <Sparkles size={18} className="text-indigo-500"/> AIコーチ
+          </h2>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={20} /></button>
+        </div>
+
+        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 m-4 rounded-xl shrink-0">
+          <button onClick={() => setActiveTab('chat')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'chat' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>チャット</button>
+          <button onClick={() => setActiveTab('ledger')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'ledger' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>マスター台帳</button>
+        </div>
+
+        {activeTab === 'chat' ? (
+          <>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 dark:bg-slate-950">
+              {chatHistory.map((msg, i) => (
+                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[85%] rounded-2xl p-3 text-sm whitespace-pre-wrap ${msg.role === 'user' ? 'bg-indigo-500 text-white rounded-br-none' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-bl-none shadow-sm'}`}>
+                    {msg.text}
+                  </div>
+                </div>
+              ))}
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl rounded-bl-none p-3 shadow-sm flex gap-1">
+                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+            <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex gap-2 shrink-0">
+              <input 
+                type="text" 
+                value={message} 
+                onChange={e => setMessage(e.target.value)} 
+                onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+                placeholder="コーチに相談する..." 
+                className="flex-1 bg-slate-100 dark:bg-slate-800 border-transparent rounded-xl px-4 py-2.5 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <button 
+                onClick={handleSendMessage} 
+                disabled={!message.trim() || isLoading}
+                className="bg-indigo-500 hover:bg-indigo-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white p-2.5 rounded-xl transition-colors"
+              >
+                <Send size={18} />
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col bg-slate-50 dark:bg-slate-950">
+            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-3">
+              AIが過去のチャットで生成した「マスター台帳」をここに貼り付けて保存してください。<br/>
+              コーチは常にこのルールと目標を元に指導を行います。
+            </p>
+            <textarea
+              value={ledgerText}
+              onChange={e => setLedgerText(e.target.value)}
+              placeholder="【長期進捗マスター台帳】&#10;・身長: 171cm&#10;・目標: ...&#10;などを貼り付け"
+              className="flex-1 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:border-indigo-500 resize-none font-mono"
+            />
+            <button 
+              onClick={handleSaveLedger} 
+              disabled={isSavingLedger}
+              className="mt-4 w-full bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white font-bold py-3.5 rounded-xl shadow-md transition-colors flex items-center justify-center gap-2"
+            >
+              {isSavingLedger ? <Activity className="animate-spin" size={18} /> : <CheckCircle size={18} />}
+              台帳を保存して適用
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -4780,7 +4950,7 @@ function BodyCompositionInfo({ info, dailyCalories = 0, dateLabel = '' }) {
 }
 
 // --- データ画面 (カレンダー・グラフ・レポート) ---
-function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport, targetUser, onToggleLike, onAddComment, onDeleteComment, onToggleCommentLike, onUserClick }) {
+function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport, targetUser, onToggleLike, onAddComment, onDeleteComment, onToggleCommentLike, onUserClick, onOpenCoach }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState(formatDateFromTimestamp(Date.now()));
   const displayUser = targetUser || currentUser;
@@ -4967,6 +5137,16 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">データ</h2>
+
+      {onOpenCoach && (
+      <button 
+        onClick={onOpenCoach} 
+        className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold py-4 rounded-2xl shadow-md flex items-center justify-center gap-2 mb-6 hover:opacity-90 transition-opacity"
+      >
+        <Sparkles size={20} />
+        AI専属コーチに相談・台帳管理
+      </button>
+      )}
 
       <div>
         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">月間レポート ({month + 1}月)</h3>
@@ -7903,7 +8083,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.8.6, 23:35, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.9.4, 22:20, updated)</p>
       </div>
     </div>
   );
