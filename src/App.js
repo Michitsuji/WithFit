@@ -352,56 +352,85 @@ const getVolumeMetaphor = (kg) => {
 
 // --- グラフコンポーネント ---
 function SimpleChart({ data, color, title }) {
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+    }
+  }, [data]);
+
   if (!data || data.length === 0) return (
     <div className="w-full bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center">
       <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 w-full flex items-center gap-2"><Activity size={16} className="text-slate-400"/> {title}</h4>
       <p className="text-sm font-bold text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-950 p-6 rounded-2xl text-center border border-slate-100 dark:border-slate-800 w-full">データがありません</p>
     </div>
   );
-  const values = data.map(d => d.value).filter(v => !isNaN(v));
-  if (values.length === 0) return null;
-  const minVal = Math.min(...values);
-  const maxVal = Math.max(...values);
+
+  const validData = data.filter(d => !isNaN(d.value) && d.date).map(d => ({
+    ...d,
+    ts: new Date(d.date).getTime()
+  })).sort((a, b) => a.ts - b.ts);
+
+  if (validData.length === 0) return null;
+
+  const minVal = Math.min(...validData.map(d => d.value));
+  const maxVal = Math.max(...validData.map(d => d.value));
   const padding = (maxVal - minVal) === 0 ? (minVal === 0 ? 1 : minVal * 0.1) : (maxVal - minVal) * 0.2;
   const min = Math.max(0, minVal - padding);
   const max = maxVal + padding;
   const range = max - min === 0 ? 1 : max - min;
-  const width = 300, height = 100;
-  const points = data.map((d, i) => {
-    const x = (i / (data.length - 1 || 1)) * width;
+
+  const minTs = validData[0].ts;
+  const maxTs = validData[validData.length - 1].ts;
+  const spanDays = maxTs === minTs ? 1 : (maxTs - minTs) / (1000 * 60 * 60 * 24);
+  
+  const width = Math.max(300, spanDays * 40 + 60);
+  const height = 100;
+  
+  const points = validData.map(d => {
+    const x = spanDays === 0 ? width / 2 : ((d.ts - minTs) / (maxTs - minTs)) * (width - 60) + 30;
     const y = height - ((d.value - min) / range) * height;
     return `${x},${y}`;
   }).join(' ');
 
   return (
-    <div className="w-full bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+    <div className="w-full bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col relative">
       <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-6 flex items-center gap-2"><Activity size={16} className="text-slate-400"/> {title}</h4>
-      <div className="relative h-48 w-full pt-4 pl-8 pr-4">
-        <svg viewBox={`0 -10 ${width} ${height + 40}`} className="w-full h-full overflow-visible">
-          {[0, 0.5, 1].map(tick => {
-             const y = height - tick * height;
-             const val = (min + range * tick).toFixed(1);
-             return (
-               <g key={tick}>
-                 <line x1="0" y1={y} x2={width} y2={y} stroke="currentColor" className="text-slate-200 dark:text-slate-800" strokeWidth="1" strokeDasharray="4 4" />
-                 <text x="-8" y={y + 4} fontSize="10" fill="currentColor" textAnchor="end" className="text-slate-400">{val}</text>
-               </g>
-             );
-          })}
-          <polyline points={points} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-          {data.map((d, i) => {
-            const x = (i / (data.length - 1 || 1)) * width;
-            const y = height - ((d.value - min) / range) * height;
-            const dateStr = d.date ? d.date.slice(5, 10).replace('-', '/') : '';
-            return (
-              <g key={i}>
-                <circle cx={x} cy={y} r="5" fill="currentColor" className="text-white dark:text-slate-900" stroke={color} strokeWidth="2.5" />
-                <text x={x} y={y - 12} fontSize="12" fill={color} textAnchor="middle" className="font-bold tracking-tighter">{d.value}</text>
-                {dateStr && <text x={x} y={height + 25} fontSize="10" fill="currentColor" textAnchor="middle" className="font-bold text-slate-400 dark:text-slate-500">{dateStr}</text>}
-              </g>
-            );
-          })}
-        </svg>
+      <div className="relative h-48 w-full flex">
+        <div className="absolute left-0 top-0 bottom-0 w-8 bg-white/90 dark:bg-slate-900/90 z-10 flex flex-col justify-between text-right text-[10px] text-slate-400 font-bold pb-[50px] pt-4 pr-1 backdrop-blur-sm">
+          <span>{max.toFixed(1)}</span>
+          <span>{((min + max) / 2).toFixed(1)}</span>
+          <span>{min.toFixed(1)}</span>
+        </div>
+        
+        <div ref={scrollRef} className="overflow-x-auto w-full hide-scrollbar pl-8">
+          <div className="relative h-full pt-4" style={{ width: width }}>
+            <svg viewBox={`0 -10 ${width} ${height + 40}`} className="w-full h-full overflow-visible">
+              {[0, 0.5, 1].map(tick => {
+                 const y = height - tick * height;
+                 return (
+                   <g key={tick}>
+                     <line x1="0" y1={y} x2={width} y2={y} stroke="currentColor" className="text-slate-200 dark:text-slate-800" strokeWidth="1" strokeDasharray="4 4" />
+                   </g>
+                 );
+              })}
+              <polyline points={points} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+              {validData.map((d, i) => {
+                const x = spanDays === 0 ? width / 2 : ((d.ts - minTs) / (maxTs - minTs)) * (width - 60) + 30;
+                const y = height - ((d.value - min) / range) * height;
+                const dateStr = d.date ? d.date.slice(5, 10).replace('-', '/') : '';
+                return (
+                  <g key={i}>
+                    <circle cx={x} cy={y} r="5" fill="currentColor" className="text-white dark:text-slate-900" stroke={color} strokeWidth="2.5" />
+                    <text x={x} y={y - 12} fontSize="12" fill={color} textAnchor="middle" className="font-bold tracking-tighter">{d.value}</text>
+                    {dateStr && <text x={x} y={height + 25} fontSize="10" fill="currentColor" textAnchor="middle" className="font-bold text-slate-400 dark:text-slate-500">{dateStr}</text>}
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1929,7 +1958,6 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
   };
 
   const handleStart = (e) => {
-    if (!myInfo?.isTraining) return;
     if (e.type === 'touchstart') {
       isTouchRef.current = true;
     } else if (e.type === 'mousedown' && isTouchRef.current) {
@@ -1942,7 +1970,7 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
   };
 
   const handleMove = (e) => {
-    if (!isOpenRef.current || !myInfo?.isTraining) return;
+    if (!isOpenRef.current) return;
     if (e.cancelable && e.type === 'touchmove') {
       e.preventDefault();
     }
@@ -1950,7 +1978,6 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
   };
 
   const handleEnd = (e) => {
-    if (!myInfo?.isTraining) return;
     if (e.type === 'mouseup' && isTouchRef.current) {
       isTouchRef.current = false;
       return;
@@ -1986,7 +2013,7 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
   return (
     <div 
       ref={wrapperRef}
-      className={`relative flex flex-col items-center ${myInfo?.isTraining ? 'touch-none select-none z-50' : ''}`}
+      className="relative flex flex-col items-center touch-none select-none z-50"
       onMouseDown={handleStart}
       onMouseMove={handleMove}
       onMouseUp={handleEnd}
@@ -1996,28 +2023,26 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
       onTouchEnd={handleEnd}
       onTouchCancel={handleEnd}
     >
-       {myInfo?.isTraining && (
-         <div 
-           className={`absolute bottom-full mb-1 left-1/2 -translate-x-1/2 flex transition-all duration-200 pointer-events-none ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}
-           style={{ transformOrigin: 'bottom center' }}
-         >
-           <div className={`relative w-28 h-28 bg-indigo-500/95 backdrop-blur-md rounded-tl-full flex items-center justify-center border-[3px] border-r-[1.5px] border-indigo-300 dark:border-indigo-700 transition-transform duration-200 ${hovered === 'left' ? 'scale-110 bg-indigo-500 z-10 shadow-[0_0_20px_rgba(99,102,241,0.6)]' : 'opacity-70'} origin-bottom-right`}>
-             <div className="flex flex-col items-center justify-center text-white mr-4 mt-6">
-               <AlignLeft size={28} />
-               <span className="text-xs font-bold mt-1 tracking-wider">メニュー</span>
-             </div>
-           </div>
-           <div className={`relative w-28 h-28 bg-emerald-500/95 backdrop-blur-md rounded-tr-full flex items-center justify-center border-[3px] border-l-[1.5px] border-emerald-300 dark:border-emerald-700 transition-transform duration-200 ${hovered === 'right' ? 'scale-110 bg-emerald-500 z-10 shadow-[0_0_20px_rgba(16,185,129,0.6)]' : 'opacity-70'} origin-bottom-left`}>
-             <div className="flex flex-col items-center justify-center text-white ml-4 mt-6">
-               <Edit2 size={28} />
-               <span className="text-xs font-bold mt-1 tracking-wider">記録画面</span>
-             </div>
+       <div 
+         className={`absolute bottom-full mb-1 left-1/2 -translate-x-1/2 flex transition-all duration-200 pointer-events-none ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}
+         style={{ transformOrigin: 'bottom center' }}
+       >
+         <div className={`relative w-28 h-28 bg-indigo-500/95 backdrop-blur-md rounded-tl-full flex items-center justify-center border-[3px] border-r-[1.5px] border-indigo-300 dark:border-indigo-700 transition-transform duration-200 ${hovered === 'left' ? 'scale-110 bg-indigo-500 z-10 shadow-[0_0_20px_rgba(99,102,241,0.6)]' : 'opacity-70'} origin-bottom-right`}>
+           <div className="flex flex-col items-center justify-center text-white mr-4 mt-6">
+             <Target size={28} />
+             <span className="text-xs font-bold mt-1 tracking-wider">プログラム</span>
            </div>
          </div>
-       )}
+         <div className={`relative w-28 h-28 bg-emerald-500/95 backdrop-blur-md rounded-tr-full flex items-center justify-center border-[3px] border-l-[1.5px] border-emerald-300 dark:border-emerald-700 transition-transform duration-200 ${hovered === 'right' ? 'scale-110 bg-emerald-500 z-10 shadow-[0_0_20px_rgba(16,185,129,0.6)]' : 'opacity-70'} origin-bottom-left`}>
+           <div className="flex flex-col items-center justify-center text-white ml-4 mt-6">
+             <Edit2 size={28} />
+             <span className="text-xs font-bold mt-1 tracking-wider">記録画面</span>
+           </div>
+         </div>
+       </div>
 
-       <div className={`transition-transform duration-200 ${isOpen && myInfo?.isTraining ? 'scale-90 opacity-80' : 'scale-100'}`}>
-         <div className={myInfo?.isTraining ? "pointer-events-none" : ""}>
+       <div className={`transition-transform duration-200 ${isOpen ? 'scale-90 opacity-80' : 'scale-100'}`}>
+         <div className="pointer-events-none">
            {children}
          </div>
        </div>
@@ -3921,7 +3946,13 @@ if (timerState.y === 'top') {
           <NavButton icon={<Home size={22} />} label="ホーム" isActive={currentTab === 'timeline'} onClick={() => { if(currentTab === 'timeline') window.scrollTo({top:0, behavior:'smooth'}); else setCurrentTab('timeline'); }} />
           <NavButton icon={<Dumbbell size={22} />} label="種目" isActive={currentTab === 'exercises'} onClick={() => { if(currentTab === 'exercises') window.scrollTo({top:0, behavior:'smooth'}); else setCurrentTab('exercises'); }} />
           <RecordWheelWrapper myInfo={myInfo} currentTab={currentTab} setCurrentTab={setCurrentTab}>
-            <NavButton icon={myInfo.isTraining ? <Clock className="animate-pulse" size={28}/> : <PlusCircle size={28} />} label={myInfo.isTraining ? "記録中" : "記録"} isActive={currentTab === 'record'} onClick={() => { if (!myInfo?.isTraining) { if(currentTab === 'record') { window.scrollTo({top:0, behavior:'smooth'}); window.dispatchEvent(new CustomEvent('showRecordDashboard')); } else { setCurrentTab('record'); window.dispatchEvent(new CustomEvent('showRecordDashboard')); } } }} isPrimary isTraining={myInfo.isTraining} />
+            <NavButton icon={myInfo?.isTraining ? <Clock className="animate-pulse" size={28}/> : <PlusCircle size={28} />} label={myInfo?.isTraining ? "記録中" : "記録"} isActive={currentTab === 'record'} onClick={() => { 
+              if(currentTab === 'record') { 
+                window.scrollTo({top:0, behavior:'smooth'}); 
+              } else { 
+                setCurrentTab('record'); 
+              } 
+            }} isPrimary isTraining={myInfo?.isTraining} />
           </RecordWheelWrapper>
           <NavButton icon={<CalendarIcon size={22} />} label="データ" isActive={currentTab === 'data'} onClick={() => { if(currentTab === 'data') window.scrollTo({top:0, behavior:'smooth'}); else setCurrentTab('data'); }} />
           <NavButton icon={<Users size={22} />} label="フレンド" isActive={currentTab === 'friends'} onClick={() => { if(currentTab === 'friends') window.scrollTo({top:0, behavior:'smooth'}); else setCurrentTab('friends'); }} />
@@ -4030,6 +4061,7 @@ function CoachChatModal({ isOpen, onClose, currentUser, accountsInfo, posts, app
 
     const prompt = `あなたは私の専属トレーニングコーチです。
 ユーザーが設定した以下の【マスター台帳】を最優先のルール・文脈として厳守し、親しみやすくモチベーションが上がる言葉遣いで簡潔に回答してください。
+さらに、今回の会話内容から台帳を更新すべきだと判断した場合は、最新の台帳情報を作成してください。
 
 【マスター台帳】
 ${myInfo.coachLedger || 'まだ台帳が設定されていません。'}
@@ -4041,7 +4073,13 @@ ${myInfo.coachLedger || 'まだ台帳が設定されていません。'}
 ・直近のトレーニング:
 ${recentWorkoutText || 'まだ記録がありません'}
 
-私のメッセージ:「${userMsg}」`;
+私のメッセージ:「${userMsg}」
+
+出力は以下のJSON形式のみで行ってください。マークダウンなどのテキストは一切含めないでください。
+{
+  "chatResponse": "ユーザーへの返信メッセージ",
+  "updatedLedger": "更新後のマスター台帳（更新が不要な場合は現在の内容をそのまま出力）"
+}`;
 
     try {
       const response = await fetch('/api/gemini', {
@@ -4053,7 +4091,18 @@ ${recentWorkoutText || 'まだ記録がありません'}
       if (!response.ok) throw new Error(data.error);
       
       let aiResponse = data.candidates[0].content.parts[0].text;
-      setChatHistory(prev => [...prev, { role: 'assistant', text: aiResponse }]);
+      let parsed = null;
+      try {
+        parsed = JSON.parse(aiResponse.replace(/```json/g, '').replace(/```/g, '').trim());
+      } catch(e) {
+        parsed = { chatResponse: aiResponse, updatedLedger: ledgerText };
+      }
+      
+      setChatHistory(prev => [...prev, { role: 'assistant', text: parsed.chatResponse }]);
+      if (parsed.updatedLedger && parsed.updatedLedger !== ledgerText) {
+         setLedgerText(parsed.updatedLedger);
+         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { coachLedger: parsed.updatedLedger }, { merge: true });
+      }
     } catch (e) {
       console.error(e);
       setChatHistory(prev => [...prev, { role: 'assistant', text: '申し訳ありません、エラーが発生しました。時間を置いて再度お試しください。' }]);
@@ -4071,9 +4120,9 @@ ${recentWorkoutText || 'まだ記録がありません'}
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={20} /></button>
         </div>
 
-        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 m-4 rounded-xl shrink-0">
-          <button onClick={() => setActiveTab('chat')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'chat' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>チャット</button>
-          <button onClick={() => setActiveTab('ledger')} className={`flex-1 py-2 text-xs font-bold text-center rounded-lg transition-colors ${activeTab === 'ledger' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>マスター台帳</button>
+        <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 mx-4 mt-4 mb-2 rounded-xl shrink-0">
+          <button onClick={() => setActiveTab('chat')} className={`flex-1 py-3 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'chat' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>チャット</button>
+          <button onClick={() => setActiveTab('ledger')} className={`flex-1 py-3 text-sm font-bold text-center rounded-lg transition-colors ${activeTab === 'ledger' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>マスター台帳</button>
         </div>
 
         {activeTab === 'chat' ? (
@@ -8083,7 +8132,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.9.4, 22:20, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.9.4, 22:39, updated)</p>
       </div>
     </div>
   );
