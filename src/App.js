@@ -1890,7 +1890,16 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
   const wrapperRef = useRef(null);
   const hoveredRef = useRef(null);
   const isOpenRef = useRef(false);
-  const isTouchRef = useRef(false);
+  
+  const pressTimer = useRef(null);
+  const touchPos = useRef({ x: 0, y: 0 });
+
+  const clearPressTimer = () => {
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  };
 
   const calculateHover = (clientX, clientY) => {
     if (!wrapperRef.current) return null;
@@ -1908,7 +1917,42 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
     return null;
   };
 
-  const updateHover = (e) => {
+  const updateHover = (clientX, clientY) => {
+    const nextHover = calculateHover(clientX, clientY);
+    hoveredRef.current = nextHover;
+    setHovered(nextHover);
+  };
+
+  const handleStart = (e) => {
+    if (!myInfo?.isTraining) return;
+    
+    let clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else if (e.clientX !== undefined) {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    } else {
+      return;
+    }
+    
+    touchPos.current = { x: clientX, y: clientY };
+    clearPressTimer();
+
+    pressTimer.current = setTimeout(() => {
+      isOpenRef.current = true;
+      setIsOpen(true);
+      updateHover(touchPos.current.x, touchPos.current.y);
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+    }, 300);
+  };
+
+  const handleMove = (e) => {
+    if (!myInfo?.isTraining) return;
+    
     let clientX, clientY;
     if (e.touches && e.touches.length > 0) {
       clientX = e.touches[0].clientX;
@@ -1923,41 +1967,36 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
       return;
     }
 
-    const nextHover = calculateHover(clientX, clientY);
-    hoveredRef.current = nextHover;
-    setHovered(nextHover);
-  };
+    touchPos.current = { x: clientX, y: clientY };
 
-  const handleStart = (e) => {
-    if (!myInfo?.isTraining) return;
-    if (e.type === 'touchstart') {
-      isTouchRef.current = true;
-    } else if (e.type === 'mousedown' && isTouchRef.current) {
-      return;
+    if (isOpenRef.current) {
+      if (e.cancelable && e.type === 'touchmove') {
+        e.preventDefault();
+      }
+      updateHover(clientX, clientY);
+    } else if (pressTimer.current) {
+      const rect = wrapperRef.current?.getBoundingClientRect();
+      if (rect) {
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const dist = Math.sqrt(Math.pow(clientX - centerX, 2) + Math.pow(clientY - centerY, 2));
+        if (dist > 40) {
+          clearPressTimer();
+        }
+      }
     }
-    
-    isOpenRef.current = true;
-    setIsOpen(true);
-    updateHover(e);
-  };
-
-  const handleMove = (e) => {
-    if (!isOpenRef.current || !myInfo?.isTraining) return;
-    if (e.cancelable && e.type === 'touchmove') {
-      e.preventDefault();
-    }
-    updateHover(e);
   };
 
   const handleEnd = (e) => {
     if (!myInfo?.isTraining) return;
-    if (e.type === 'mouseup' && isTouchRef.current) {
-      isTouchRef.current = false;
-      return;
-    }
+    
+    clearPressTimer();
+
     if (!isOpenRef.current) return;
     
-    updateHover(e);
+    if (e.type === 'touchend' || e.type === 'touchcancel' || e.type === 'mouseup' || e.type === 'mouseleave') {
+       updateHover(touchPos.current.x, touchPos.current.y);
+    }
     
     const finalSelected = hoveredRef.current;
     
@@ -1987,6 +2026,7 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
     <div 
       ref={wrapperRef}
       className={`relative flex flex-col items-center ${myInfo?.isTraining ? 'touch-none select-none z-50' : ''}`}
+      style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
       onMouseDown={handleStart}
       onMouseMove={handleMove}
       onMouseUp={handleEnd}
@@ -1995,6 +2035,13 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
       onTouchMove={handleMove}
       onTouchEnd={handleEnd}
       onTouchCancel={handleEnd}
+      onContextMenu={(e) => {
+        if (myInfo?.isTraining) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+      }}
     >
        {myInfo?.isTraining && (
          <div 
@@ -8083,7 +8130,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.9.4, 22:20, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.9.5, 08:44, updated)</p>
       </div>
     </div>
   );
