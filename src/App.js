@@ -383,7 +383,7 @@ function SimpleChart({ data, color, title }) {
   const maxTime = new Date(sortedData[sortedData.length - 1].date).getTime();
   const daysDiff = (maxTime - minTime) / (1000 * 60 * 60 * 24);
 
-  const PIXELS_PER_DAY = 25;
+  const PIXELS_PER_DAY = 12;
   const chartWidth = Math.max(300, Math.round(daysDiff * PIXELS_PER_DAY + 80));
 
   const points = sortedData.map(d => {
@@ -8180,7 +8180,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.9.5, 08:54, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.9.5, 08:55, updated)</p>
       </div>
     </div>
   );
