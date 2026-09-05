@@ -4069,6 +4069,10 @@ function CoachChatModal({ isOpen, onClose, currentUser, accountsInfo, posts, app
   const [isSavingLedger, setIsSavingLedger] = useState(false);
   const chatEndRef = useRef(null);
 
+  const [setupGoal, setSetupGoal] = useState('筋肥大（バルクアップ）');
+  const [setupLevel, setSetupLevel] = useState('初心者（1年未満）');
+  const [setupDays, setSetupDays] = useState('週3〜4回');
+
   useEffect(() => {
     if (isOpen) {
       setLedgerText(myInfo.coachLedger || '');
@@ -4099,17 +4103,37 @@ function CoachChatModal({ isOpen, onClose, currentUser, accountsInfo, posts, app
     setIsSavingLedger(false);
   };
 
+  const handleLoadMenu = () => {
+    const draftItems = myInfo.currentWorkoutItems || [];
+    if (draftItems.length === 0) {
+      alert('現在の記録・下書きがありません。');
+      return;
+    }
+    const menuText = draftItems.map((item, idx) => `${idx + 1}. ${item.exerciseName} (${item.sets.length}セット)`).join('\n');
+    setMessage(`今日のメニューは以下の通りです。アドバイスをお願いします！\n${menuText}`);
+  };
+
+  const handleGenerateLedger = () => {
+    const initialText = `【長期進捗マスター台帳】\n・主な目的: ${setupGoal}\n・経験レベル: ${setupLevel}\n・トレーニング頻度: ${setupDays}\n\n【方針】\n無理なく継続し、設定した目的に沿って着実にステップアップを目指す。`;
+    setLedgerText(initialText);
+  };
+
   const handleSendMessage = async () => {
     if (!message.trim() || isLoading) return;
     const userMsg = message.trim();
     setMessage('');
-    setChatHistory(prev => [...prev, { role: 'user', text: userMsg }]);
+    setChatHistory(prev => {
+      const newHistory = [...prev, { role: 'user', text: userMsg }];
+      return newHistory.slice(-10);
+    });
     setIsLoading(true);
 
     const myRecentPosts = posts.filter(p => p.author === currentUser).slice(0, 3);
     const recentWorkoutText = myRecentPosts.map(p => 
       `${p.date.substring(0,10)}: ${p.gymName || '不明なジム'} (総負荷量: ${p.volume}kg)`
     ).join('\n');
+
+    const historyText = chatHistory.slice(-10).map(m => `${m.role === 'user' ? '私' : 'コーチ'}: ${m.text}`).join('\n');
 
     const prompt = `あなたは私の専属トレーニングコーチです。
 ユーザーからメッセージやトレーニング内容が送られます。
@@ -4128,6 +4152,9 @@ ${myInfo.coachLedger || 'まだ台帳が設定されていません。'}
 ・直近のトレーニング:
 ${recentWorkoutText || 'まだ記録がありません'}
 
+【これまでの会話（直近10件）】
+${historyText}
+
 私のメッセージ:「${userMsg}」`;
 
     try {
@@ -4143,7 +4170,10 @@ ${recentWorkoutText || 'まだ記録がありません'}
       textResponse = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(textResponse);
       
-      setChatHistory(prev => [...prev, { role: 'assistant', text: parsed.chatResponse }]);
+      setChatHistory(prev => {
+        const newHistory = [...prev, { role: 'assistant', text: parsed.chatResponse }];
+        return newHistory.slice(-10);
+      });
       
       if (parsed.updatedLedger) {
          setLedgerText(parsed.updatedLedger);
@@ -4194,7 +4224,12 @@ ${recentWorkoutText || 'まだ記録がありません'}
               )}
               <div ref={chatEndRef} />
             </div>
-            <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex gap-2 shrink-0">
+            <div className="px-4 pt-2 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-start">
+              <button onClick={handleLoadMenu} className="text-[11px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-full hover:bg-indigo-100 transition-colors flex items-center gap-1">
+                <ListPlus size={12} /> 今日のメニューを読み込む
+              </button>
+            </div>
+            <div className="p-4 bg-white dark:bg-slate-900 flex gap-2 shrink-0">
               <input 
                 type="text" 
                 value={message} 
@@ -4218,15 +4253,49 @@ ${recentWorkoutText || 'まだ記録がありません'}
               チャットをするたびにAIが自動で「マスター台帳」を整理・更新します。<br/>
               コーチは常にこの情報を基準に指導を行います。手動で直接編集して保存することも可能です。
             </p>
-            <textarea
-              value={ledgerText}
-              onChange={e => setLedgerText(e.target.value)}
-              placeholder="【長期進捗マスター台帳】&#10;・身長: 171cm&#10;・目標: ...&#10;などを記述"
-              className="flex-1 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:border-indigo-500 resize-none font-mono"
-            />
+            {(!myInfo.coachLedger && ledgerText === '') ? (
+              <div className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-5 flex flex-col gap-4">
+                <p className="text-sm font-bold text-slate-800 dark:text-slate-200 text-center">台帳の初期設定</p>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">主な目的</label>
+                  <select value={setupGoal} onChange={e => setSetupGoal(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm font-bold text-slate-700">
+                    <option value="筋肥大（バルクアップ）">筋肥大（バルクアップ）</option>
+                    <option value="ダイエット（減量）">ダイエット（減量）</option>
+                    <option value="筋力向上（重量アップ）">筋力向上（重量アップ）</option>
+                    <option value="健康維持">健康維持</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">経験レベル</label>
+                  <select value={setupLevel} onChange={e => setSetupLevel(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm font-bold text-slate-700">
+                    <option value="初心者（1年未満）">初心者（1年未満）</option>
+                    <option value="中級者（1〜3年）">中級者（1〜3年）</option>
+                    <option value="上級者（3年以上）">上級者（3年以上）</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">トレーニング頻度</label>
+                  <select value={setupDays} onChange={e => setSetupDays(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm font-bold text-slate-700">
+                    <option value="週1〜2回">週1〜2回</option>
+                    <option value="週3〜4回">週3〜4回</option>
+                    <option value="週5回以上">週5回以上</option>
+                  </select>
+                </div>
+                <button onClick={handleGenerateLedger} className="mt-auto bg-indigo-500 text-white font-bold py-3 rounded-xl shadow-sm hover:bg-indigo-600 transition-colors">
+                  台帳のベースを作成
+                </button>
+              </div>
+            ) : (
+              <textarea
+                value={ledgerText}
+                onChange={e => setLedgerText(e.target.value)}
+                placeholder="【長期進捗マスター台帳】&#10;・身長: 171cm&#10;・目標: ...&#10;などを記述"
+                className="flex-1 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:border-indigo-500 resize-none font-mono"
+              />
+            )}
             <button 
               onClick={handleSaveLedger} 
-              disabled={isSavingLedger}
+              disabled={isSavingLedger || (!myInfo.coachLedger && ledgerText === '')}
               className="mt-4 w-full bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white font-bold py-3.5 rounded-xl shadow-md transition-colors flex items-center justify-center gap-2"
             >
               {isSavingLedger ? <Activity className="animate-spin" size={18} /> : <CheckCircle size={18} />}
@@ -8180,7 +8249,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.9.5, 08:55, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.9.5, 21:15, updated)</p>
       </div>
     </div>
   );
