@@ -4072,6 +4072,7 @@ function CoachChatModal({ isOpen, onClose, currentUser, accountsInfo, posts, app
   const [setupGoal, setSetupGoal] = useState('筋肥大（バルクアップ）');
   const [setupLevel, setSetupLevel] = useState('初心者（1年未満）');
   const [setupDays, setSetupDays] = useState('週3〜4回');
+  const [selectedMenuDate, setSelectedMenuDate] = useState(() => formatDateFromTimestamp(Date.now()));
 
   useEffect(() => {
     if (isOpen) {
@@ -4104,13 +4105,36 @@ function CoachChatModal({ isOpen, onClose, currentUser, accountsInfo, posts, app
   };
 
   const handleLoadMenu = () => {
-    const draftItems = myInfo.currentWorkoutItems || [];
-    if (draftItems.length === 0) {
-      alert('現在の記録・下書きがありません。');
+    const todayStr = formatDateFromTimestamp(Date.now());
+    let menuText = '';
+
+    if (selectedMenuDate === todayStr && myInfo.currentWorkoutItems && myInfo.currentWorkoutItems.length > 0) {
+      menuText += `【予定・記録中のメニュー】\n`;
+      myInfo.currentWorkoutItems.forEach((item, idx) => {
+        menuText += `${idx + 1}. ${item.exerciseName} (${item.sets?.length || 0}セット)\n`;
+      });
+    }
+
+    const targetPosts = posts.filter(p => p.author === currentUser && formatDateFromTimestamp(p.timestamp) === selectedMenuDate);
+    
+    if (targetPosts.length > 0) {
+      targetPosts.forEach(post => {
+         const gymName = post.gymName || '不明なジム';
+         menuText += `【${gymName}での記録】\n`;
+         if (post.items) {
+             post.items.forEach((item, idx) => {
+                 menuText += `${idx + 1}. ${item.exerciseName} (${item.sets?.length || 0}セット)\n`;
+             });
+         }
+      });
+    }
+
+    if (!menuText) {
+      alert(`${selectedMenuDate} の記録・予定がありません。`);
       return;
     }
-    const menuText = draftItems.map((item, idx) => `${idx + 1}. ${item.exerciseName} (${item.sets.length}セット)`).join('\n');
-    setMessage(`今日のメニューは以下の通りです。アドバイスをお願いします！\n${menuText}`);
+
+    setMessage(`${selectedMenuDate} のトレーニング内容は以下の通りです。分析やアドバイスをお願いします！\n${menuText}`);
   };
 
   const handleGenerateLedger = () => {
@@ -4224,9 +4248,15 @@ ${historyText}
               )}
               <div ref={chatEndRef} />
             </div>
-            <div className="px-4 pt-2 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-start">
-              <button onClick={handleLoadMenu} className="text-[11px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-full hover:bg-indigo-100 transition-colors flex items-center gap-1">
-                <ListPlus size={12} /> 今日のメニューを読み込む
+            <div className="px-4 pt-2 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2">
+              <input 
+                type="date" 
+                value={selectedMenuDate} 
+                onChange={(e) => setSelectedMenuDate(e.target.value)}
+                className="text-[11px] font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-slate-700 dark:text-slate-300 focus:outline-none focus:border-indigo-500"
+              />
+              <button onClick={handleLoadMenu} className="text-[11px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-full hover:bg-indigo-100 transition-colors flex items-center gap-1 shrink-0">
+                <ListPlus size={12} /> データを読み込む
               </button>
             </div>
             <div className="p-4 bg-white dark:bg-slate-900 flex gap-2 shrink-0">
@@ -8249,7 +8279,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.9.5, 21:15, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.9.5, 21:20, updated)</p>
       </div>
     </div>
   );
