@@ -4105,36 +4105,160 @@ function CoachChatModal({ isOpen, onClose, currentUser, accountsInfo, posts, app
   };
 
   const handleLoadMenu = () => {
-    const todayStr = formatDateFromTimestamp(Date.now());
-    let menuText = '';
-
-    if (selectedMenuDate === todayStr && myInfo.currentWorkoutItems && myInfo.currentWorkoutItems.length > 0) {
-      menuText += `【予定・記録中のメニュー】\n`;
-      myInfo.currentWorkoutItems.forEach((item, idx) => {
-        menuText += `${idx + 1}. ${item.exerciseName} (${item.sets?.length || 0}セット)\n`;
-      });
-    }
-
     const targetPosts = posts.filter(p => p.author === currentUser && formatDateFromTimestamp(p.timestamp) === selectedMenuDate);
     
-    if (targetPosts.length > 0) {
-      targetPosts.forEach(post => {
-         const gymName = post.gymName || '不明なジム';
-         menuText += `【${gymName}での記録】\n`;
-         if (post.items) {
-             post.items.forEach((item, idx) => {
-                 menuText += `${idx + 1}. ${item.exerciseName} (${item.sets?.length || 0}セット)\n`;
-             });
-         }
-      });
-    }
-
-    if (!menuText) {
-      alert(`${selectedMenuDate} の記録・予定がありません。`);
+    if (targetPosts.length === 0) {
+      alert(`${selectedMenuDate} の記録がありません。`);
       return;
     }
 
-    setMessage(`${selectedMenuDate} のトレーニング内容は以下の通りです。分析やアドバイスをお願いします！\n${menuText}`);
+    let allText = '';
+    
+    targetPosts.forEach(post => {
+      const authorInfo = accountsInfo && accountsInfo[post.author];
+      const baseWeight = Number(post.bodyWeight) || Number(authorInfo?.weight) || 60;
+      const { processedItems, totalVolume, totalCalories } = calculateWorkoutTotals(post.items || [], post.duration, baseWeight);
+      const displayVolumeCalc = (!post.items || post.items.length === 0) ? 0 : ((post.volume && post.volume > 0) ? post.volume : totalVolume);
+      const displayCalories = (!post.items || post.items.length === 0) ? 0 : ((post.calories && post.calories > 0) ? post.calories : totalCalories);
+
+      const d = new Date(post.timestamp);
+      const days = ['日', '月', '火', '水', '木', '金', '土'];
+      const dateStr = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日(${days[d.getDay()]}) ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      
+      let text = `【トレーニング記録】\n`;
+      text += `日時: ${dateStr}\n`;
+      if (post.gymName) text += `場所: ${post.gymName}\n`;
+      if (post.bodyWeight || post.bodyFat) {
+          text += `体組成: `;
+          if (post.bodyWeight) text += `${post.bodyWeight}kg `;
+          if (post.bodyFat) text += `${post.bodyFat}%`;
+          text += `\n`;
+      }
+      if (displayVolumeCalc > 0) text += `総負荷量: ${displayVolumeCalc.toLocaleString()}kg\n`;
+      if (displayCalories > 0) text += `総消費: ${displayCalories.toLocaleString()} kcal\n`;
+      text += `\n`;
+
+      processedItems.forEach((item, idx) => {
+          text += `■ ${idx + 1}. ${item.exerciseName}`;
+          if (item.category) text += ` [${item.category}]`;
+          text += `\n`;
+          
+          if (item.isSuperSet && item.superExerciseName) {
+              text += `  スーパー: ${item.superExerciseName}\n`;
+              if (item.superExerciseName3) text += `  ジャイアント: ${item.superExerciseName3}\n`;
+          }
+
+          const getSetText = (setObj, wType, type, isDrop, prefix) => {
+              const isCardio = wType === 'cardio';
+              const isLR = wType === 'lr';
+              
+              const val = (f) => {
+                let fieldName = f;
+                if (type === 'super2') fieldName = 'super' + f.charAt(0).toUpperCase() + f.slice(1);
+                if (type === 'super3') fieldName = 'super' + f.charAt(0).toUpperCase() + f.slice(1) + '3';
+                return setObj[fieldName] || '';
+              };
+
+              if (isCardio) {
+                  const distance = val('distance');
+                  const time = val('time');
+                  const calories = val('calories');
+                  if (!distance && !time && !calories) return null;
+                  let t = `${prefix} `;
+                  if (distance) t += `${distance}km `;
+                  if (time) t += `${time}分 `;
+                  if (calories) t += `${calories}kcal `;
+                  return t.trim() + '\n';
+              }
+
+              const weight = val('weight');
+              const reps = val('reps');
+              const lReps = val('lReps');
+              const rReps = val('rReps');
+              const forcedReps = val('forcedReps');
+
+              if (!weight && !reps && !lReps && !rReps) return null;
+
+              let displayWeight = weight || 0;
+              let weightLabel = 'kg';
+              if (wType === 'plate') weightLabel = '枚';
+              else if (wType === 'oneSide') weightLabel = 'kg(片)';
+              else if (wType === 'bodyWeight') {
+                  if (Number(weight) < 0) { displayWeight = weight; weightLabel = 'kg'; } 
+                  else if (Number(weight) > 0) { displayWeight = `+${weight}`; weightLabel = 'kg'; } 
+                  else { displayWeight = '自重'; weightLabel = ''; }
+              }
+
+              let t = `${prefix} ${displayWeight}${weightLabel} x `;
+              if (isLR) {
+                  t += `L:${lReps||0} R:${rReps||0}回`;
+              } else {
+                  t += `${reps||0}回`;
+              }
+              if (forcedReps) t += ` (+補助${forcedReps})`;
+              return t + '\n';
+          };
+
+          if (item.sets && Array.isArray(item.sets)) {
+              item.sets.forEach((set, sIdx) => {
+                  const mainText = getSetText(set, item.weightType, 'main', false, `Set ${sIdx + 1}:`);
+                  if (mainText) text += `  ${mainText}`;
+                  
+                  if (item.isDropSet && set.dropSets) {
+                      set.dropSets.forEach((ds, dsIdx) => {
+                          const dropText = getSetText(ds, item.weightType, 'main', true, `   ↳ Drop:`);
+                          if (dropText) text += `  ${dropText}`;
+                      });
+                  }
+                  
+                  if (item.isSuperSet && item.superExerciseName) {
+                      const sup2Text = getSetText(set, item.superWeightType || 'total', 'super2', false, `   ↳ Sup2:`);
+                      if (sup2Text) text += `  ${sup2Text}`;
+                      
+                      if (item.isDropSet && set.dropSets && !set.superDropSets) {
+                          set.dropSets.forEach((ds, dsIdx) => {
+                              if (ds.superWeight !== undefined) {
+                                  const dsSup2Text = getSetText(ds, item.superWeightType || 'total', 'super2', true, `     ↳ Drop2:`);
+                                  if (dsSup2Text) text += `    ${dsSup2Text}`;
+                              }
+                          });
+                      }
+                      if (item.isDropSet && set.superDropSets) {
+                          set.superDropSets.forEach((ds, dsIdx) => {
+                              const dsSup2Text = getSetText(ds, item.superWeightType || 'total', 'super2', true, `     ↳ Drop2:`);
+                              if (dsSup2Text) text += `    ${dsSup2Text}`;
+                          });
+                      }
+                  }
+
+                  if (item.isSuperSet && item.superExerciseName3) {
+                      const sup3Text = getSetText(set, item.superWeightType3 || 'total', 'super3', false, `   ↳ Sup3:`);
+                      if (sup3Text) text += `  ${sup3Text}`;
+                      
+                      if (item.isDropSet && set.dropSets && !set.superDropSets3) {
+                          set.dropSets.forEach((ds, dsIdx) => {
+                              if (ds.superWeight3 !== undefined) {
+                                  const dsSup3Text = getSetText(ds, item.superWeightType3 || 'total', 'super3', true, `     ↳ Drop3:`);
+                                  if (dsSup3Text) text += `    ${dsSup3Text}`;
+                              }
+                          });
+                      }
+                      if (item.isDropSet && set.superDropSets3) {
+                          set.superDropSets3.forEach((ds, dsIdx) => {
+                              const dsSup3Text = getSetText(ds, item.superWeightType3 || 'total', 'super3', true, `     ↳ Drop3:`);
+                              if (dsSup3Text) text += `    ${dsSup3Text}`;
+                          });
+                      }
+                  }
+              });
+          }
+          if (item.memo) text += `  メモ: ${item.memo}\n`;
+          text += `\n`;
+      });
+      allText += text + '\n';
+    });
+
+    setMessage(`以下のトレーニング内容について、分析やアドバイスをお願いします！\n\n${allText.trim()}`);
   };
 
   const handleGenerateLedger = () => {
@@ -8279,7 +8403,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.9.5, 21:20, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.9.5, 21:25, updated)</p>
       </div>
     </div>
   );
