@@ -2547,6 +2547,57 @@ if (timerState.y === 'top') {
     }
   };
 
+  useEffect(() => {
+    if (!currentUser || !db || !myInfo?.isTraining || !myInfo?.trainingStartTime) return;
+    if (myInfo.hasSentStartNotification) return;
+
+    const elapsed = Date.now() - myInfo.trainingStartTime;
+    const timeUntilNotify = (3 * 60 * 1000) - elapsed;
+
+    const sendStartNotification = async () => {
+      try {
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { hasSentStartNotification: true }, { merge: true });
+        const myFriends = myInfo.friends || [];
+        const authorName = myInfo.displayName || currentUser;
+        const gymName = allGyms.find(g => g.id === myInfo.currentGymId)?.name || 'ジム';
+        myFriends.forEach(friendId => {
+          sendNotification(friendId, '🔥 トレーニング開始！', `${authorName}さんが${gymName}でトレーニングを開始しました！`, 'general');
+        });
+      } catch (e) { console.error(e); }
+    };
+
+    if (timeUntilNotify <= 0) { sendStartNotification(); } 
+    else { const timer = setTimeout(sendStartNotification, timeUntilNotify); return () => clearTimeout(timer); }
+  }, [currentUser, db, myInfo?.isTraining, myInfo?.trainingStartTime, myInfo?.hasSentStartNotification, myInfo?.friends, myInfo?.displayName, myInfo?.currentGymId, allGyms]);
+
+  useEffect(() => {
+    if (!currentUser || !db || !myInfo?.isTraining || !myInfo?.trainingStartTime) return;
+    if (myInfo.hasSentForgotNotification) return;
+
+    const lastInteraction = Math.max(myInfo.trainingStartTime, myInfo.draftUpdatedAt || 0);
+    const elapsed = Date.now() - lastInteraction;
+    const timeUntilNotify = (30 * 60 * 1000) - elapsed;
+
+    const sendForgotNotification = async () => {
+      try {
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { hasSentForgotNotification: true }, { merge: true });
+        const token = myInfo.fcmToken;
+        if (token) {
+          fetch('/api/sendPush', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ targetToken: token, title: '⏳ 記録忘れはありませんか？', body: '開始または最後の記録から30分以上経過しています。終了する場合は記録を保存してください。' })
+          }).catch(console.error);
+        }
+        const notifId = `notif_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notifications', notifId), { targetUser: currentUser, fromUser: 'system', type: 'general', title: '⏳ 記録忘れはありませんか？', message: '開始または最後の記録から30分以上経過しています。終了する場合は記録を保存してください。', timestamp: Date.now() });
+      } catch (e) { console.error(e); }
+    };
+
+    if (timeUntilNotify <= 0) { sendForgotNotification(); } 
+    else { const timer = setTimeout(sendForgotNotification, timeUntilNotify); return () => clearTimeout(timer); }
+  }, [currentUser, db, myInfo?.isTraining, myInfo?.trainingStartTime, myInfo?.draftUpdatedAt, myInfo?.hasSentForgotNotification, myInfo?.fcmToken]);
+
   const handleAddComment = async (postId, text, parentId = null) => {
     if (!currentUser || !db || !text.trim()) return;
     const newComment = {
@@ -3133,7 +3184,7 @@ if (timerState.y === 'top') {
 
   const handleStartTraining = async (gymId) => {
     if (!currentUser || !db) return;
-    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: true, trainingStartTime: Date.now(), currentGymId: gymId, currentExerciseName: '', lastActive: Date.now() }, { merge: true }); } catch (e) {}
+    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: true, trainingStartTime: Date.now(), currentGymId: gymId, currentExerciseName: '', lastActive: Date.now(), hasSentStartNotification: deleteField(), hasSentForgotNotification: deleteField() }, { merge: true }); } catch (e) {}
   };
 
   const handlePostWorkout = async (gymName, workoutItems, bodyWeight, bodyFat, manualStart, manualEnd, jointPartnerId = null, partnerItems = null) => {
@@ -3195,11 +3246,11 @@ if (timerState.y === 'top') {
          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', pDocId), {
             author: jointPartnerId, gymName, items: pCleanItems, timestamp: timestamp, startTime, endTime, duration, date: dateIso, likes: 0, likedByMe: false, bodyWeight: null, bodyFat: null, volume: pCalc.totalVolume, calories: pCalc.totalCalories, totalSets: pTotalSets, jointWith: currentUser
          });
-         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now(), jointPartnerId: null, currentWorkoutItems: deleteField() }, { merge: true });
+         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now(), jointPartnerId: null, currentWorkoutItems: deleteField(), hasSentStartNotification: deleteField(), hasSentForgotNotification: deleteField() }, { merge: true });
       }
 
       if (!manualStart) {
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now(), jointPartnerId: null }, { merge: true });
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now(), jointPartnerId: null, hasSentStartNotification: deleteField(), hasSentForgotNotification: deleteField() }, { merge: true });
       }
       setDraftWorkoutItems([]); setSelectedCategories([]); setCurrentTab('timeline');
       
@@ -3276,7 +3327,7 @@ if (timerState.y === 'top') {
     if (!window.confirm("現在の記録を破棄して終了しますか？")) return;
     if (!currentUser || !db) return;
     try { 
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now(), jointPartnerId: null, currentWorkoutItems: deleteField() }, { merge: true }); 
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: false, trainingStartTime: null, currentGymId: null, currentExerciseName: '', lastActive: Date.now(), jointPartnerId: null, currentWorkoutItems: deleteField(), hasSentStartNotification: deleteField(), hasSentForgotNotification: deleteField() }, { merge: true }); 
       if (myInfo.jointPartnerId) {
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', myInfo.jointPartnerId), { jointPartnerId: null }, { merge: true });
       }
@@ -8449,7 +8500,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.7, 13:21, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.7, 13:31, updated)</p>
       </div>
     </div>
   );
