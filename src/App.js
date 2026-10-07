@@ -2570,56 +2570,6 @@ if (timerState.y === 'top') {
     }
   };
 
-  useEffect(() => {
-    if (!currentUser || !db || !myInfo?.isTraining || !myInfo?.trainingStartTime) return;
-    if (myInfo.hasSentStartNotification) return;
-
-    const elapsed = Date.now() - myInfo.trainingStartTime;
-    const timeUntilNotify = (3 * 60 * 1000) - elapsed;
-
-    const sendStartNotification = async () => {
-      try {
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { hasSentStartNotification: true }, { merge: true });
-        const myFriends = myInfo.friends || [];
-        const authorName = myInfo.displayName || currentUser;
-        const gymName = allGyms.find(g => g.id === myInfo.currentGymId)?.name || 'ジム';
-        myFriends.forEach(friendId => {
-          sendNotification(friendId, '🔥 トレーニング開始！', `${authorName}さんが${gymName}でトレーニングを開始しました！`, 'general');
-        });
-      } catch (e) { console.error(e); }
-    };
-
-    if (timeUntilNotify <= 0) { sendStartNotification(); } 
-    else { const timer = setTimeout(sendStartNotification, timeUntilNotify); return () => clearTimeout(timer); }
-  }, [currentUser, db, myInfo?.isTraining, myInfo?.trainingStartTime, myInfo?.hasSentStartNotification, myInfo?.friends, myInfo?.displayName, myInfo?.currentGymId, allGyms]);
-
-  useEffect(() => {
-    if (!currentUser || !db || !myInfo?.isTraining || !myInfo?.trainingStartTime) return;
-    if (myInfo.hasSentForgotNotification) return;
-
-    const lastInteraction = Math.max(myInfo.trainingStartTime, myInfo.draftUpdatedAt || 0);
-    const elapsed = Date.now() - lastInteraction;
-    const timeUntilNotify = (30 * 60 * 1000) - elapsed;
-
-    const sendForgotNotification = async () => {
-      try {
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { hasSentForgotNotification: true }, { merge: true });
-        const token = myInfo.fcmToken;
-        if (token) {
-          fetch('/api/sendPush', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ targetToken: token, title: '⏳ 記録忘れはありませんか？', body: '開始または最後の記録から30分以上経過しています。終了する場合は記録を保存してください。' })
-          }).catch(console.error);
-        }
-        const notifId = `notif_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notifications', notifId), { targetUser: currentUser, fromUser: 'system', type: 'general', title: '⏳ 記録忘れはありませんか？', message: '開始または最後の記録から30分以上経過しています。終了する場合は記録を保存してください。', timestamp: Date.now() });
-      } catch (e) { console.error(e); }
-    };
-
-    if (timeUntilNotify <= 0) { sendForgotNotification(); } 
-    else { const timer = setTimeout(sendForgotNotification, timeUntilNotify); return () => clearTimeout(timer); }
-  }, [currentUser, db, myInfo?.isTraining, myInfo?.trainingStartTime, myInfo?.draftUpdatedAt, myInfo?.hasSentForgotNotification, myInfo?.fcmToken]);
 
   const handleAddComment = async (postId, text, parentId = null) => {
     if (!currentUser || !db || !text.trim()) return;
@@ -3384,6 +3334,57 @@ if (timerState.y === 'top') {
 
   const myInfo = accountsInfo[currentUser] || {};
   const allGyms = useMemo(() => [{ id: 'common', name: 'フリーウェイト', createdAt: 0 }, ...gyms], [gyms]);
+
+  useEffect(() => {
+    if (!currentUser || !db || !myInfo?.isTraining || !myInfo?.trainingStartTime) return;
+    if (myInfo.hasSentStartNotification) return;
+
+    const elapsed = Date.now() - myInfo.trainingStartTime;
+    const timeUntilNotify = (3 * 60 * 1000) - elapsed;
+
+    const sendStartNotification = async () => {
+      try {
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { hasSentStartNotification: true }, { merge: true });
+        const myFriends = myInfo.friends || [];
+        const authorName = myInfo.displayName || currentUser;
+        const gymName = allGyms.find(g => g.id === myInfo.currentGymId)?.name || 'ジム';
+        myFriends.forEach(friendId => {
+          sendNotification(friendId, '🔥 トレーニング開始！', `${authorName}さんが${gymName}でトレーニングを開始しました！`, 'general');
+        });
+      } catch (e) { console.error(e); }
+    };
+
+    if (timeUntilNotify <= 0) { sendStartNotification(); } 
+    else { const timer = setTimeout(sendStartNotification, timeUntilNotify); return () => clearTimeout(timer); }
+  }, [currentUser, db, myInfo?.isTraining, myInfo?.trainingStartTime, myInfo?.hasSentStartNotification, myInfo?.friends, myInfo?.displayName, myInfo?.currentGymId, allGyms]);
+
+  useEffect(() => {
+    if (!currentUser || !db || !myInfo?.isTraining || !myInfo?.trainingStartTime) return;
+    if (myInfo.hasSentForgotNotification) return;
+
+    const lastInteraction = Math.max(myInfo.trainingStartTime, myInfo.draftUpdatedAt || 0);
+    const elapsed = Date.now() - lastInteraction;
+    const timeUntilNotify = (30 * 60 * 1000) - elapsed;
+
+    const sendForgotNotification = async () => {
+      try {
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { hasSentForgotNotification: true }, { merge: true });
+        const token = myInfo.fcmToken;
+        if (token) {
+          fetch('/api/sendPush', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ targetToken: token, title: '⏳ 記録忘れはありませんか？', body: '開始または最後の記録から30分以上経過しています。終了する場合は記録を保存してください。' })
+          }).catch(console.error);
+        }
+        const notifId = `notif_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notifications', notifId), { targetUser: currentUser, fromUser: 'system', type: 'general', title: '⏳ 記録忘れはありませんか？', message: '開始または最後の記録から30分以上経過しています。終了する場合は記録を保存してください。', timestamp: Date.now() });
+      } catch (e) { console.error(e); }
+    };
+
+    if (timeUntilNotify <= 0) { sendForgotNotification(); } 
+    else { const timer = setTimeout(sendForgotNotification, timeUntilNotify); return () => clearTimeout(timer); }
+  }, [currentUser, db, myInfo?.isTraining, myInfo?.trainingStartTime, myInfo?.draftUpdatedAt, myInfo?.hasSentForgotNotification, myInfo?.fcmToken]);
 
   const [notifications, setNotifications] = useState([]);
   useEffect(() => {
@@ -8542,7 +8543,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.7, 13:35, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.7, 13:45, updated)</p>
       </div>
     </div>
   );
