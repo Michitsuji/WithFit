@@ -1439,11 +1439,14 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
         </div>
       );
     } else {
+      const weightInputType = wType === 'bodyWeight' ? "text" : "number";
+      const weightInputMode = wType === 'bodyWeight' ? "text" : "decimal";
+
       inputContent = (
         <div className="flex-1 flex gap-1.5 min-w-0">
           {isLR ? (
             <>
-              <input type="number" inputMode="decimal" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder={getWeightPlaceholder(wType)} className="w-[48px] sm:w-[60px] shrink-0 text-center text-sm font-bold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded focus:outline-none focus:border-emerald-500 py-1.5 px-0" style={{ fontSize: '16px' }}/>
+              <input type={weightInputType} inputMode={weightInputMode} value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder={getWeightPlaceholder(wType)} className="w-[48px] sm:w-[60px] shrink-0 text-center text-sm font-bold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded focus:outline-none focus:border-emerald-500 py-1.5 px-0" style={{ fontSize: '16px' }}/>
               <div className="flex flex-1 items-center gap-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-1 min-w-0">
                 <span className="text-[10px] text-slate-400 font-bold shrink-0">L:</span>
                 <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('lReps')} onChange={(e) => update('lReps', e.target.value)} placeholder={targetVal('lReps') || "0"} className="w-full text-center text-sm font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0 px-0" style={{ fontSize: '16px' }}/>
@@ -1455,7 +1458,7 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
             </>
           ) : (
             <>
-              <input type="number" inputMode="decimal" value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder={getWeightPlaceholder(wType)} className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-1.5 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-sm" style={{ fontSize: '16px' }}/>
+              <input type={weightInputType} inputMode={weightInputMode} value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder={getWeightPlaceholder(wType)} className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-1.5 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-sm" style={{ fontSize: '16px' }}/>
               <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('reps')} onChange={(e) => update('reps', e.target.value)} placeholder={targetVal('reps') || "回数"} className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-1.5 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-sm" style={{ fontSize: '16px' }}/>
             </>
           )}
@@ -1744,7 +1747,38 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
       {!isJointPartner && (
       <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
         <button
-          onClick={() => updateItem(item.id, { isConfirmed: !item.isConfirmed })}
+          onClick={() => {
+            if (!item.isConfirmed) {
+              if (!item.exerciseName) {
+                alert("種目を選択してください。");
+                return;
+              }
+              const isCardio = item.weightType === 'cardio';
+              const isLR = item.weightType === 'lr';
+              const isBodyWeight = item.weightType === 'bodyWeight';
+              
+              for (let i = 0; i < item.sets.length; i++) {
+                const set = item.sets[i];
+                if (isCardio) {
+                  if (!set.distance && !set.time && !set.calories) {
+                    alert(`セット${i + 1}の入力が不十分です（距離、時間、カロリーのいずれかを入力してください）。`);
+                    return;
+                  }
+                } else if (isLR) {
+                  if ((set.weight === '' && !isBodyWeight) || (set.lReps === '' && set.rReps === '')) {
+                    alert(`セット${i + 1}の入力が不十分です（重量と左右どちらかの回数を入力してください）。`);
+                    return;
+                  }
+                } else {
+                  if ((set.weight === '' && !isBodyWeight) || set.reps === '') {
+                    alert(`セット${i + 1}の入力が不十分です（重量と回数を入力してください）。`);
+                    return;
+                  }
+                }
+              }
+            }
+            updateItem(item.id, { isConfirmed: !item.isConfirmed });
+          }}
           className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors ${
             isConfirmed
               ? 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -2126,6 +2160,14 @@ export default function App() {
 
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const pendingPushToken = useRef(null);
+
+  useEffect(() => {
+    if (currentUser && pendingPushToken.current) {
+      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { fcmToken: pendingPushToken.current }, { merge: true }).catch(console.error);
+      pendingPushToken.current = null;
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     const handleNativeMessage = (event) => {
@@ -2134,8 +2176,12 @@ export default function App() {
         if (!rawData) return;
         const data = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
         
-        if (data.type === 'PUSH_TOKEN' && currentUser) {
-          setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { fcmToken: data.token }, { merge: true });
+        if (data.type === 'PUSH_TOKEN') {
+          if (currentUser) {
+            setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { fcmToken: data.token }, { merge: true });
+          } else {
+            pendingPushToken.current = data.token;
+          }
         } else if (data.type === 'PUSH_PERMISSION_STATUS') {
           setOsPermission(prev => prev !== data.status ? data.status : prev);
         } else if (data.type === 'NATIVE_GOOGLE_LOGIN' && data.idToken) {
@@ -8403,7 +8449,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.9.5, 21:25, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.7, 13:21, updated)</p>
       </div>
     </div>
   );
