@@ -1308,13 +1308,36 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
     setLocalFilters(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]);
   };
 
-  const filteredExercises = availableExercises.filter(ex => {
-    if (localFilters.length === 0) return true;
-    const isCommon = ex.gymId === 'common';
-    const fwType = ex.freeWeightType || (ex.name.includes('ダンベル') ? 'dumbbell' : ex.name.includes('スミス') ? 'smith' : 'barbell');
-    const exFilterType = !isCommon ? 'gym' : fwType;
-    return localFilters.includes(exFilterType);
-  });
+  const exerciseUsageCount = useMemo(() => {
+    const counts = {};
+    if (!myPastPosts) return counts;
+    myPastPosts.forEach(p => {
+      if (!p.items) return;
+      p.items.forEach(i => {
+        if (i.exerciseName) counts[i.exerciseName] = (counts[i.exerciseName] || 0) + 1;
+        if (i.isSuperSet) {
+          if (i.superExerciseName) counts[i.superExerciseName] = (counts[i.superExerciseName] || 0) + 1;
+          if (i.superExerciseName3) counts[i.superExerciseName3] = (counts[i.superExerciseName3] || 0) + 1;
+        }
+      });
+    });
+    return counts;
+  }, [myPastPosts]);
+
+  const filteredExercises = useMemo(() => {
+    const filtered = availableExercises.filter(ex => {
+      if (localFilters.length === 0) return true;
+      const isCommon = ex.gymId === 'common';
+      const fwType = ex.freeWeightType || (ex.name.includes('ダンベル') ? 'dumbbell' : ex.name.includes('スミス') ? 'smith' : 'barbell');
+      const exFilterType = !isCommon ? 'gym' : fwType;
+      return localFilters.includes(exFilterType);
+    });
+    return filtered.sort((a, b) => {
+      const countA = exerciseUsageCount[a.name] || 0;
+      const countB = exerciseUsageCount[b.name] || 0;
+      return countB - countA;
+    });
+  }, [availableExercises, localFilters, exerciseUsageCount]);
 
   const updateExerciseName = (newName, superIndex = 0) => {
     const exData = availableExercises.find(ex => ex.name === newName);
@@ -5860,7 +5883,26 @@ function RecordView({ onStart, onPost, onCancel, onRequestJointTraining, onAccep
   const joinedGyms = myInfo.joinedGyms || ['common'];
   const jointPartnerId = myInfo.jointPartnerId;
   const partnerItems = jointPartnerId ? (accountsInfo[jointPartnerId]?.currentWorkoutItems || []) : [];
-  const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (gyms.filter(g => joinedGyms.includes(g.id) && g.id !== 'common')[0]?.id || ''));
+
+  const myPastPostsForSort = useMemo(() => posts.filter(p => p.author === currentUser), [posts, currentUser]);
+  const gymUsageCount = useMemo(() => {
+    const counts = {};
+    myPastPostsForSort.forEach(p => {
+      if (p.gymName) counts[p.gymName] = (counts[p.gymName] || 0) + 1;
+    });
+    return counts;
+  }, [myPastPostsForSort]);
+
+  const sortedGyms = useMemo(() => {
+    const joined = gyms.filter(g => joinedGyms.includes(g.id) && g.id !== 'common');
+    return joined.sort((a, b) => {
+      const countA = gymUsageCount[a.name] || 0;
+      const countB = gymUsageCount[b.name] || 0;
+      return countB - countA;
+    });
+  }, [gyms, joinedGyms, gymUsageCount]);
+
+  const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (sortedGyms[0]?.id || ''));
   const [showReorderModal, setShowReorderModal] = useState(false);
   const [showProgramModal, setShowProgramModal] = useState(false);
 
@@ -6604,7 +6646,7 @@ ${importText}`;
           <div className="w-full relative mb-6">
             <select value={selectedGymId} onChange={(e) => setSelectedGymId(e.target.value)} disabled={myInfo?.isTraining} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base disabled:opacity-70" style={{ fontSize: '16px' }}>
               <option value="" disabled>ジムを選択</option>
-              {gyms.filter(g => joinedGyms.includes(g.id) && g.id !== 'common').map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
+              {sortedGyms.map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
             </select>
             <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">▼</div>
           </div>
@@ -6681,7 +6723,7 @@ ${importText}`;
              <div className="w-full relative">
                <select value={selectedGymId} onChange={(e) => setSelectedGymId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
                  <option value="" disabled>ジムを選択</option>
-                 {gyms.filter(g => joinedGyms.includes(g.id) && g.id !== 'common').map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
+                 {sortedGyms.map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
                </select>
                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">▼</div>
              </div>
@@ -8500,7 +8542,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.7, 13:31, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.7, 13:35, updated)</p>
       </div>
     </div>
   );
