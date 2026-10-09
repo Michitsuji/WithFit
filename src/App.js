@@ -4215,66 +4215,535 @@ if (timerState.y === 'top') {
 }
 
 // --- シークレットゲームコンポーネント ---
-function SecretGame({ onClose }) {
-  const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(10);
-  const [isPlaying, setIsPlaying] = useState(false);
+const CAT_DESIGNS = {
+  1: { bg: "#FF6B6B", name: "カズさん", desc: "いつも寝ているおっさん猫" },
+  2: { bg: "#FF6B6B", name: "フミさん", desc: "鼻の下が長いおっさん猫" },
+  3: { bg: "#1ABC9C", name: "シワさん", desc: "苦労人のおっさん猫" },
+  4: { bg: "#FF6B6B", name: "ドロさん", desc: "夜行性のおっさん猫" },
+  5: { bg: "#1ABC9C", name: "ハチさん", desc: "寄り目のおっさん猫" },
+  6: { bg: "#FF6B6B", name: "テンさん", desc: "感情がないおっさん猫" },
+  7: { bg: "#1ABC9C", name: "ヒゲさん", desc: "立派なヒゲを持つ" },
+  8: { bg: "#FF6B6B", name: "マロさん", desc: "高貴な血筋を自称" },
+  9: { bg: "#1ABC9C", name: "トラさん", desc: "阪神ファン歴40年" },
+  10:{ bg: "#FF6B6B", name: "ボブさん", desc: "尻尾が短いおっさん" },
+  11:{ bg: "#1ABC9C", name: "タマさん", desc: "町内の顔役" },
+  12:{ bg: "#FF6B6B", name: "クロさん", desc: "暗闇に同化する" },
+  13:{ bg: "#1ABC9C", name: "シロさん", desc: "いつも綺麗好き" },
+  14:{ bg: "#FFD700", name: "神様", desc: "全てを悟ったおっさん猫" },
+};
 
-  useEffect(() => {
-    let timer;
-    if (isPlaying && timeLeft > 0) {
-      timer = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
-    } else if (timeLeft === 0) {
-      setIsPlaying(false);
-    }
-    return () => clearInterval(timer);
-  }, [isPlaying, timeLeft]);
+const CatSvg = ({ level }) => {
+  const line = "#4a4a4a";
+  const Outline = ({ bg = "#FFF" }) => (
+    <path d="M 20,40 C 15,20 20,10 25,20 C 35,15 65,15 75,20 C 80,10 85,20 80,40 C 90,70 70,95 50,95 C 30,95 10,70 20,40 Z" fill={bg} stroke={line} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
+  );
 
-  const startGame = () => {
-    setScore(0);
-    setTimeLeft(10);
-    setIsPlaying(true);
-  };
-
-  const handleTap = () => {
-    if (isPlaying) {
-      setScore(prev => prev + 1);
+  const renderContent = () => {
+    switch (level) {
+      case 1:
+        return (
+          <g>
+            <Outline />
+            <path d="M 25,20 C 35,15 45,25 40,40 C 25,40 15,30 25,20 Z" fill="#E68A5C" />
+            <path d="M 75,20 C 65,15 55,25 60,40 C 75,40 85,30 75,20 Z" fill="#4A3F35" />
+            <circle cx="35" cy="50" r="3" fill={line} />
+            <circle cx="65" cy="50" r="3" fill={line} />
+            <circle cx="50" cy="65" r="10" fill="#FFF" stroke={line} strokeWidth="3" />
+            <circle cx="50" cy="61" r="3.5" fill="#E68A5C" />
+            <path d="M 50,65 L 50,75 M 42,70 Q 50,78 58,70" stroke={line} strokeWidth="3" fill="none" strokeLinecap="round" />
+            <path d="M 28,60 Q 32,65 38,60 M 62,60 Q 68,65 72,60" stroke={line} strokeWidth="2" fill="none" strokeLinecap="round" />
+          </g>
+        );
+      case 2:
+        return (
+          <g>
+            <Outline />
+            <path d="M 45,20 L 45,35 M 50,18 L 50,35 M 55,20 L 55,35" stroke={line} strokeWidth="3" strokeLinecap="round" />
+            <path d="M 30,42 Q 35,38 40,42 M 60,42 Q 65,38 70,42" stroke={line} strokeWidth="3" fill="none" strokeLinecap="round" />
+            <circle cx="35" cy="50" r="2.5" fill={line} />
+            <circle cx="65" cy="50" r="2.5" fill={line} />
+            <circle cx="50" cy="55" r="3" fill={line} />
+            <path d="M 42,55 C 42,75 35,85 50,85 C 65,85 58,75 58,55 Z" fill="#FFF" stroke={line} strokeWidth="3" strokeLinejoin="round" />
+          </g>
+        );
+      case 3:
+        return (
+          <g>
+            <Outline bg="#B0B0B0" />
+            <path d="M 25,48 Q 35,42 45,48 Z" fill={line} />
+            <path d="M 55,48 Q 65,42 75,48 Z" fill={line} />
+            <circle cx="50" cy="65" r="10" fill="#B0B0B0" stroke={line} strokeWidth="3" />
+            <circle cx="50" cy="60" r="3" fill="#E68A5C" />
+            <path d="M 50,63 L 50,75 M 42,70 Q 50,80 58,70" stroke={line} strokeWidth="3" fill="none" strokeLinecap="round" />
+            <path d="M 35,60 Q 30,75 35,85 M 65,60 Q 70,75 65,85" stroke={line} strokeWidth="3" fill="none" strokeLinecap="round" />
+          </g>
+        );
+      case 4:
+        return (
+          <g>
+            <Outline />
+            <path d="M 20,45 C 30,40 45,55 50,55 C 55,55 70,40 80,45 C 85,50 85,65 75,65 C 65,65 55,75 50,75 C 45,75 35,65 25,65 C 15,65 15,50 20,45 Z" fill={line} />
+            <circle cx="35" cy="55" r="3.5" fill="#FFF" />
+            <circle cx="65" cy="55" r="3.5" fill="#FFF" />
+            <circle cx="50" cy="72" r="10" fill="#FFF" stroke={line} strokeWidth="3" />
+            <circle cx="50" cy="68" r="3" fill="#E68A5C" />
+            <path d="M 50,71 L 50,80 M 44,76 Q 50,84 56,76" stroke={line} strokeWidth="3" fill="none" strokeLinecap="round" />
+          </g>
+        );
+      case 5:
+        return (
+          <g>
+            <Outline />
+            <path d="M 25,20 C 35,15 45,30 50,35 C 55,30 65,15 75,20 C 80,10 85,20 80,40 L 20,40 C 15,20 20,10 25,20 Z" fill={line} />
+            <circle cx="40" cy="55" r="3" fill={line} />
+            <circle cx="60" cy="55" r="3" fill={line} />
+            <circle cx="50" cy="70" r="11" fill="#FFF" stroke={line} strokeWidth="3" />
+            <circle cx="50" cy="65" r="3.5" fill={line} />
+            <path d="M 50,69 L 50,80 M 42,75 Q 50,85 58,75" stroke={line} strokeWidth="3" fill="none" strokeLinecap="round" />
+          </g>
+        );
+      case 6:
+        return (
+          <g>
+            <Outline />
+            <path d="M 20,40 C 40,35 45,55 40,65 C 30,70 20,60 20,40 Z" fill={line} />
+            <circle cx="35" cy="52" r="3" fill="#FFF" />
+            <circle cx="65" cy="52" r="3" fill={line} />
+            <path d="M 40,75 Q 50,75 60,75" stroke={line} strokeWidth="3" fill="none" strokeLinecap="round" />
+            <circle cx="50" cy="65" r="2.5" fill={line} />
+          </g>
+        );
+      default:
+        return (
+          <g>
+            <Outline bg={level % 2 === 0 ? "#F9E4B7" : "#E4B7F9"} />
+            <circle cx="35" cy="50" r="3" fill={line} />
+            <circle cx="65" cy="50" r="3" fill={line} />
+            <path d="M 40,70 Q 50,80 60,70" stroke={line} strokeWidth="3" fill="none" strokeLinecap="round" />
+            <text x="50" y="40" textAnchor="middle" fill={line} fontSize="14" fontWeight="bold">Lv.{level}</text>
+          </g>
+        );
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900 z-[100] flex flex-col items-center justify-center text-white p-4 animate-in fade-in duration-300">
-      <h2 className="text-2xl sm:text-3xl font-bold mb-4 text-emerald-400">10秒連打チャレンジ！</h2>
-      <div className="text-xl mb-4 font-mono">残り時間: {timeLeft}秒</div>
-      <div className="text-4xl font-bold mb-8 text-amber-400">スコア: {score}</div>
-      
-      {!isPlaying && timeLeft === 10 && (
-        <button onClick={startGame} className="bg-emerald-500 text-white font-bold py-3 px-8 rounded-full text-xl mb-8 active:scale-95 transition-transform shadow-lg shadow-emerald-500/30">
-          スタート！
-        </button>
-      )}
-      {!isPlaying && timeLeft === 0 && (
-        <div className="flex flex-col items-center mb-8 animate-in zoom-in duration-300">
-          <p className="text-xl mb-4 font-bold text-center">ゲーム終了！<br/>あなたのスコアは {score} 回です！</p>
-          <button onClick={startGame} className="bg-indigo-500 text-white font-bold py-3 px-8 rounded-full text-xl active:scale-95 transition-transform shadow-lg shadow-indigo-500/30">
-            もう一度プレイ
-          </button>
-        </div>
-      )}
-      
-      {isPlaying && (
-        <button 
-          onClick={handleTap} 
-          className="w-48 h-48 sm:w-64 sm:h-64 bg-rose-500 rounded-full flex items-center justify-center text-4xl sm:text-5xl font-bold shadow-[0_0_30px_rgba(244,63,94,0.6)] active:scale-90 transition-transform mb-8 select-none"
-          style={{ touchAction: 'manipulation' }}
-        >
-          TAP!!
-        </button>
-      )}
+    <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-[0_2px_2px_rgba(0,0,0,0.1)]">
+      {renderContent()}
+    </svg>
+  );
+};
 
-      <button onClick={onClose} className="absolute top-8 right-6 text-slate-400 hover:text-white bg-slate-800 p-2 rounded-full transition-colors">
+const BackgroundCats = () => (
+  <div className="absolute inset-0 pointer-events-none overflow-hidden flex justify-between items-center opacity-70 z-0">
+    <svg viewBox="0 0 100 100" className="w-[45%] translate-x-[-15%] translate-y-[10%]" fill="none" stroke="#C1B79E" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20,50 C10,70 30,90 50,95 C70,90 90,70 80,50 C75,30 50,30 20,50 Z" />
+      <path d="M25,40 L15,15 L40,32 M75,40 L85,15 L60,32" />
+      <circle cx="35" cy="55" r="8" />
+      <circle cx="65" cy="55" r="8" />
+      <path d="M43,55 L57,55" />
+      <path d="M35,45 Q40,40 45,45 M65,45 Q60,40 55,45" />
+      <path d="M20,60 L10,62 M20,65 L10,68 M20,70 L12,74" />
+      <path d="M80,60 L90,62 M80,65 L90,68 M80,70 L88,74" />
+      <circle cx="50" cy="70" r="10" />
+      <circle cx="50" cy="67" r="2" fill="#C1B79E" />
+      <path d="M45,73 Q50,75 55,73" />
+    </svg>
+    <svg viewBox="0 0 100 100" className="w-[45%] translate-x-[15%] translate-y-[10%]" fill="none" stroke="#C1B79E" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20,50 C10,70 30,90 50,95 C70,90 90,70 80,50 C75,30 50,30 20,50 Z" />
+      <path d="M25,40 L15,15 L40,32 M75,40 L85,15 L60,32" />
+      <path d="M60,35 C65,40 75,30 70,25 Z" fill="#C1B79E" stroke="none" />
+      <path d="M30,55 Q35,52 40,55 M60,55 Q65,52 70,55" />
+      <circle cx="50" cy="70" r="12" />
+      <path d="M48,65 Q50,68 52,65 Z" fill="#C1B79E" />
+      <path d="M50,68 L50,82 M40,75 Q50,82 60,75" />
+      <path d="M20,60 L10,62 M20,65 L10,68 M20,70 L12,74" />
+      <path d="M80,60 L90,62 M80,65 L90,68 M80,70 L88,74" />
+    </svg>
+  </div>
+);
+
+function SecretGame({ onClose }) {
+  const [screen, setScreen] = useState('TITLE');
+  const [tiles, setTiles] = useState([]);
+  const [score, setScore] = useState(0);
+  const [combo, setCombo] = useState(0);
+  const [gameOver, setGameOver] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
+  
+  const [zukanPage, setZukanPage] = useState(0);
+  const [selectedCat, setSelectedCat] = useState(null);
+  
+  const [maxLevel, setMaxLevel] = useState(() => parseInt(localStorage.getItem('ossanMax')) || 1);
+  const [highScore, setHighScore] = useState(() => parseInt(localStorage.getItem('ossanHigh')) || 0);
+  const nextId = useRef(1);
+  const touchRef = useRef({ x: 0, y: 0, r: null, c: null, active: false });
+
+  useEffect(() => {
+    localStorage.setItem('ossanMax', maxLevel);
+    localStorage.setItem('ossanHigh', highScore);
+  }, [maxLevel, highScore]);
+
+  const resetGame = () => {
+    let initialTiles = [];
+    let count = 0;
+    let positions = new Set();
+    while(count < 6) {
+      let r = Math.floor(Math.random() * 4);
+      let c = Math.floor(Math.random() * 4);
+      let pos = `${r}-${c}`;
+      if(!positions.has(pos)) {
+        positions.add(pos);
+        initialTiles.push({ id: nextId.current++, val: 1, r, c, isNew: true });
+        count++;
+      }
+    }
+    setTiles(initialTiles);
+    setScore(0);
+    setCombo(0);
+    setGameOver(false);
+  };
+
+  const handleSwipe = (startR, startC, dir) => {
+    if (gameOver || isAnimating) return;
+    let board = Array(4).fill(null).map(() => Array(4).fill(null));
+    tiles.forEach(t => { if (!t.isMerging) board[t.r][t.c] = t; });
+    let line = [];
+    for(let i=0; i<4; i++) {
+      if (dir === 'RIGHT') line[i] = board[startR][i];
+      if (dir === 'LEFT')  line[i] = board[startR][3-i];
+      if (dir === 'DOWN')  line[i] = board[i][startC];
+      if (dir === 'UP')    line[i] = board[3-i][startC];
+    }
+    let moved = false;
+    let mergedLevel = 0;
+    let sacrifices = [];
+    for (let i = 3; i > 0; i--) {
+      if (line[i] === null && line[i-1] !== null) {
+        for(let j=i; j>0; j--) line[j] = line[j-1];
+        line[0] = null;
+        moved = true;
+        break;
+      } else if (line[i] !== null && line[i-1] !== null && line[i].val === line[i-1].val) {
+        let survivor = line[i];
+        let sacrifice = line[i-1];
+        survivor.nextVal = survivor.val + 1;
+        survivor.isUpgrading = true;
+        sacrifice.isMerging = true;
+        sacrifice.mergeTarget = survivor;
+        sacrifices.push(sacrifice);
+        for(let j=i-1; j>0; j--) line[j] = line[j-1];
+        line[0] = null;
+        moved = true;
+        mergedLevel = survivor.nextVal;
+        break;
+      }
+    }
+    if (!moved) return;
+    setIsAnimating(true);
+    for(let i=0; i<4; i++) {
+      let tile = line[i];
+      if (tile) {
+        if (dir === 'RIGHT') { tile.nextR = startR; tile.nextC = i; }
+        if (dir === 'LEFT')  { tile.nextR = startR; tile.nextC = 3-i; }
+        if (dir === 'DOWN')  { tile.nextR = i; tile.nextC = startC; }
+        if (dir === 'UP')    { tile.nextR = 3-i; tile.nextC = startC; }
+      }
+    }
+    sacrifices.forEach(sac => {
+      sac.nextR = sac.mergeTarget.nextR;
+      sac.nextC = sac.mergeTarget.nextC;
+    });
+    let spawnR, spawnC;
+    if (dir === 'RIGHT') { spawnR = startR; spawnC = 0; }
+    if (dir === 'LEFT')  { spawnR = startR; spawnC = 3; }
+    if (dir === 'DOWN')  { spawnR = 0; spawnC = startC; }
+    if (dir === 'UP')    { spawnR = 3; spawnC = startC; }
+    let newTile = { id: nextId.current++, val: 1, r: spawnR, c: spawnC, isNew: true };
+    let updatedTiles = tiles.map(t => {
+      let updated = { ...t };
+      if (updated.nextR !== undefined) {
+        updated.r = updated.nextR;
+        updated.c = updated.nextC;
+        if (updated.nextVal) updated.val = updated.nextVal;
+        delete updated.nextR;
+        delete updated.nextC;
+        delete updated.nextVal;
+      }
+      return updated;
+    });
+    updatedTiles.push(newTile);
+    setTiles(updatedTiles);
+    let currentCombo = mergedLevel ? combo + 1 : 0;
+    setCombo(currentCombo);
+    let newMax = maxLevel;
+    if (mergedLevel) {
+      let addScore = Math.pow(2, mergedLevel) * (currentCombo > 1 ? currentCombo : 1);
+      setScore(s => {
+        const ns = s + addScore;
+        if (ns > highScore) setHighScore(ns);
+        return ns;
+      });
+      if (mergedLevel > newMax) {
+        newMax = mergedLevel;
+        setMaxLevel(newMax);
+      }
+    }
+    setTimeout(() => {
+      setTiles(prev => {
+        const cleaned = prev.filter(t => !t.isMerging).map(t => ({...t, isNew: false, isUpgrading: false}));
+        checkGameOver(cleaned);
+        return cleaned;
+      });
+      setIsAnimating(false);
+    }, 150);
+  };
+
+  const checkGameOver = (currentTiles) => {
+    if (currentTiles.length < 16) return;
+    let b = Array(4).fill(0).map(()=>Array(4).fill(0));
+    currentTiles.forEach(t => { b[t.r][t.c] = t.val; });
+    for(let r=0; r<4; r++){
+      for(let c=0; c<4; c++){
+        if (c<3 && b[r][c] === b[r][c+1]) return;
+        if (r<3 && b[r][c] === b[r+1][c]) return;
+      }
+    }
+    setGameOver(true);
+    setTimeout(() => setScreen('RESULT'), 800);
+  };
+
+  const handlePointerDown = (e) => {
+    if(screen !== 'PLAY' || gameOver || isAnimating) return;
+    const cell = e.target.closest('[data-grid-cell]');
+    if (cell) {
+      touchRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        r: parseInt(cell.getAttribute('data-row')),
+        c: parseInt(cell.getAttribute('data-col')),
+        active: true
+      };
+    }
+  };
+
+  const handlePointerUp = (e) => {
+    const start = touchRef.current;
+    if (!start.active || start.r === null) return;
+    start.active = false;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    if (Math.abs(dx) > 30 || Math.abs(dy) > 30) {
+      let dir = null;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        dir = dx > 0 ? 'RIGHT' : 'LEFT';
+      } else {
+        dir = dy > 0 ? 'DOWN' : 'UP';
+      }
+      handleSwipe(start.r, start.c, dir);
+    }
+  };
+
+  const renderContent = () => {
+    if (screen === 'TITLE') {
+      return (
+        <div className="w-full h-full relative flex flex-col items-center justify-center p-6 bg-[#F4F1E1]">
+          <BackgroundCats />
+          <div className="z-10 flex flex-col items-center mb-6 w-full">
+            <div className="relative mb-2">
+              <h1 className="text-[54px] font-black text-white title-text-stroke absolute inset-0 tracking-wide text-center drop-shadow-md">おっさん猫</h1>
+              <h1 className="text-[54px] font-black text-white relative z-10 tracking-wide text-center">おっさん猫</h1>
+            </div>
+            <div className="text-[#A4997C] text-lg tracking-widest my-1 relative z-10">ossan cat puzzle</div>
+            <div className="relative flex items-center justify-center w-full mt-2">
+              <div className="relative">
+                <h1 className="text-[68px] font-black text-white title-text-stroke absolute inset-0 tracking-widest text-center drop-shadow-md">パズル</h1>
+                <h1 className="text-[68px] font-black text-white relative z-10 tracking-widest text-center">パズル</h1>
+              </div>
+            </div>
+          </div>
+          <div className="z-10 flex flex-col items-center mb-10">
+            <div className="text-[#B5A585] text-2xl mb-1">Best Score</div>
+            <div className="text-[#B5A585] text-4xl mb-4">{highScore}</div>
+          </div>
+          <div className="z-10 grid grid-cols-2 gap-x-4 gap-y-4 w-[90%] max-w-[300px]">
+            <button onClick={() => { resetGame(); setScreen('PLAY'); }} className="bg-[#FF6B6B] text-white text-3xl font-bold py-4 rounded-2xl shadow-[0_5px_0_#D15456] active:translate-y-1 active:shadow-none transition-all flex justify-center items-center">
+              <span className="drop-shadow-sm">スタート</span>
+            </button>
+            <button onClick={() => { setZukanPage(0); setScreen('ZUKAN'); }} className="bg-[#1ABC9C] text-white text-2xl font-bold py-4 rounded-2xl shadow-[0_5px_0_#129C81] active:translate-y-1 active:shadow-none transition-all flex justify-center items-center">
+              <span className="drop-shadow-sm tracking-tighter">コレクション</span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+    if (screen === 'RESULT') {
+      return (
+        <div className="w-full h-full relative flex flex-col items-center justify-center p-6 bg-[#F4F1E1]">
+          <div className="bg-white hand-drawn-border w-full max-w-[340px] p-8 flex flex-col items-center mb-8 shadow-sm">
+            <div className="relative mb-4 mt-2">
+              <h2 className="text-5xl font-black text-[#FFCC00] absolute inset-0 score-text-stroke text-center tracking-wide">High Score</h2>
+              <h2 className="text-5xl font-black text-[#FFCC00] relative z-10 text-center tracking-wide">High Score</h2>
+            </div>
+            <div className="text-[72px] text-[#7A7A7A] mb-8 leading-none">{score}</div>
+          </div>
+          <div className="flex gap-4 w-full max-w-[340px]">
+            <button onClick={() => setScreen('TITLE')} className="flex-1 bg-[#1ABC9C] text-white text-2xl font-bold py-4 rounded-2xl shadow-[0_5px_0_#129C81] active:translate-y-1 active:shadow-none transition-all text-center flex justify-center items-center">
+              <span className="drop-shadow-sm">タイトルヘ</span>
+            </button>
+            <button onClick={() => { resetGame(); setScreen('PLAY'); }} className="flex-1 bg-[#1ABC9C] text-white text-2xl font-bold py-4 rounded-2xl shadow-[0_5px_0_#129C81] active:translate-y-1 active:shadow-none transition-all text-center flex justify-center items-center">
+              <span className="drop-shadow-sm">リトライ</span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+    if (screen === 'ZUKAN') {
+      const compRate = Math.floor((maxLevel / 14) * 100);
+      const itemsPerPage = 6;
+      const maxPage = Math.ceil(14 / itemsPerPage) - 1;
+      const startIndex = zukanPage * itemsPerPage;
+      const pageItems = [];
+      for (let i = 0; i < itemsPerPage; i++) {
+        const catId = startIndex + i + 1;
+        pageItems.push(catId <= 14 ? catId : null);
+      }
+      return (
+        <div className="w-full h-full relative flex flex-col items-center justify-center p-4 bg-[#F4F1E1]">
+          <h2 className="text-[#A4997C] text-2xl mb-4 font-bold tracking-widest">派閥Aコンプ率: {compRate}%</h2>
+          <div className="flex items-center justify-between w-full mb-8 relative px-2">
+            <button 
+              className={`w-10 h-16 flex items-center justify-center z-10 text-[#1ABC9C] text-4xl font-bold active:scale-90 ${zukanPage > 0 ? '' : 'opacity-0 pointer-events-none'}`} 
+              onClick={() => setZukanPage(p => p - 1)}
+            >◀</button>
+            <div className="flex-1 bg-white hand-drawn-border p-4 grid grid-cols-3 gap-2 min-h-[280px] shadow-sm mx-1">
+              {pageItems.map((id, idx) => {
+                if (!id) return <div key={`empty-${idx}`} className="bg-transparent rounded-xl"></div>;
+                const isUnlocked = id <= maxLevel;
+                const cat = CAT_DESIGNS[id] || CAT_DESIGNS[1];
+                return (
+                  <div key={id} onClick={() => isUnlocked && setSelectedCat({...cat, id})} className={`tile-border flex flex-col items-center justify-center relative aspect-square cursor-pointer transition-transform active:scale-95 ${isUnlocked ? '' : 'bg-[#EAE5D4] border-[#DFD9C5]'}`} style={{ backgroundColor: isUnlocked ? cat.bg : '' }}>
+                    {isUnlocked ? (
+                      <><div className="absolute top-1 left-1 text-xs text-yellow-300 font-bold drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)] z-10 rotate-[-15deg]">new</div><CatSvg level={id} /></>
+                    ) : (
+                      <svg viewBox="0 0 100 100" className="w-12 h-12 text-[#C1B79E] opacity-50" fill="currentColor">
+                         <path d="M50,45 C40,45 35,55 35,65 C35,75 42,85 50,85 C58,85 65,75 65,65 C65,55 60,45 50,45 Z" />
+                         <circle cx="30" cy="35" r="10" /><circle cx="50" cy="25" r="10" /><circle cx="70" cy="35" r="10" />
+                      </svg>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <button 
+              className={`w-10 h-16 flex items-center justify-center z-10 text-[#1ABC9C] text-4xl font-bold transition-opacity ${zukanPage < maxPage ? 'active:scale-90' : 'opacity-0 pointer-events-none'}`}
+              onClick={() => setZukanPage(p => p + 1)}
+            >▶</button>
+          </div>
+          <button onClick={() => {setScreen('TITLE'); setZukanPage(0);}} className="bg-[#1ABC9C] text-white text-2xl font-bold py-3 px-12 rounded-2xl shadow-[0_5px_0_#129C81] active:translate-y-1 active:shadow-none transition-all">
+            タイトルヘ
+          </button>
+          {selectedCat && (
+            <div className="absolute inset-0 bg-[#F4F1E1] flex flex-col items-center justify-center z-50 p-6 animate-pop">
+              <div className="bg-white hand-drawn-border w-full max-w-[340px] p-8 flex flex-col items-center shadow-md relative mb-8">
+                <div className="w-48 h-48 mb-6"><CatSvg level={selectedCat.id} /></div>
+                <div className="w-full text-left">
+                  <h3 className="text-3xl font-bold text-gray-800 mb-2">{selectedCat.name}</h3>
+                  <p className="text-xl text-gray-700 font-bold mb-8">{selectedCat.desc}</p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedCat(null)} className="bg-[#FF6B6B] text-white text-2xl py-3 px-16 rounded-2xl shadow-[0_5px_0_#D15456] active:translate-y-1 active:shadow-none transition-all">
+                閉じる
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    }
+    return (
+      <div className="w-full h-full flex flex-col relative bg-[#F4F1E1] text-[#A4997C] pb-6" onPointerDown={handlePointerDown} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp}>
+        <div className="pt-6 pb-2 flex justify-between items-center px-4 relative z-10 h-[80px]">
+          <button onClick={() => setScreen('TITLE')} className="w-12 h-12 bg-[#1ABC9C] text-white rounded-xl shadow-[0_4px_0_#129C81] flex items-center justify-center active:translate-y-1 active:shadow-none z-50 transition-all pointer-events-auto" onPointerDown={(e) => e.stopPropagation()}>
+            <svg className="w-7 h-7 pr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M15 19l-7-7 7-7"></path></svg>
+          </button>
+          <div className="flex-1 text-center pointer-events-none">
+             {combo > 1 && (
+               <div key={combo} className="relative inline-block animate-combo mt-2">
+                 <div className="text-xl font-bold text-[#1ABC9C] mb-1 title-text-stroke-white drop-shadow-sm whitespace-nowrap">コレクション追加</div>
+                 <div className="relative">
+                   <span className="text-[#1ABC9C] font-black text-3xl absolute inset-0 combo-text-stroke tracking-widest whitespace-nowrap">連続コンボ中!!</span>
+                   <span className="text-[#1ABC9C] font-black text-3xl relative z-10 tracking-widest whitespace-nowrap">連続コンボ中!!</span>
+                 </div>
+               </div>
+             )}
+          </div>
+          <div className="w-12 h-12"></div>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center p-4 relative w-full mx-auto">
+          <div className="w-full aspect-square bg-white hand-drawn-border p-2 relative shadow-sm flex-shrink-0">
+            {Array.from({ length: 16 }).map((_, i) => (
+              <div key={`bg-${i}`} className="absolute p-[6px]" style={{ width: '25%', height: '25%', left: `${(i % 4) * 25}%`, top: `${Math.floor(i / 4) * 25}%` }}>
+                <div className="w-full h-full bg-[#EAE5D4] rounded-xl"></div>
+              </div>
+            ))}
+            {tiles.map(t => {
+              const config = CAT_DESIGNS[t.val > 14 ? 14 : t.val] || CAT_DESIGNS[1];
+              return (
+                <div key={t.id} className="absolute p-[6px] transition-transform duration-[150ms] ease-out" style={{ width: '25%', height: '25%', transform: `translate(${t.c * 100}%, ${t.r * 100}%)`, zIndex: t.isMerging ? 10 : 20 }}>
+                  <div className={`w-full h-full tile-border flex items-center justify-center relative ${t.isNew ? 'animate-pop' : ''} ${t.isUpgrading ? 'animate-merge' : ''}`} style={{ backgroundColor: config.bg }}>
+                    <div className="w-full h-full p-1"><CatSvg level={t.val} /></div>
+                    <div className="absolute bottom-0 right-0 translate-x-1/4 translate-y-1/4 w-7 h-7 bg-white border-[3px] border-[#4a4a4a] rounded-full flex items-center justify-center text-[16px] text-gray-800 font-bold z-30">{t.val}</div>
+                  </div>
+                </div>
+              );
+            })}
+            <div className="absolute inset-1 z-40 touch-none">
+              {Array.from({ length: 16 }).map((_, i) => (
+                <div key={`touch-${i}`} data-grid-cell="true" data-row={Math.floor(i / 4)} data-col={i % 4} className="absolute" style={{ width: '25%', height: '25%', left: `${(i % 4) * 25}%`, top: `${Math.floor(i / 4) * 25}%` }}></div>
+              ))}
+            </div>
+          </div>
+          <div className="w-full flex justify-between mt-6 gap-3 px-1 flex-shrink-0">
+            <div className="flex-1 bg-[#1ABC9C] text-white rounded-2xl py-3 px-6 flex justify-between items-center shadow-md">
+               <span className="text-xl font-bold">Score:</span> 
+               <span className="text-3xl font-bold">{score}</span>
+            </div>
+            <div className="flex-1 bg-[#FF6B6B] text-white rounded-2xl py-3 px-6 flex justify-between items-center shadow-md">
+               <span className="text-xl font-bold">Best:</span> 
+               <span className="text-3xl font-bold">{highScore}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-slate-900 animate-in fade-in duration-300 overflow-hidden flex flex-col justify-center items-center">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Yomogi&display=swap');
+        .hand-drawn-border { border: 4px solid #1ABC9C; border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px; background-color: white; }
+        .tile-border { border: 3px solid #4a4a4a; border-radius: 12px; }
+        .title-text-stroke { -webkit-text-stroke: 8px #C1B79E; paint-order: stroke fill; }
+        .title-text-stroke-white { -webkit-text-stroke: 8px white; paint-order: stroke fill; }
+        .score-text-stroke { -webkit-text-stroke: 6px #FF6B6B; paint-order: stroke fill; }
+        .combo-text-stroke { -webkit-text-stroke: 6px white; paint-order: stroke fill; }
+        @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 80% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes mergePop { 0% { transform: scale(1); } 50% { transform: scale(1.2); box-shadow: 0 0 15px rgba(255,215,0,0.6); z-index: 30; } 100% { transform: scale(1); } }
+        @keyframes comboAnim { 0% { transform: translateY(20px) scale(0.8) rotate(-5deg); opacity: 0; } 30% { transform: translateY(0px) scale(1.2) rotate(5deg); opacity: 1; } 70% { transform: translateY(0px) scale(1.1) rotate(0deg); opacity: 1; } 100% { transform: translateY(-20px) scale(1) opacity: 0; } }
+        .animate-pop { animation: popIn 0.2s ease-out forwards; }
+        .animate-merge { animation: mergePop 0.25s ease-out forwards; }
+        .animate-combo { animation: comboAnim 1.2s ease-out forwards; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
+      
+      <button onClick={onClose} className="absolute top-6 right-6 mt-4 bg-slate-800 text-slate-400 hover:text-white p-2 rounded-full z-[110] transition-colors shadow-lg">
         <X size={24} />
       </button>
+
+      <div className="w-full max-w-[420px] h-full relative" style={{ fontFamily: "'Yomogi', cursive, sans-serif" }}>
+        {renderContent()}
+      </div>
     </div>
   );
 }
@@ -8643,7 +9112,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.9, 15:11, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.9, 15:13, updated)</p>
       </div>
     </div>
   );
