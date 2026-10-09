@@ -443,9 +443,11 @@ function SimpleChart({ data, color, title }) {
               {points.map((p, i) => (
                 <g key={i}>
                   <circle cx={p.x} cy={p.y} r="5" fill="currentColor" className="text-white dark:text-slate-900" stroke={color} strokeWidth="2.5" />
-                  <text x={p.x} y={p.y - 12 - (i % 2 === 0 ? 0 : 14)} fontSize="12" fill={color} textAnchor="middle" className="font-bold tracking-tighter">{p.val}</text>
-                  {p.dateStr && <text x={p.x} y={height + 25 + (i % 2 === 0 ? 0 : 12)} fontSize="10" fill="currentColor" textAnchor="middle" className="font-bold text-slate-400 dark:text-slate-500">{p.dateStr}</text>}
+                  <text x={p.x} y={p.y - 12} fontSize="12" fill={color} textAnchor="middle" className="font-bold tracking-tighter">{p.val}</text>
                 </g>
+              ))}
+              {dateTicks.map((t, i) => (
+                <text key={`tick-${i}`} x={t.x} y={height + 25} fontSize="10" fill="currentColor" textAnchor="middle" className="font-bold text-slate-400 dark:text-slate-500">{t.dateStr}</text>
               ))}
             </svg>
           </div>
@@ -8555,7 +8557,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.9, 14:54, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.9, 14:55, updated)</p>
       </div>
     </div>
   );
