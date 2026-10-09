@@ -22,7 +22,7 @@ export const getFFMI = (weight, fat, height) => {
   return ffmi + 6.1 * (1.8 - heightM);
 };
 
-export export const getFFMIEval = (ffmi, gender) => {
+export const getFFMIEval = (ffmi, gender) => {
   if (gender === 'female') {
       if (ffmi < 14) return '低め';
       if (ffmi < 16) return '平均的';

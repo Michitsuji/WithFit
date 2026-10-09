@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { MapPin, Dumbbell, Play, Calendar as CalendarIcon, Scale, Target, ArrowUp, ArrowDown, ListPlus, Flame, UserPlus, Sparkles, Activity } from 'lucide-react';
+import { MapPin, Dumbbell, Play, Calendar as CalendarIcon, Scale, Target, ArrowUp, ArrowDown, ListPlus, Flame, UserPlus, Sparkles, Activity, X } from 'lucide-react';
 import { doc, setDoc, deleteField } from 'firebase/firestore';
 import { db, appId } from '../services/firebase';
 import { FormInput } from '../components/common/FormInput';

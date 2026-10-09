@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Users, Trophy, Award, Copy, UserPlus, AlignLeft, Bell, Sparkles, Activity, Trash2, Flame, Circle } from 'lucide-react';
+import { Users, Trophy, Award, Copy, UserPlus, AlignLeft, Bell, Sparkles, Activity, Trash2, Flame, Circle, Target, ArrowUp, ArrowDown } from 'lucide-react';
 import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { db, appId } from '../services/firebase';
 import { UserAvatar } from '../components/common/UserAvatar';

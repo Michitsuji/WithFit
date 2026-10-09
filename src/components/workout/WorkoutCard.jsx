@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Heart, Clock, MapPin, Edit2, Trash2, MoreVertical, FileText, Scale, ListPlus, Copy, Play, Calendar as CalendarIcon, X, Dumbbell, Flame, Activity, Zap, MessageCircle, ArrowDown, ArrowUp, Send } from 'lucide-react';
+import { Heart, Clock, MapPin, Edit2, Trash2, MoreVertical, FileText, Scale, ListPlus, Copy, Play, Calendar as CalendarIcon, X, Dumbbell, Flame, Activity, Zap, MessageCircle, ArrowDown, ArrowUp, Send, AlignLeft } from 'lucide-react';
 import { UserAvatar } from '../common/UserAvatar';
 import { renderUsernameWithBadge } from '../common/renderUsernameWithBadge';
 import { generateColor, getCategoryColor } from '../../utils/helpers';
