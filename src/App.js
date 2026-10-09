@@ -358,7 +358,7 @@ function SimpleChart({ data, color, title }) {
     if (scrollRef.current) {
       scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
     }
-  }, [data]);
+  }, [data?.length]);
 
   if (!data || data.length === 0) return (
     <div className="w-full bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center">
@@ -395,9 +395,21 @@ function SimpleChart({ data, color, title }) {
       x = 40 + ((t - minTime) / (maxTime - minTime)) * (chartWidth - 80);
     }
     const y = height - ((d.value - min) / range) * height;
-    const dateStr = d.date ? d.date.slice(5, 10).replace('-', '/') : '';
-    return { x, y, val: d.value, dateStr };
+    return { x, y, val: d.value };
   });
+
+  const dateTicks = [];
+  if (daysDiff === 0) {
+    const d = new Date(minTime);
+    dateTicks.push({ x: chartWidth / 2, dateStr: `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}` });
+  } else {
+    for (let i = 0; i <= daysDiff; i += 10) {
+      const tickTime = minTime + i * 24 * 60 * 60 * 1000;
+      const x = 40 + (i / daysDiff) * (chartWidth - 80);
+      const d = new Date(tickTime);
+      dateTicks.push({ x, dateStr: `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}` });
+    }
+  }
 
   const polylinePoints = points.map(p => `${p.x},${p.y}`).join(' ');
 
@@ -8543,7 +8555,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.9, 14:48, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.9, 14:54, updated)</p>
       </div>
     </div>
   );
