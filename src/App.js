@@ -383,7 +383,7 @@ function SimpleChart({ data, color, title }) {
   const maxTime = new Date(sortedData[sortedData.length - 1].date).getTime();
   const daysDiff = (maxTime - minTime) / (1000 * 60 * 60 * 24);
 
-  const PIXELS_PER_DAY = 12;
+  const PIXELS_PER_DAY = 5;
   const chartWidth = Math.max(300, Math.round(daysDiff * PIXELS_PER_DAY + 80));
 
   const points = sortedData.map(d => {
@@ -431,8 +431,8 @@ function SimpleChart({ data, color, title }) {
               {points.map((p, i) => (
                 <g key={i}>
                   <circle cx={p.x} cy={p.y} r="5" fill="currentColor" className="text-white dark:text-slate-900" stroke={color} strokeWidth="2.5" />
-                  <text x={p.x} y={p.y - 12} fontSize="12" fill={color} textAnchor="middle" className="font-bold tracking-tighter">{p.val}</text>
-                  {p.dateStr && <text x={p.x} y={height + 25} fontSize="10" fill="currentColor" textAnchor="middle" className="font-bold text-slate-400 dark:text-slate-500">{p.dateStr}</text>}
+                  <text x={p.x} y={p.y - 12 - (i % 2 === 0 ? 0 : 14)} fontSize="12" fill={color} textAnchor="middle" className="font-bold tracking-tighter">{p.val}</text>
+                  {p.dateStr && <text x={p.x} y={height + 25 + (i % 2 === 0 ? 0 : 12)} fontSize="10" fill="currentColor" textAnchor="middle" className="font-bold text-slate-400 dark:text-slate-500">{p.dateStr}</text>}
                 </g>
               ))}
             </svg>
@@ -3362,7 +3362,7 @@ if (timerState.y === 'top') {
     if (!currentUser || !db || !myInfo?.isTraining || !myInfo?.trainingStartTime) return;
     if (myInfo.hasSentForgotNotification) return;
 
-    const lastInteraction = Math.max(myInfo.trainingStartTime, myInfo.draftUpdatedAt || 0);
+    const lastInteraction = Math.max(myInfo.trainingStartTime, myInfo.lastActive || myInfo.draftUpdatedAt || 0);
     const elapsed = Date.now() - lastInteraction;
     const timeUntilNotify = (30 * 60 * 1000) - elapsed;
 
@@ -3384,7 +3384,7 @@ if (timerState.y === 'top') {
 
     if (timeUntilNotify <= 0) { sendForgotNotification(); } 
     else { const timer = setTimeout(sendForgotNotification, timeUntilNotify); return () => clearTimeout(timer); }
-  }, [currentUser, db, myInfo?.isTraining, myInfo?.trainingStartTime, myInfo?.draftUpdatedAt, myInfo?.hasSentForgotNotification, myInfo?.fcmToken]);
+  }, [currentUser, db, myInfo?.isTraining, myInfo?.trainingStartTime, myInfo?.lastActive, myInfo?.draftUpdatedAt, myInfo?.hasSentForgotNotification, myInfo?.fcmToken]);
 
   const [notifications, setNotifications] = useState([]);
   useEffect(() => {
@@ -8543,7 +8543,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.7, 13:45, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.9, 14:48, updated)</p>
       </div>
     </div>
   );
