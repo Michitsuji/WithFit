@@ -2327,6 +2327,18 @@ export default function App() {
     return 1.0;
   });
 
+  const [headerSecretTapCount, setHeaderSecretTapCount] = useState(0);
+  const [showSecretGame, setShowSecretGame] = useState(false);
+
+  const handleHeaderOnlineTap = () => {
+    const newCount = headerSecretTapCount + 1;
+    setHeaderSecretTapCount(newCount);
+    if (newCount >= 10) {
+      setShowSecretGame(true);
+      setHeaderSecretTapCount(0);
+    }
+  };
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
        // ご自身で用意される音楽ファイル名（パス）に合わせて変更してください
@@ -3902,7 +3914,7 @@ if (timerState.y === 'top') {
                 </div>
               )}
             </button>
-            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 px-2 py-1.5 rounded-full border border-slate-200 dark:border-slate-800">
+            <div onClick={handleHeaderOnlineTap} className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 px-2 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 cursor-pointer select-none">
               <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-[#10b981] shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`}></div>
               <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">{isOnline ? 'オンライン' : 'オフライン'}</span>
             </div>
@@ -4197,6 +4209,72 @@ if (timerState.y === 'top') {
       <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} userInfo={myInfo} onSave={handleSaveProfile} currentUser={currentUser} onLinkGoogle={handleLinkGoogle} onDeleteAccount={handleDeleteAccount} onTogglePush={handleTogglePushPermission} />
       <UserProfileModal isOpen={!!selectedUserProfile} onClose={() => setSelectedUserProfile(null)} targetUser={selectedUserProfile} accountsInfo={accountsInfo} currentUser={currentUser} onSendRequest={handleSendFriendRequest} />
       <CoachChatModal isOpen={showCoachChat} onClose={() => setShowCoachChat(false)} currentUser={currentUser} accountsInfo={accountsInfo} posts={posts} appId={appId} />
+      {showSecretGame && <SecretGame onClose={() => setShowSecretGame(false)} />}
+    </div>
+  );
+}
+
+// --- シークレットゲームコンポーネント ---
+function SecretGame({ onClose }) {
+  const [score, setScore] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(10);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  useEffect(() => {
+    let timer;
+    if (isPlaying && timeLeft > 0) {
+      timer = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
+    } else if (timeLeft === 0) {
+      setIsPlaying(false);
+    }
+    return () => clearInterval(timer);
+  }, [isPlaying, timeLeft]);
+
+  const startGame = () => {
+    setScore(0);
+    setTimeLeft(10);
+    setIsPlaying(true);
+  };
+
+  const handleTap = () => {
+    if (isPlaying) {
+      setScore(prev => prev + 1);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900 z-[100] flex flex-col items-center justify-center text-white p-4 animate-in fade-in duration-300">
+      <h2 className="text-2xl sm:text-3xl font-bold mb-4 text-emerald-400">10秒連打チャレンジ！</h2>
+      <div className="text-xl mb-4 font-mono">残り時間: {timeLeft}秒</div>
+      <div className="text-4xl font-bold mb-8 text-amber-400">スコア: {score}</div>
+      
+      {!isPlaying && timeLeft === 10 && (
+        <button onClick={startGame} className="bg-emerald-500 text-white font-bold py-3 px-8 rounded-full text-xl mb-8 active:scale-95 transition-transform shadow-lg shadow-emerald-500/30">
+          スタート！
+        </button>
+      )}
+      {!isPlaying && timeLeft === 0 && (
+        <div className="flex flex-col items-center mb-8 animate-in zoom-in duration-300">
+          <p className="text-xl mb-4 font-bold text-center">ゲーム終了！<br/>あなたのスコアは {score} 回です！</p>
+          <button onClick={startGame} className="bg-indigo-500 text-white font-bold py-3 px-8 rounded-full text-xl active:scale-95 transition-transform shadow-lg shadow-indigo-500/30">
+            もう一度プレイ
+          </button>
+        </div>
+      )}
+      
+      {isPlaying && (
+        <button 
+          onClick={handleTap} 
+          className="w-48 h-48 sm:w-64 sm:h-64 bg-rose-500 rounded-full flex items-center justify-center text-4xl sm:text-5xl font-bold shadow-[0_0_30px_rgba(244,63,94,0.6)] active:scale-90 transition-transform mb-8 select-none"
+          style={{ touchAction: 'manipulation' }}
+        >
+          TAP!!
+        </button>
+      )}
+
+      <button onClick={onClose} className="absolute top-8 right-6 text-slate-400 hover:text-white bg-slate-800 p-2 rounded-full transition-colors">
+        <X size={24} />
+      </button>
     </div>
   );
 }
@@ -8565,7 +8643,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.9, 14:59, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.9, 15:11, updated)</p>
       </div>
     </div>
   );
