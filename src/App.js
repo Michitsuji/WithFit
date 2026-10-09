@@ -789,10 +789,10 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
       return (
         <div className={`flex justify-between items-center border-b border-slate-200/50 dark:border-slate-800/50 pb-2 pt-2 last:border-0 ${isDrop ? 'pl-8' : ''}`}>
           <span className="font-bold w-16 text-sm shrink-0 text-slate-500 dark:text-slate-400">{label}</span>
-          <div className="flex-1 flex justify-end items-center px-1 gap-3 overflow-hidden">
-             {distance && <span className="font-bold text-slate-800 dark:text-slate-100 truncate">{distance}<span className="text-xs font-normal text-slate-400 ml-0.5">km</span></span>}
-             {time && <span className="font-bold text-slate-800 dark:text-slate-100 truncate">{time}<span className="text-xs font-normal text-slate-400 ml-0.5">分</span></span>}
-             {calories && <span className="font-bold text-slate-800 dark:text-slate-100 truncate">{calories}<span className="text-xs font-normal text-slate-400 ml-0.5">kcal</span></span>}
+          <div className="flex-1 flex flex-wrap justify-end items-center px-1 gap-2">
+             {distance && <span className="font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap">{distance}<span className="text-xs font-normal text-slate-400 ml-0.5">km</span></span>}
+             {time && <span className="font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap">{time}<span className="text-xs font-normal text-slate-400 ml-0.5">分</span></span>}
+             {calories && <span className="font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap">{calories}<span className="text-xs font-normal text-slate-400 ml-0.5">kcal</span></span>}
           </div>
         </div>
       );
@@ -8565,7 +8565,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.9, 14:57, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.9, 14:59, updated)</p>
       </div>
     </div>
   );
