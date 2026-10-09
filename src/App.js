@@ -4216,19 +4216,19 @@ if (timerState.y === 'top') {
 
 // --- シークレットゲームコンポーネント ---
 const CAT_DESIGNS = {
-  1: { bg: "#FF6B6B", name: "カズさん", desc: "いつも寝ているおっさん猫" },
-  2: { bg: "#FF6B6B", name: "フミさん", desc: "鼻の下が長いおっさん猫" },
-  3: { bg: "#1ABC9C", name: "シワさん", desc: "苦労人のおっさん猫" },
-  4: { bg: "#FF6B6B", name: "ドロさん", desc: "夜行性のおっさん猫" },
-  5: { bg: "#1ABC9C", name: "ハチさん", desc: "寄り目のおっさん猫" },
-  6: { bg: "#FF6B6B", name: "テンさん", desc: "感情がないおっさん猫" },
-  7: { bg: "#1ABC9C", name: "ヒゲさん", desc: "立派なヒゲを持つ" },
-  8: { bg: "#FF6B6B", name: "マロさん", desc: "高貴な血筋を自称" },
-  9: { bg: "#1ABC9C", name: "トラさん", desc: "阪神ファン歴40年" },
-  10:{ bg: "#FF6B6B", name: "ボブさん", desc: "尻尾が短いおっさん" },
-  11:{ bg: "#1ABC9C", name: "タマさん", desc: "町内の顔役" },
-  12:{ bg: "#FF6B6B", name: "クロさん", desc: "暗闇に同化する" },
-  13:{ bg: "#1ABC9C", name: "シロさん", desc: "いつも綺麗好き" },
+  1: { bg: "#FAD390", name: "カズさん", desc: "いつも寝ているおっさん猫" },
+  2: { bg: "#F8C291", name: "フミさん", desc: "鼻の下が長いおっさん猫" },
+  3: { bg: "#FF6B6B", name: "シワさん", desc: "苦労人のおっさん猫" },
+  4: { bg: "#C23616", name: "ドロさん", desc: "夜行性のおっさん猫" },
+  5: { bg: "#82CCDD", name: "ハチさん", desc: "寄り目のおっさん猫" },
+  6: { bg: "#60A3BC", name: "テンさん", desc: "感情がないおっさん猫" },
+  7: { bg: "#4A69BD", name: "ヒゲさん", desc: "立派なヒゲを持つ" },
+  8: { bg: "#B8E994", name: "マロさん", desc: "高貴な血筋を自称" },
+  9: { bg: "#78E08F", name: "トラさん", desc: "阪神ファン歴40年" },
+  10:{ bg: "#38ADA9", name: "ボブさん", desc: "尻尾が短いおっさん" },
+  11:{ bg: "#E58E26", name: "タマさん", desc: "町内の顔役" },
+  12:{ bg: "#D6A2E8", name: "クロさん", desc: "暗闇に同化する" },
+  13:{ bg: "#9C88FF", name: "シロさん", desc: "いつも綺麗好き" },
   14:{ bg: "#FFD700", name: "神様", desc: "全てを悟ったおっさん猫" },
 };
 
@@ -9164,7 +9164,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.9, 15:21, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.9, 15:23, updated)</p>
       </div>
     </div>
   );
