@@ -2753,16 +2753,15 @@ if (timerState.y === 'top') {
           };
           restoreToken();
         } else {
-          const lastPrompt = Number(localStorage.getItem('withfit_push_prompt_time') || 0);
-          const daysSinceLastPrompt = (Date.now() - lastPrompt) / (1000 * 60 * 60 * 24);
-          if (daysSinceLastPrompt > 3) {
+          const hasPromptedThisSession = sessionStorage.getItem('withfit_push_prompted');
+          if (!hasPromptedThisSession) {
             if (!myData.fcmToken && Notification.permission === 'default') {
               setPushPromptType('request');
-              const timer = setTimeout(() => { setShowPushPrompt(true); localStorage.setItem('withfit_push_prompt_time', Date.now().toString()); }, 1500);
+              const timer = setTimeout(() => { setShowPushPrompt(true); sessionStorage.setItem('withfit_push_prompted', 'true'); }, 1500);
               return () => clearTimeout(timer);
             } else if (Notification.permission === 'denied') {
               setPushPromptType('warning');
-              const timer = setTimeout(() => { setShowPushPrompt(true); localStorage.setItem('withfit_push_prompt_time', Date.now().toString()); }, 1500);
+              const timer = setTimeout(() => { setShowPushPrompt(true); sessionStorage.setItem('withfit_push_prompted', 'true'); }, 1500);
               return () => clearTimeout(timer);
             }
           }
@@ -9164,7 +9163,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.9, 15:23, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.19, 13:32, updated)</p>
       </div>
     </div>
   );
