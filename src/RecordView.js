@@ -2,10 +2,10 @@
 // RecordView.js — トレーニング記録入力画面・プログラム生成＆管理コンポーネント
 // ==========================================
 import React, { useState, useMemo, useEffect } from 'react';
-import { Target, X, AlignLeft, Trash2, CheckCircle, ArrowUp, ArrowDown, Zap, Plus, Activity, Scale, MapPin, Dumbbell, Play, Calendar as CalendarIcon, Flame, UserPlus, ListPlus, Sparkles } from 'lucide-react';
+import { Target, X, AlignLeft, Trash2, CheckCircle, ArrowUp, ArrowDown, Zap, Plus, Activity, Scale, MapPin, Dumbbell, Play, Calendar as CalendarIcon, Flame, UserPlus, ListPlus, Sparkles, Clock, Search } from 'lucide-react';
 import { setDoc, doc, deleteField } from 'firebase/firestore';
 import { db, appId } from './firebase';
-import { formatDateFromTimestamp, generateId, MASTER_USER } from './utils';
+import { formatDateFromTimestamp, formatDateWithDay, generateId, MASTER_USER, getCategoryColor, MUSCLE_CATEGORIES } from './utils';
 import { FormInput, UserAvatar, CategoryFilterGrid } from './CommonUI';
 import { WorkoutItemForm, ReorderItemsModal } from './WorkoutForm';
 
@@ -228,7 +228,153 @@ function ActiveProgramDisplay({ program, onApply, onToggleComplete, onDelete }) 
   );
 }
 
-function RecordView({ onStart, onPost, onCancel, onRequestJointTraining, onAcceptJointTraining, onRejectJointTraining, onCancelJointTraining, myInfo, gyms, exercises, workoutItems, setWorkoutItems, selectedCategories, setSelectedCategories, posts, currentUser, isManual, setIsManual, onActiveExerciseChange, accountsInfo }) {
+// --- 過去のデータから種目ごとに追加するモーダル ---
+function PastExercisePickerModal({ isOpen, onClose, pastPosts, onSelectExerciseItem }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+
+  const pastExerciseEntries = useMemo(() => {
+    if (!pastPosts) return [];
+    const list = [];
+    pastPosts.forEach(post => {
+      if (!post.items || !Array.isArray(post.items)) return;
+      post.items.forEach((item, idx) => {
+        if (!item.exerciseName) return;
+        list.push({
+          key: `${post.id}_${idx}`,
+          post,
+          item,
+          dateStr: formatDateWithDay(post.date || post.timestamp),
+          gymName: post.gymName || ''
+        });
+      });
+    });
+    return list;
+  }, [pastPosts]);
+
+  const filteredEntries = useMemo(() => {
+    return pastExerciseEntries.filter(entry => {
+      if (categoryFilter !== 'all' && (entry.item.category || 'その他') !== categoryFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchName = entry.item.exerciseName.toLowerCase().includes(q);
+        const matchGym = entry.gymName.toLowerCase().includes(q);
+        const matchSuper = (entry.item.superExerciseName || '').toLowerCase().includes(q);
+        return matchName || matchGym || matchSuper;
+      }
+      return true;
+    });
+  }, [pastExerciseEntries, categoryFilter, searchQuery]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={onClose}>
+      <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950/40">
+          <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 text-sm">
+            <Clock size={18} className="text-emerald-500" /> 過去のデータから種目を追加
+          </h3>
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-4 border-b border-slate-100 dark:border-slate-800 space-y-2.5 bg-white dark:bg-slate-900">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="種目名やジム名で検索..."
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-9 pr-8 py-2 text-sm font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                <X size={16} />
+              </button>
+            )}
+          </div>
+          <div className="flex gap-1.5 overflow-x-auto pb-1 hide-scrollbar">
+            <button
+              onClick={() => setCategoryFilter('all')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 border transition-colors ${
+                categoryFilter === 'all'
+                  ? 'bg-emerald-500 text-white border-emerald-500'
+                  : 'bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800'
+              }`}
+            >
+              すべて
+            </button>
+            {MUSCLE_CATEGORIES.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setCategoryFilter(cat)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 border transition-colors ${
+                  categoryFilter === cat
+                    ? 'bg-emerald-500 text-white border-emerald-500'
+                    : 'bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-4 overflow-y-auto space-y-2.5 flex-1 bg-slate-50/50 dark:bg-slate-950/50">
+          {filteredEntries.length === 0 ? (
+            <div className="text-center py-8 text-xs font-bold text-slate-400">
+              該当する過去の種目データがありません
+            </div>
+          ) : (
+            filteredEntries.slice(0, 60).map(({ key, post, item, dateStr, gymName }) => (
+              <div key={key} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 shadow-sm flex flex-col gap-2">
+                <div className="flex justify-between items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-sm text-slate-800 dark:text-slate-100 truncate">{item.exerciseName}</span>
+                      {item.category && (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${getCategoryColor(item.category)}`}>
+                          {item.category}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400 mt-0.5">
+                      <span>{dateStr}</span>
+                      {gymName && <span>・{gymName}</span>}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSelectExerciseItem(item, post);
+                    }}
+                    className="shrink-0 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-sm flex items-center gap-1 transition-colors"
+                  >
+                    <Plus size={14} /> 追加
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {(item.sets || []).map((s, idx) => (
+                    <span key={idx} className="text-[11px] font-bold bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded border border-slate-200/80 dark:border-slate-800">
+                      {item.weightType === 'cardio'
+                        ? `${s.distance || 0}km / ${s.time || 0}分`
+                        : `${s.weight || 0}${item.weightType === 'plate' ? '枚' : 'kg'} × ${s.reps || Math.max(s.lReps || 0, s.rReps || 0)}回`}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RecordView({ onStart, onPost, onCancel, onRequestJointTraining, onAcceptJointTraining, onRejectJointTraining, onCancelJointTraining, onImportItem, myInfo, gyms, exercises, workoutItems, setWorkoutItems, selectedCategories, setSelectedCategories, posts, currentUser, isManual, setIsManual, onActiveExerciseChange, accountsInfo }) {
   const joinedGyms = myInfo.joinedGyms || ['common'];
   const jointPartnerId = myInfo.jointPartnerId;
   const partnerItems = jointPartnerId ? (accountsInfo[jointPartnerId]?.currentWorkoutItems || []) : [];
@@ -254,6 +400,7 @@ function RecordView({ onStart, onPost, onCancel, onRequestJointTraining, onAccep
   const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (sortedGyms[0]?.id || ''));
   const [showReorderModal, setShowReorderModal] = useState(false);
   const [showProgramModal, setShowProgramModal] = useState(false);
+  const [showPastExerciseModal, setShowPastExerciseModal] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bodyWeight, setBodyWeight] = useState('');
@@ -919,6 +1066,9 @@ ${importText}`;
       alert("種目を追加するか、体重・体脂肪率を入力してください。"); return;
     }
 
+    // 押し間違い防止の確認ステップ（ログアウト時と同様のwindow.confirm）
+    if (!window.confirm(isManual ? "過去の記録を保存しますか？" : "トレーニングを完了して保存しますか？")) return;
+
     setIsSubmitting(true);
     const gym = gyms.find(g => g.id === selectedGymId);
     
@@ -950,6 +1100,7 @@ ${importText}`;
 
   const handleMetricsOnlySubmit = async () => {
       if (!bodyWeight && !bodyFat) { alert('体重または体脂肪率を入力してください'); return; }
+      if (!window.confirm('体組成の記録を保存しますか？')) return;
       setIsSubmitting(true);
       const startTs = new Date(`${manualDate}T${manualStartTime}`).getTime();
       await onPost('', [], Number(bodyWeight), Number(bodyFat), startTs, startTs);
@@ -985,7 +1136,7 @@ ${importText}`;
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
         <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
-          {myInfo?.isTraining ? 'メニュー' : 'ワークアウトを開始'}
+          {myInfo?.isTraining ? 'プログラム・メニュー' : 'ワークアウトを開始'}
         </h2>
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col items-center">
           <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4"><MapPin size={28} className="text-slate-400 dark:text-slate-500" /></div>
@@ -1140,9 +1291,16 @@ ${importText}`;
         })()}
       </div>
 
-      <div className="flex justify-between items-center mb-2">
+      <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
         <h2 className="text-lg font-bold text-slate-900 dark:text-white">{isManual ? '記録内容' : 'ワークアウト中'}</h2>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowPastExerciseModal(true)}
+            className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800 flex items-center gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors shadow-sm"
+          >
+            <Clock size={14} /> 過去データから種目追加
+          </button>
           {workoutItems.length > 1 && (
             <button onClick={() => setShowReorderModal(true)} className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 flex items-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-colors shadow-sm">
               <ArrowUp size={14} /><ArrowDown size={14} className="-ml-2" /> 並び替え
@@ -1340,6 +1498,18 @@ ${importText}`;
           }}
         />
       )}
+
+      <PastExercisePickerModal
+        isOpen={showPastExerciseModal}
+        onClose={() => setShowPastExerciseModal(false)}
+        pastPosts={myPastPosts}
+        onSelectExerciseItem={(item, post) => {
+          if (onImportItem) {
+            onImportItem(item, post);
+          }
+          setShowPastExerciseModal(false);
+        }}
+      />
     </div>
   );
 }
@@ -1348,5 +1518,6 @@ export {
   PROG_INFO,
   ProgramGeneratorModal,
   ActiveProgramDisplay,
+  PastExercisePickerModal,
   RecordView
 };

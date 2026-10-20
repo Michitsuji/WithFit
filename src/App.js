@@ -18,16 +18,22 @@ import { FriendsView, FriendDetailModal } from './FriendsView';
 import { LoginScreen, ProfileModal, UserProfileModal } from './ProfileModals';
 import { CoachChatModal, SecretGame } from './CoachAndGame';
 
+const VAPID_PUBLIC_KEY = 'BAty8GYk1zuoZVh-ZaSdcJsq_o-7vXJLXPNVNzlgsq9rd3wP-jQtclYEdu1MnnLN_0BnlmiKuoWH3X2YvOFl7aM';
+
 export default function App() {
   useAutoScrollDisable();
 
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const pendingPushToken = useRef(null);
+  const hasRefreshedTokenForUser = useRef(null);
 
   useEffect(() => {
     if (currentUser && pendingPushToken.current) {
-      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { fcmToken: pendingPushToken.current }, { merge: true }).catch(console.error);
+      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), {
+        fcmToken: pendingPushToken.current,
+        fcmTokenUpdatedAt: Date.now()
+      }, { merge: true }).catch(console.error);
       pendingPushToken.current = null;
     }
   }, [currentUser]);
@@ -41,7 +47,10 @@ export default function App() {
         
         if (data.type === 'PUSH_TOKEN') {
           if (currentUser) {
-            setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { fcmToken: data.token }, { merge: true });
+            setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), {
+              fcmToken: data.token,
+              fcmTokenUpdatedAt: Date.now()
+            }, { merge: true });
           } else {
             pendingPushToken.current = data.token;
           }
@@ -553,35 +562,61 @@ if (timerState.y === 'top') {
     }
   }, [firebaseUser, dataLoaded.accounts, currentUser]);
 
+  // 毎起動時（およびフォアグラウンド復帰時）にプッシュ通知トークンを必ず再取得して最新化する
   useEffect(() => {
-    if (currentUser && dataLoaded.accounts && typeof window !== 'undefined' && 'Notification' in window) {
-      const myData = accountsInfo[currentUser];
-      if (myData) {
-        if (Notification.permission === 'denied' && myData.fcmToken) {
-          setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { fcmToken: deleteField() }, { merge: true }).catch(()=>{});
-        }
+    if (!currentUser) {
+      hasRefreshedTokenForUser.current = null;
+      return;
+    }
+    if (!dataLoaded.accounts || typeof window === 'undefined') return;
 
-        if (Notification.permission === 'granted' && !myData.fcmToken) {
-          const restoreToken = async () => {
+    const myData = accountsInfo[currentUser];
+    if (!myData) return;
+
+    // ReactNativeWebView環境の場合は起動ごとにネイティブ側へ最新トークンを要求
+    if (window.ReactNativeWebView && hasRefreshedTokenForUser.current !== currentUser) {
+      hasRefreshedTokenForUser.current = currentUser;
+      try {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'REQUEST_PUSH_TOKEN' }));
+      } catch (e) {}
+    }
+
+    if ('Notification' in window) {
+      if (Notification.permission === 'denied' && myData.fcmToken) {
+        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { fcmToken: deleteField() }, { merge: true }).catch(()=>{});
+      }
+
+      if (Notification.permission === 'granted') {
+        // 毎起動時（ログインユーザーごと）に必ずトークンを再取得してFirestoreを更新
+        if (hasRefreshedTokenForUser.current !== currentUser) {
+          hasRefreshedTokenForUser.current = currentUser;
+          const refreshPushToken = async () => {
             try {
               const messaging = getMessaging(app);
-              const token = await getToken(messaging, { vapidKey: 'BAty8GYk1zuoZVh-ZaSdcJsq_o-7vXJLXPNVNzlgsq9rd3wP-jQtclYEdu1MnnLN_0BnlmiKuoWH3X2YvOFl7aM' });
-              if (token) await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { fcmToken: token }, { merge: true });
-            } catch(e){}
-          };
-          restoreToken();
-        } else {
-          const hasPromptedThisSession = sessionStorage.getItem('withfit_push_prompted');
-          if (!hasPromptedThisSession) {
-            if (!myData.fcmToken && Notification.permission === 'default') {
-              setPushPromptType('request');
-              const timer = setTimeout(() => { setShowPushPrompt(true); sessionStorage.setItem('withfit_push_prompted', 'true'); }, 1500);
-              return () => clearTimeout(timer);
-            } else if (Notification.permission === 'denied') {
-              setPushPromptType('warning');
-              const timer = setTimeout(() => { setShowPushPrompt(true); sessionStorage.setItem('withfit_push_prompted', 'true'); }, 1500);
-              return () => clearTimeout(timer);
+              const token = await getToken(messaging, { vapidKey: VAPID_PUBLIC_KEY });
+              if (token) {
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), {
+                  fcmToken: token,
+                  fcmTokenUpdatedAt: Date.now()
+                }, { merge: true });
+              }
+            } catch (e) {
+              console.warn('FCM token refresh failed:', e);
             }
+          };
+          refreshPushToken();
+        }
+      } else {
+        const hasPromptedThisSession = sessionStorage.getItem('withfit_push_prompted');
+        if (!hasPromptedThisSession) {
+          if (!myData.fcmToken && Notification.permission === 'default') {
+            setPushPromptType('request');
+            const timer = setTimeout(() => { setShowPushPrompt(true); sessionStorage.setItem('withfit_push_prompted', 'true'); }, 1500);
+            return () => clearTimeout(timer);
+          } else if (Notification.permission === 'denied') {
+            setPushPromptType('warning');
+            const timer = setTimeout(() => { setShowPushPrompt(true); sessionStorage.setItem('withfit_push_prompted', 'true'); }, 1500);
+            return () => clearTimeout(timer);
           }
         }
       }
@@ -650,7 +685,7 @@ if (timerState.y === 'top') {
         } else {
           localStorage.removeItem(`withfit_draft_${currentUser}`);
           localStorage.removeItem(`withfit_cats_${currentUser}`);
-          localStorage.removeItem(`withfit_draft_time_${currentUser}`);
+          localStorage.setItem(`withfit_draft_time_${currentUser}`, Date.now().toString());
           setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { 
             currentWorkoutItems: deleteField(),
             currentSelectedCategories: deleteField(),
@@ -1251,6 +1286,108 @@ if (timerState.y === 'top') {
     return () => unsub();
   }, [db, currentUser]);
 
+  // 単一種目を過去データから現在の記録中メニューに追加するヘルパー
+  const formatItemForImport = (item) => {
+    return {
+      ...item,
+      id: generateId(),
+      isConfirmed: false,
+      sets: (item.sets || []).map(set => ({
+        ...set,
+        id: generateId(),
+        targetReps: set.reps || set.targetReps || '',
+        targetLReps: set.lReps || set.targetLReps || '',
+        targetRReps: set.rReps || set.targetRReps || '',
+        targetSuperReps: set.superReps || set.targetSuperReps || '',
+        targetSuperLReps: set.superLReps || set.targetSuperLReps || '',
+        targetSuperRReps: set.superRReps || set.targetSuperRReps || '',
+        targetSuperReps3: set.superReps3 || set.targetSuperReps3 || '',
+        targetSuperLReps3: set.superLReps3 || set.targetSuperLReps3 || '',
+        targetSuperRReps3: set.superRReps3 || set.targetSuperRReps3 || '',
+        reps: '', lReps: '', rReps: '',
+        superReps: '', superLReps: '', superRReps: '',
+        superReps3: '', superLReps3: '', superRReps3: '',
+        isWeightPR: false,
+        isRepsPR: false,
+        dropSets: set.dropSets ? set.dropSets.map(ds => ({
+          ...ds,
+          id: generateId(),
+          targetReps: ds.reps || ds.targetReps || '',
+          targetLReps: ds.lReps || ds.targetLReps || '',
+          targetRReps: ds.rReps || ds.targetRReps || '',
+          targetSuperReps: ds.superReps || ds.targetSuperReps || '',
+          targetSuperLReps: ds.superLReps || ds.targetSuperLReps || '',
+          targetSuperRReps: ds.superRReps || ds.targetSuperRReps || '',
+          targetSuperReps3: ds.superReps3 || ds.targetSuperReps3 || '',
+          targetSuperLReps3: ds.superLReps3 || ds.targetSuperLReps3 || '',
+          targetSuperRReps3: ds.superRReps3 || ds.targetSuperRReps3 || '',
+          reps: '', lReps: '', rReps: '',
+          superReps: '', superLReps: '', superRReps: '',
+          superReps3: '', superLReps3: '', superRReps3: ''
+        })) : undefined,
+        superDropSets: set.superDropSets ? set.superDropSets.map(ds => ({
+          ...ds,
+          id: generateId(),
+          targetSuperReps: ds.superReps || ds.targetSuperReps || '',
+          targetSuperLReps: ds.superLReps || ds.targetSuperLReps || '',
+          targetSuperRReps: ds.superRReps || ds.targetSuperRReps || '',
+          superReps: '', superLReps: '', superRReps: ''
+        })) : undefined,
+        superDropSets3: set.superDropSets3 ? set.superDropSets3.map(ds => ({
+          ...ds,
+          id: generateId(),
+          targetSuperReps3: ds.superReps3 || ds.targetSuperReps3 || '',
+          targetSuperLReps3: ds.superLReps3 || ds.targetSuperLReps3 || '',
+          targetSuperRReps3: ds.superRReps3 || ds.targetSuperRReps3 || '',
+          superReps3: '', superLReps3: '', superRReps3: ''
+        })) : undefined
+      }))
+    };
+  };
+
+  const handleImportExerciseItem = async (item, post = null) => {
+    if (!item || !item.exerciseName) return;
+    const newItem = formatItemForImport(item);
+
+    if (newItem.category) {
+      setSelectedCategories(prev => prev.includes(newItem.category) ? prev : [...prev, newItem.category]);
+    }
+
+    setDraftWorkoutItems(prev => {
+      const hasOnlyBlank = prev.length === 1 && !prev[0].exerciseName && (!prev[0].sets || prev[0].sets.every(s => !s.weight && !s.reps && !s.distance && !s.time));
+      const nextItems = hasOnlyBlank ? [newItem] : [...prev, newItem];
+
+      if (myInfo?.jointPartnerId && db) {
+        const partnerCurrent = accountsInfo[myInfo.jointPartnerId]?.currentWorkoutItems || [];
+        const partnerNewItem = formatItemForImport(item);
+        const partnerHasOnlyBlank = partnerCurrent.length === 1 && !partnerCurrent[0].exerciseName;
+        const nextPartnerItems = partnerHasOnlyBlank ? [partnerNewItem] : [...partnerCurrent, partnerNewItem];
+        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', myInfo.jointPartnerId), {
+          currentWorkoutItems: nextPartnerItems,
+          lastUpdater: currentUser
+        }, { merge: true }).catch(() => {});
+      }
+
+      return nextItems;
+    });
+
+    if (myInfo?.isTraining || isRecordManual) {
+      alert(`「${item.exerciseName}」を現在の記録に追加しました！`);
+    } else {
+      const matchedGym = post?.gymName ? allGyms.find(g => g.name === post.gymName) : null;
+      const fallbackGymId = matchedGym?.id || (myInfo.joinedGyms || []).find(id => id !== 'common') || '';
+      if (fallbackGymId && window.confirm(`「${item.exerciseName}」をメニューに追加しました。\nこのままトレーニングを開始して記録画面を開きますか？`)) {
+        await handleStartTraining(fallbackGymId);
+        setCurrentTab('record');
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('returnToRecordInput'));
+        }, 50);
+      } else {
+        alert(`「${item.exerciseName}」を記録メニューに追加しました！`);
+      }
+    }
+  };
+
   const handleImportWorkout = async (post, isManual) => {
     const gym = allGyms.find(g => g.name === post.gymName);
     const gymId = gym ? gym.id : '';
@@ -1263,30 +1400,7 @@ if (timerState.y === 'top') {
        }
     }
 
-    const newItems = (post.items || []).map(item => ({
-      ...item,
-      id: generateId(),
-      sets: (item.sets || []).map(set => ({ 
-         ...set, 
-         id: generateId(),
-         targetReps: set.reps, targetLReps: set.lReps, targetRReps: set.rReps,
-         targetSuperReps: set.superReps, targetSuperLReps: set.superLReps, targetSuperRReps: set.superRReps,
-         targetSuperReps3: set.superReps3, targetSuperLReps3: set.superLReps3, targetSuperRReps3: set.superRReps3,
-         reps: '', lReps: '', rReps: '',
-         superReps: '', superLReps: '', superRReps: '',
-         superReps3: '', superLReps3: '', superRReps3: '',
-         dropSets: set.dropSets ? set.dropSets.map(ds => ({ 
-             ...ds, 
-             id: generateId(),
-             targetReps: ds.reps, targetLReps: ds.lReps, targetRReps: ds.rReps,
-             targetSuperReps: ds.superReps, targetSuperLReps: ds.superLReps, targetSuperRReps: ds.superRReps,
-             targetSuperReps3: ds.superReps3, targetSuperLReps3: ds.superLReps3, targetSuperRReps3: ds.superRReps3,
-             reps: '', lReps: '', rReps: '',
-             superReps: '', superLReps: '', superRReps: '',
-             superReps3: '', superLReps3: '', superRReps3: ''
-         })) : [] 
-      }))
-    }));
+    const newItems = (post.items || []).map(item => formatItemForImport(item));
     
     const importedCategories = Array.from(new Set(newItems.map(item => item.category).filter(Boolean)));
     setSelectedCategories(importedCategories);
@@ -1520,9 +1634,12 @@ if (timerState.y === 'top') {
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
           const messaging = getMessaging(app);
-          const token = await getToken(messaging, { vapidKey: 'BAty8GYk1zuoZVh-ZaSdcJsq_o-7vXJLXPNVNzlgsq9rd3wP-jQtclYEdu1MnnLN_0BnlmiKuoWH3X2YvOFl7aM' });
+          const token = await getToken(messaging, { vapidKey: VAPID_PUBLIC_KEY });
           if (token) {
-            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { fcmToken: token }, { merge: true });
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), {
+              fcmToken: token,
+              fcmTokenUpdatedAt: Date.now()
+            }, { merge: true });
             alert('プッシュ通知をオンにしました。');
           }
         } else {
@@ -1924,11 +2041,11 @@ if (timerState.y === 'top') {
              <button onClick={handleLinkGoogle} className="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg shrink-0 transition-colors">連携</button>
           </div>
         )}
-        {currentTab === 'timeline' && <TimelineView posts={visiblePosts} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} scrollToPostId={scrollToPostId} setScrollToPostId={setScrollToPostId} />}
+        {currentTab === 'timeline' && <TimelineView posts={visiblePosts} onToggleLike={toggleLike} onImport={handleImportWorkout} onImportItem={handleImportExerciseItem} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} scrollToPostId={scrollToPostId} setScrollToPostId={setScrollToPostId} />}
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} currentUser={currentUser} myInfo={myInfo} setCurrentTab={setCurrentTab} onSendRequest={handleSendFriendRequest} onUserClick={setSelectedUserProfile} />}
-        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} onRequestJointTraining={handleRequestJointTraining} onAcceptJointTraining={handleAcceptJointTraining} onRejectJointTraining={handleRejectJointTraining} onCancelJointTraining={handleCancelJointTraining} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} />}
-        {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} onOpenCoach={() => setShowCoachChat(true)} />}
-        {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onSendPartnerRequest={handleSendPartnerRequest} onAcceptPartnerRequest={handleAcceptPartnerRequest} onRejectPartnerRequest={handleRejectPartnerRequest} onRemovePartner={handleRemovePartner} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} posts={posts} targetFriendTab={targetFriendTab} setTargetFriendTab={setTargetFriendTab} onSendTestPush={async (targetUser, message) => {
+        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} onRequestJointTraining={handleRequestJointTraining} onAcceptJointTraining={handleAcceptJointTraining} onRejectJointTraining={handleRejectJointTraining} onCancelJointTraining={handleCancelJointTraining} onImportItem={handleImportExerciseItem} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} />}
+        {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} onImportItem={handleImportExerciseItem} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} onOpenCoach={() => setShowCoachChat(true)} />}
+        {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onSendPartnerRequest={handleSendPartnerRequest} onAcceptPartnerRequest={handleAcceptPartnerRequest} onRejectPartnerRequest={handleRejectPartnerRequest} onRemovePartner={handleRemovePartner} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} posts={posts} targetFriendTab={targetFriendTab} setTargetFriendTab={setTargetFriendTab} onImport={handleImportWorkout} onImportItem={handleImportExerciseItem} onSendTestPush={async (targetUser, message) => {
           if (!db) return;
           const targetToken = accountsInfo[targetUser]?.fcmToken;
           if (!targetToken) {
@@ -1955,7 +2072,7 @@ if (timerState.y === 'top') {
       </main>
 
       {editingPost && <EditWorkoutModal post={editingPost} gyms={allGyms} exercises={exercises} onClose={() => setEditingPost(null)} onSave={handleUpdateWorkout} myPastPosts={posts.filter(p => p.author === currentUser)} />}
-      {selectedFriendUser && <FriendDetailModal friendUsername={selectedFriendUser} posts={posts} accountsInfo={accountsInfo} onClose={() => setSelectedFriendUser(null)} onToggleLike={toggleLike} onImport={handleImportWorkout} currentUser={currentUser} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} />}
+      {selectedFriendUser && <FriendDetailModal friendUsername={selectedFriendUser} posts={posts} accountsInfo={accountsInfo} onClose={() => setSelectedFriendUser(null)} onToggleLike={toggleLike} onImport={handleImportWorkout} onImportItem={handleImportExerciseItem} currentUser={currentUser} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} />}
       
       {focusedPost && (
         <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setFocusedPost(null)}>
@@ -1965,7 +2082,7 @@ if (timerState.y === 'top') {
                 <button onClick={() => setFocusedPost(null)} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={20} /></button>
              </div>
              <div className="p-4 overflow-y-auto flex-1">
-               <WorkoutCard post={focusedPost} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onToggleLike={toggleLike} onImport={handleImportWorkout} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} />
+               <WorkoutCard post={focusedPost} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onToggleLike={toggleLike} onImport={handleImportWorkout} onImportItem={handleImportExerciseItem} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} />
              </div>
           </div>
         </div>

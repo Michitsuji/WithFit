@@ -1,8 +1,8 @@
 // ==========================================
 // CommonUI.js — 共通UIコンポーネント・カスタムフック・アイコン
 // ==========================================
-import React, { useState, useEffect, useRef } from 'react';
-import { Activity, AlignLeft, Edit2 } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Activity, AlignLeft, Edit2, TrendingUp, TrendingDown } from 'lucide-react';
 import { MASTER_USER, generateColor, MUSCLE_CATEGORIES, getCategoryTabColor } from './utils';
 
 // --- カスタムアイコン ---
@@ -90,117 +90,463 @@ function TimerDisplay({ startTime, isStopped = false }) {
   return <span className="font-mono font-bold tracking-wider">{hours > 0 ? `${hours}:` : ''}{minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}</span>;
 }
 
-// --- グラフコンポーネント ---
-function SimpleChart({ data, color, title }) {
-  const scrollRef = useRef(null);
-  const isFirstRender = useRef(true);
-  const prevLength = useRef(data?.length || 0);
+// --- グラフコンポーネント（1か月・3か月・1年・全期間切替＋タッチ数値確認対応） ---
+function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
+  const [rangeType, setRangeType] = useState('3M'); // '1M' | '3M' | '1Y' | 'ALL'
+  const [selectedIndex, setSelectedIndex] = useState(null);
+  const svgRef = useRef(null);
+  const gradientId = useRef(`chart-grad-${Math.random().toString(36).substring(2, 9)}`).current;
 
+  const inferredUnit = unit || (title?.includes('%') ? '%' : title?.includes('kg') ? 'kg' : '');
+
+  // 全データを日付順にソートし、同日のデータは最新（または最後の記録）に集約
+  const allSortedData = useMemo(() => {
+    if (!data || data.length === 0) return [];
+    const valid = data
+      .filter(d => d && d.date && !isNaN(Number(d.value)))
+      .map(d => {
+        const time = new Date(d.date).getTime();
+        const dt = new Date(time);
+        const dayKey = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+        return {
+          ...d,
+          value: Math.round(Number(d.value) * 10) / 10,
+          time,
+          dayKey
+        };
+      })
+      .filter(d => !isNaN(d.time))
+      .sort((a, b) => a.time - b.time);
+
+    // 同じ日に複数記録がある場合は最後の値を採用してグラフを見やすくする
+    const byDay = new Map();
+    valid.forEach(item => byDay.set(item.dayKey, item));
+    return Array.from(byDay.values());
+  }, [data]);
+
+  // 表示範囲に応じたフィルタリング
+  const filteredData = useMemo(() => {
+    if (allSortedData.length === 0) return [];
+    if (rangeType === 'ALL') return allSortedData;
+
+    const latestTime = Math.max(Date.now(), allSortedData[allSortedData.length - 1].time);
+    const daysMap = { '1M': 31, '3M': 92, '1Y': 366 };
+    const cutoff = latestTime - (daysMap[rangeType] || 92) * 24 * 60 * 60 * 1000;
+    return allSortedData.filter(d => d.time >= cutoff);
+  }, [allSortedData, rangeType]);
+
+  // 期間変更時やデータ更新時は最新ポイントを選択状態にする
   useEffect(() => {
-    if (scrollRef.current) {
-      if (isFirstRender.current) {
-        scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
-        isFirstRender.current = false;
-      } else if (data?.length !== prevLength.current) {
-        scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
-      }
-    }
-    prevLength.current = data?.length || 0;
-  }, [data?.length]);
-
-  if (!data || data.length === 0) return (
-    <div className="w-full bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center">
-      <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-4 w-full flex items-center gap-2"><Activity size={16} className="text-slate-400"/> {title}</h4>
-      <p className="text-sm font-bold text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-950 p-6 rounded-2xl text-center border border-slate-100 dark:border-slate-800 w-full">データがありません</p>
-    </div>
-  );
-
-  const values = data.map(d => d.value).filter(v => !isNaN(v));
-  if (values.length === 0) return null;
-  const minVal = Math.min(...values);
-  const maxVal = Math.max(...values);
-  const padding = (maxVal - minVal) === 0 ? (minVal === 0 ? 1 : minVal * 0.1) : (maxVal - minVal) * 0.2;
-  const min = Math.max(0, minVal - padding);
-  const max = maxVal + padding;
-  const range = max - min === 0 ? 1 : max - min;
-  
-  const height = 100;
-
-  const sortedData = [...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  const minTime = new Date(sortedData[0].date).getTime();
-  const maxTime = new Date(sortedData[sortedData.length - 1].date).getTime();
-  const daysDiff = (maxTime - minTime) / (1000 * 60 * 60 * 24);
-
-  const PIXELS_PER_DAY = 5;
-  const chartWidth = Math.max(300, Math.round(daysDiff * PIXELS_PER_DAY + 80));
-
-  const points = sortedData.map(d => {
-    let x;
-    if (daysDiff === 0) {
-      x = chartWidth / 2;
+    if (filteredData.length > 0) {
+      setSelectedIndex(filteredData.length - 1);
     } else {
-      const t = new Date(d.date).getTime();
-      x = 40 + ((t - minTime) / (maxTime - minTime)) * (chartWidth - 80);
+      setSelectedIndex(null);
     }
-    const y = height - ((d.value - min) / range) * height;
-    return { x, y, val: d.value };
-  });
+  }, [filteredData.length, rangeType]);
 
-  const dateTicks = [];
-  if (daysDiff === 0) {
-    const d = new Date(minTime);
-    dateTicks.push({ x: chartWidth / 2, dateStr: `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}` });
-  } else {
-    for (let i = 0; i <= daysDiff; i += 10) {
-      const tickTime = minTime + i * 24 * 60 * 60 * 1000;
-      const x = 40 + (i / daysDiff) * (chartWidth - 80);
-      const d = new Date(tickTime);
-      dateTicks.push({ x, dateStr: `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}` });
-    }
+  const rangeOptions = [
+    { key: '1M', label: '1か月' },
+    { key: '3M', label: '3か月' },
+    { key: '1Y', label: '1年' },
+    { key: 'ALL', label: '全期間' }
+  ];
+
+  if (allSortedData.length === 0) {
+    return (
+      <div className="w-full bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center">
+        <div className="flex justify-between items-center w-full mb-4">
+          <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }}></span>
+            {title}
+          </h4>
+        </div>
+        <p className="text-sm font-bold text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-950 p-6 rounded-2xl text-center border border-slate-100 dark:border-slate-800 w-full">
+          データがありません
+        </p>
+      </div>
+    );
   }
 
-  const polylinePoints = points.map(p => `${p.x},${p.y}`).join(' ');
+  const values = filteredData.map(d => d.value);
+  const hasRangeData = values.length > 0;
+
+  const minVal = hasRangeData ? Math.min(...values) : 0;
+  const maxVal = hasRangeData ? Math.max(...values) : 0;
+  const avgVal = hasRangeData ? (values.reduce((a, b) => a + b, 0) / values.length) : 0;
+  const firstVal = hasRangeData ? values[0] : 0;
+  const latestVal = hasRangeData ? values[values.length - 1] : 0;
+  const periodDiff = Math.round((latestVal - firstVal) * 10) / 10;
+
+  const pad = (maxVal - minVal) === 0 ? Math.max(1, minVal * 0.05) : (maxVal - minVal) * 0.22;
+  const yMin = Math.max(0, Math.floor((minVal - pad) * 10) / 10);
+  const yMax = Math.ceil((maxVal + pad) * 10) / 10;
+  const yRange = yMax - yMin === 0 ? 1 : yMax - yMin;
+
+  // SVG座標設計 (レスポンシブViewBox)
+  const svgW = 360;
+  const svgH = 195;
+  const padL = 38;
+  const padR = 16;
+  const padT = 26;
+  const padB = 30;
+  const plotW = svgW - padL - padR;
+  const plotH = svgH - padT - padB;
+
+  const minTime = hasRangeData ? filteredData[0].time : 0;
+  const maxTime = hasRangeData ? filteredData[filteredData.length - 1].time : 0;
+  const timeSpan = maxTime - minTime;
+
+  const points = filteredData.map((d, idx) => {
+    let x;
+    if (filteredData.length === 1 || timeSpan === 0) {
+      x = padL + plotW / 2;
+    } else {
+      // 時間比率とインデックス比率をハイブリッドして点の重なりを防止しつつ時間間隔も表現
+      const timeRatio = (d.time - minTime) / timeSpan;
+      const idxRatio = idx / (filteredData.length - 1);
+      const ratio = filteredData.length > 20 ? idxRatio : (timeRatio * 0.7 + idxRatio * 0.3);
+      x = padL + ratio * plotW;
+    }
+    const y = padT + plotH - ((d.value - yMin) / yRange) * plotH;
+    const dt = new Date(d.time);
+    const shortDate = `${dt.getMonth() + 1}/${dt.getDate()}`;
+    const fullDate = `${dt.getFullYear()}/${String(dt.getMonth() + 1).padStart(2, '0')}/${String(dt.getDate()).padStart(2, '0')}`;
+    const prevDiff = idx > 0 ? Math.round((d.value - filteredData[idx - 1].value) * 10) / 10 : null;
+    return { x, y, val: d.value, shortDate, fullDate, prevDiff, idx };
+  });
+
+  // ベジェ曲線パスまたは滑らかな折れ線パス生成
+  const buildSmoothPath = (pts) => {
+    if (pts.length === 0) return '';
+    if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`;
+    if (pts.length === 2) return `M ${pts[0].x} ${pts[0].y} L ${pts[1].x} ${pts[1].y}`;
+    let d = `M ${pts[0].x} ${pts[0].y}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i];
+      const p1 = pts[i + 1];
+      const cpx1 = p0.x + (p1.x - p0.x) * 0.35;
+      const cpy1 = p0.y;
+      const cpx2 = p1.x - (p1.x - p0.x) * 0.35;
+      const cpy2 = p1.y;
+      d += ` C ${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${p1.x} ${p1.y}`;
+    }
+    return d;
+  };
+
+  const linePath = buildSmoothPath(points);
+  const areaPath = points.length > 1
+    ? `${linePath} L ${points[points.length - 1].x} ${padT + plotH} L ${points[0].x} ${padT + plotH} Z`
+    : '';
+
+  // X軸の日付メモリ（最大5個、重ならないように間引く）
+  const xTicks = useMemo(() => {
+    if (points.length === 0) return [];
+    if (points.length <= 5) return points;
+    const tickCount = 5;
+    const result = [];
+    for (let i = 0; i < tickCount; i++) {
+      const targetIdx = Math.round((i / (tickCount - 1)) * (points.length - 1));
+      result.push(points[targetIdx]);
+    }
+    return result;
+  }, [points]);
+
+  // タッチ・マウス操作で最も近いデータ点を選択
+  const handlePointerInteract = (e) => {
+    if (!svgRef.current || points.length === 0) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const clientX = e.touches && e.touches.length > 0
+      ? e.touches[0].clientX
+      : e.clientX;
+    if (clientX === undefined) return;
+
+    const relX = ((clientX - rect.left) / rect.width) * svgW;
+    let closestIdx = 0;
+    let minDist = Infinity;
+    points.forEach((p, idx) => {
+      const dist = Math.abs(p.x - relX);
+      if (dist < minDist) {
+        minDist = dist;
+        closestIdx = idx;
+      }
+    });
+    setSelectedIndex(closestIdx);
+  };
+
+  const activePoint = (selectedIndex !== null && points[selectedIndex])
+    ? points[selectedIndex]
+    : (points[points.length - 1] || null);
+
+  const showStaticLabels = points.length <= 6;
 
   return (
-    <div className="w-full bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
-      <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-6 flex items-center gap-2"><Activity size={16} className="text-slate-400"/> {title}</h4>
-      
-      <div className="relative w-full" style={{ height: '160px' }}>
-        <div className="absolute left-0 top-0 bottom-0 w-8 z-10 bg-white/90 dark:bg-slate-900/90 pointer-events-none">
-          <svg viewBox="0 -10 32 140" width="32" height="140" className="overflow-visible">
-            {[0, 0.5, 1].map(tick => {
-               const y = height - tick * height;
-               const val = (min + range * tick).toFixed(1);
-               return (
-                 <text key={tick} x="28" y={y + 4} fontSize="10" fill="currentColor" textAnchor="end" className="text-slate-400 font-bold">{val}</text>
-               );
-            })}
-          </svg>
-        </div>
-        
-        <div ref={scrollRef} className="overflow-x-auto w-full hide-scrollbar">
-          <div style={{ width: `${chartWidth}px`, height: '140px' }}>
-            <svg viewBox={`0 -10 ${chartWidth} 140`} width={chartWidth} height={140} className="overflow-visible">
-              {[0, 0.5, 1].map(tick => {
-                 const y = height - tick * height;
-                 return (
-                   <line key={tick} x1="0" y1={y} x2={chartWidth} y2={y} stroke="currentColor" className="text-slate-200 dark:text-slate-800" strokeWidth="1" strokeDasharray="4 4" />
-                 );
-              })}
-              <polyline points={polylinePoints} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-              {points.map((p, i) => (
-                <g key={i}>
-                  <circle cx={p.x} cy={p.y} r="5" fill="currentColor" className="text-white dark:text-slate-900" stroke={color} strokeWidth="2.5" />
-                  <text x={p.x} y={p.y - 12} fontSize="12" fill={color} textAnchor="middle" className="font-bold tracking-tighter">{p.val}</text>
-                </g>
-              ))}
-              {dateTicks.map((t, i) => (
-                <text key={`tick-${i}`} x={t.x} y={height + 25} fontSize="10" fill="currentColor" textAnchor="middle" className="font-bold text-slate-400 dark:text-slate-500">{t.dateStr}</text>
-              ))}
-            </svg>
-          </div>
+    <div className="w-full bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col transition-all">
+      {/* ヘッダー＆期間セレクター */}
+      <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
+        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}80` }}></span>
+          {title}
+        </h4>
+        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200/70 dark:border-slate-700/70">
+          {rangeOptions.map(opt => {
+            const active = rangeType === opt.key;
+            return (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setRangeType(opt.key)}
+                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all ${
+                  active
+                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                }`}
+                style={active ? { color } : undefined}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
         </div>
       </div>
+
+      {!hasRangeData ? (
+        <div className="bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-2xl p-8 text-center my-2">
+          <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mb-2">選択した期間のデータがありません</p>
+          <button
+            type="button"
+            onClick={() => setRangeType('ALL')}
+            className="text-xs font-bold px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:opacity-80"
+          >
+            全期間を表示する
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* 選択中のポイント詳細 ＆ サマリーカード */}
+          <div className="bg-slate-50/90 dark:bg-slate-950/70 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-3.5 mb-4 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-0.5">
+                <span>{activePoint ? activePoint.fullDate : '-'}</span>
+                {activePoint && activePoint.idx === points.length - 1 && (
+                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300">最新</span>
+                )}
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-black tracking-tight text-slate-900 dark:text-white font-mono">
+                  {activePoint ? activePoint.val.toFixed(1) : '-'}
+                </span>
+                <span className="text-xs font-bold text-slate-400">{inferredUnit}</span>
+                {activePoint && activePoint.prevDiff !== null && (
+                  <span className={`ml-1 text-[11px] font-bold px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5 ${
+                    activePoint.prevDiff > 0
+                      ? 'bg-rose-50 text-rose-500 dark:bg-rose-950/60 dark:text-rose-400'
+                      : activePoint.prevDiff < 0
+                      ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400'
+                      : 'bg-slate-200/60 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                  }`}>
+                    {activePoint.prevDiff > 0 ? `+${activePoint.prevDiff}` : activePoint.prevDiff}{inferredUnit}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-right shrink-0 border-l border-slate-200/70 dark:border-slate-800 pl-3">
+              <div>
+                <div className="text-[9px] font-bold text-slate-400">期間変化</div>
+                <div className={`text-xs font-bold font-mono flex items-center justify-end gap-0.5 ${
+                  periodDiff > 0 ? 'text-rose-500' : periodDiff < 0 ? 'text-emerald-500' : 'text-slate-600 dark:text-slate-300'
+                }`}>
+                  {periodDiff > 0 ? `+${periodDiff}` : periodDiff}
+                </div>
+              </div>
+              <div>
+                <div className="text-[9px] font-bold text-slate-400">平均</div>
+                <div className="text-xs font-bold font-mono text-slate-700 dark:text-slate-200">{avgVal.toFixed(1)}</div>
+              </div>
+              <div>
+                <div className="text-[9px] font-bold text-slate-400">最小/最大</div>
+                <div className="text-[10px] font-bold font-mono text-slate-600 dark:text-slate-300">
+                  {minVal.toFixed(1)}<span className="text-slate-400 mx-0.5">/</span>{maxVal.toFixed(1)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* インタラクティブSVGチャート */}
+          <div className="relative w-full select-none">
+            <svg
+              ref={svgRef}
+              viewBox={`0 0 ${svgW} ${svgH}`}
+              className="w-full h-auto overflow-visible touch-pan-y cursor-crosshair"
+              onClick={handlePointerInteract}
+              onTouchStart={handlePointerInteract}
+              onTouchMove={handlePointerInteract}
+              onMouseMove={(e) => { if (e.buttons === 1) handlePointerInteract(e); }}
+            >
+              <defs>
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={color} stopOpacity="0.38" />
+                  <stop offset="75%" stopColor={color} stopOpacity="0.06" />
+                  <stop offset="100%" stopColor={color} stopOpacity="0.0" />
+                </linearGradient>
+              </defs>
+
+              {/* 水平グリッド線 ＆ Y軸ラベル */}
+              {[0, 0.333, 0.666, 1].map((t, idx) => {
+                const y = padT + plotH - t * plotH;
+                const val = (yMin + yRange * t).toFixed(1);
+                return (
+                  <g key={`grid-${idx}`}>
+                    <line
+                      x1={padL}
+                      y1={y}
+                      x2={svgW - padR}
+                      y2={y}
+                      stroke="currentColor"
+                      className="text-slate-100 dark:text-slate-800/90"
+                      strokeWidth="1"
+                      strokeDasharray={idx === 0 ? undefined : "3 3"}
+                    />
+                    <text
+                      x={padL - 6}
+                      y={y + 3.5}
+                      fontSize="9.5"
+                      fill="currentColor"
+                      textAnchor="end"
+                      className="text-slate-400 dark:text-slate-500 font-bold font-mono"
+                    >
+                      {val}
+                    </text>
+                  </g>
+                );
+              })}
+
+              {/* グラデーションエリア */}
+              {areaPath && <path d={areaPath} fill={`url(#${gradientId})`} />}
+
+              {/* メインの折れ線・曲線 */}
+              {linePath && (
+                <path
+                  d={linePath}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth="2.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              )}
+
+              {/* 選択中の垂直ガイドライン */}
+              {activePoint && (
+                <line
+                  x1={activePoint.x}
+                  y1={padT - 4}
+                  x2={activePoint.x}
+                  y2={padT + plotH}
+                  stroke={color}
+                  strokeWidth="1.5"
+                  strokeDasharray="3 3"
+                  opacity="0.65"
+                />
+              )}
+
+              {/* データポイント描画（データ数が多い場合は文字を重ねずドットをスマート化） */}
+              {points.map((p, i) => {
+                const isSelected = activePoint && activePoint.idx === i;
+                const isDense = points.length > 20;
+                const dotRadius = isSelected ? 5.5 : (isDense ? 2.2 : 3.5);
+
+                return (
+                  <g key={`pt-${i}`}>
+                    {isSelected && (
+                      <circle
+                        cx={p.x}
+                        cy={p.y}
+                        r="10"
+                        fill={color}
+                        opacity="0.2"
+                      />
+                    )}
+                    <circle
+                      cx={p.x}
+                      cy={p.y}
+                      r={dotRadius}
+                      fill={isSelected ? color : "currentColor"}
+                      className={isSelected ? "" : "text-white dark:text-slate-900"}
+                      stroke={color}
+                      strokeWidth={isSelected ? "2.5" : (isDense ? "1.5" : "2")}
+                    />
+                    {showStaticLabels && !isSelected && (
+                      <text
+                        x={p.x}
+                        y={p.y - 9}
+                        fontSize="9.5"
+                        fill={color}
+                        textAnchor="middle"
+                        className="font-bold font-mono"
+                        opacity="0.8"
+                      >
+                        {p.val}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
+
+              {/* 選択ポイントのフローティングツールチップ */}
+              {activePoint && (() => {
+                const boxW = 78;
+                const boxH = 22;
+                const clampedX = Math.min(Math.max(activePoint.x, padL + boxW / 2), svgW - padR - boxW / 2);
+                const placeBelow = activePoint.y < padT + 26;
+                const boxY = placeBelow ? activePoint.y + 10 : activePoint.y - boxH - 9;
+
+                return (
+                  <g className="pointer-events-none">
+                    <rect
+                      x={clampedX - boxW / 2}
+                      y={boxY}
+                      width={boxW}
+                      height={boxH}
+                      rx="6"
+                      fill={color}
+                      opacity="0.95"
+                    />
+                    <text
+                      x={clampedX}
+                      y={boxY + 14.5}
+                      fontSize="10"
+                      fill="#ffffff"
+                      textAnchor="middle"
+                      className="font-bold font-mono"
+                    >
+                      {activePoint.shortDate} {activePoint.val}{inferredUnit}
+                    </text>
+                  </g>
+                );
+              })()}
+
+              {/* X軸の日付ラベル */}
+              {xTicks.map((t, idx) => (
+                <text
+                  key={`xtick-${idx}`}
+                  x={t.x}
+                  y={svgH - 7}
+                  fontSize="9.5"
+                  fill="currentColor"
+                  textAnchor="middle"
+                  className="text-slate-400 dark:text-slate-500 font-bold font-mono"
+                >
+                  {t.shortDate}
+                </text>
+              ))}
+            </svg>
+            <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 text-right mt-1">
+              ※グラフをタッチ・なぞると各日の数値を表示します（全{points.length}件）
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -252,15 +598,18 @@ function CategoryFilterGrid({ selectedCategories, toggleCategory }) {
   );
 }
 
+// --- 記録ボタン長押しホイール（ドラッグ選択＆長押し後タップ選択の両対応で安定化） ---
 function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
   const [isOpen, setIsOpen] = useState(false);
   const [hovered, setHovered] = useState(null);
+  const [tapSelectMode, setTapSelectMode] = useState(false);
   const wrapperRef = useRef(null);
   const hoveredRef = useRef(null);
   const isOpenRef = useRef(false);
-  
+  const isPressingRef = useRef(false);
   const pressTimer = useRef(null);
-  const touchPos = useRef({ x: 0, y: 0 });
+  const startPosRef = useRef({ x: 0, y: 0 });
+  const lastPosRef = useRef({ x: 0, y: 0 });
 
   const clearPressTimer = () => {
     if (pressTimer.current) {
@@ -269,17 +618,47 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
     }
   };
 
+  const closeMenu = () => {
+    clearPressTimer();
+    isPressingRef.current = false;
+    isOpenRef.current = false;
+    hoveredRef.current = null;
+    setIsOpen(false);
+    setHovered(null);
+    setTapSelectMode(false);
+  };
+
+  const executeSelection = (target) => {
+    closeMenu();
+    if (target === 'left') {
+      if (currentTab !== 'record') {
+        setCurrentTab('record');
+      }
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('showRecordDashboard'));
+      }, 20);
+    } else if (target === 'right') {
+      if (currentTab !== 'record') {
+        setCurrentTab('record');
+      }
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('returnToRecordInput'));
+      }, 20);
+    }
+  };
+
   const calculateHover = (clientX, clientY) => {
     if (!wrapperRef.current) return null;
     const rect = wrapperRef.current.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    
+
     const dx = clientX - centerX;
-    const dy = centerY - clientY; 
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    
-    if (dist > 30 && dy > -10) {
+    const dy = centerY - clientY; // 上方向が正
+    const dist = Math.hypot(dx, dy);
+
+    // ボタン中心から少し（14px以上）動かしただけで左右どちらかを確実に判定
+    if (dist >= 14 && dy > -45) {
       return dx < 0 ? 'left' : 'right';
     }
     return null;
@@ -287,156 +666,198 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
 
   const updateHover = (clientX, clientY) => {
     const nextHover = calculateHover(clientX, clientY);
-    hoveredRef.current = nextHover;
-    setHovered(nextHover);
+    if (hoveredRef.current !== nextHover) {
+      hoveredRef.current = nextHover;
+      setHovered(nextHover);
+      if (nextHover && typeof navigator !== 'undefined' && navigator.vibrate) {
+        try { navigator.vibrate(15); } catch (e) {}
+      }
+    }
   };
 
-  const handleStart = (e) => {
+  const handlePointerStart = (clientX, clientY) => {
     if (!myInfo?.isTraining) return;
-    
-    let clientX, clientY;
-    if (e.touches && e.touches.length > 0) {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else if (e.clientX !== undefined) {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    } else {
-      return;
-    }
-    
-    touchPos.current = { x: clientX, y: clientY };
+    if (tapSelectMode) return; // タップ選択モード中はメニュー側のクリックで処理
+
+    isPressingRef.current = true;
+    startPosRef.current = { x: clientX, y: clientY };
+    lastPosRef.current = { x: clientX, y: clientY };
     clearPressTimer();
 
     pressTimer.current = setTimeout(() => {
+      if (!isPressingRef.current) return;
       isOpenRef.current = true;
       setIsOpen(true);
-      updateHover(touchPos.current.x, touchPos.current.y);
+      updateHover(lastPosRef.current.x, lastPosRef.current.y);
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate(50);
+        try { navigator.vibrate(40); } catch (e) {}
       }
-    }, 200);
+    }, 220);
   };
 
-  const handleMove = (e) => {
-    if (!myInfo?.isTraining) return;
-    
-    let clientX, clientY;
-    if (e.touches && e.touches.length > 0) {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else if (e.changedTouches && e.changedTouches.length > 0) {
-      clientX = e.changedTouches[0].clientX;
-      clientY = e.changedTouches[0].clientY;
-    } else if (e.clientX !== undefined) {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    } else {
+  useEffect(() => {
+    if (!myInfo?.isTraining) {
+      closeMenu();
       return;
     }
 
-    touchPos.current = { x: clientX, y: clientY };
+    const onWindowTouchMove = (e) => {
+      if (!isPressingRef.current) return;
+      const touch = e.touches && e.touches[0];
+      if (!touch) return;
+      lastPosRef.current = { x: touch.clientX, y: touch.clientY };
 
-    if (isOpenRef.current) {
-      if (e.cancelable && e.type === 'touchmove') {
-        e.preventDefault();
-      }
-      updateHover(clientX, clientY);
-    } else if (pressTimer.current) {
-      const rect = wrapperRef.current?.getBoundingClientRect();
-      if (rect) {
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-        const dist = Math.sqrt(Math.pow(clientX - centerX, 2) + Math.pow(clientY - centerY, 2));
-        if (dist > 40) {
+      if (isOpenRef.current) {
+        if (e.cancelable) e.preventDefault();
+        updateHover(touch.clientX, touch.clientY);
+      } else {
+        const moveDist = Math.hypot(
+          touch.clientX - startPosRef.current.x,
+          touch.clientY - startPosRef.current.y
+        );
+        // 長押し待機中に上方向・左右へドラッグを開始した場合は即座にメニューを開く
+        if (moveDist > 18) {
           clearPressTimer();
+          isOpenRef.current = true;
+          setIsOpen(true);
+          updateHover(touch.clientX, touch.clientY);
         }
       }
-    }
-  };
+    };
 
-  const handleEnd = (e) => {
-    if (!myInfo?.isTraining) return;
-    
-    clearPressTimer();
-
-    if (!isOpenRef.current) return;
-    
-    if (e.type === 'touchend' || e.type === 'touchcancel' || e.type === 'mouseup' || e.type === 'mouseleave') {
-       updateHover(touchPos.current.x, touchPos.current.y);
-    }
-    
-    const finalSelected = hoveredRef.current;
-    
-    isOpenRef.current = false;
-    setIsOpen(false);
-    hoveredRef.current = null;
-    setHovered(null);
-
-    if (finalSelected === 'left') {
-      if (currentTab !== 'record') {
-        setCurrentTab('record');
+    const onWindowMouseMove = (e) => {
+      if (!isPressingRef.current) return;
+      lastPosRef.current = { x: e.clientX, y: e.clientY };
+      if (isOpenRef.current) {
+        updateHover(e.clientX, e.clientY);
       }
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('showRecordDashboard'));
-      }, 10);
-    } else if (finalSelected === 'right') {
-      if (currentTab !== 'record') {
-        setCurrentTab('record');
+    };
+
+    const onWindowEnd = () => {
+      if (!isPressingRef.current) return;
+      isPressingRef.current = false;
+      const hadTimer = !!pressTimer.current;
+      clearPressTimer();
+
+      // 短押し（長押しメニューが開く前に離した場合）：記録画面へ遷移
+      if (!isOpenRef.current && hadTimer) {
+        if (currentTab !== 'record') {
+          setCurrentTab('record');
+        }
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('returnToRecordInput'));
+        }, 20);
+        return;
       }
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('returnToRecordInput'));
-      }, 10);
-    }
-  };
+
+      if (isOpenRef.current) {
+        updateHover(lastPosRef.current.x, lastPosRef.current.y);
+        const finalSelected = hoveredRef.current;
+        if (finalSelected === 'left' || finalSelected === 'right') {
+          executeSelection(finalSelected);
+        } else {
+          // 指を動かさずに長押しして離した場合はメニューを開いたままにし、タップでも選べるようにする
+          setTapSelectMode(true);
+        }
+      }
+    };
+
+    window.addEventListener('touchmove', onWindowTouchMove, { passive: false });
+    window.addEventListener('touchend', onWindowEnd);
+    window.addEventListener('touchcancel', onWindowEnd);
+    window.addEventListener('mousemove', onWindowMouseMove);
+    window.addEventListener('mouseup', onWindowEnd);
+
+    return () => {
+      window.removeEventListener('touchmove', onWindowTouchMove);
+      window.removeEventListener('touchend', onWindowEnd);
+      window.removeEventListener('touchcancel', onWindowEnd);
+      window.removeEventListener('mousemove', onWindowMouseMove);
+      window.removeEventListener('mouseup', onWindowEnd);
+    };
+  }, [myInfo?.isTraining, currentTab, tapSelectMode]);
 
   return (
-    <div 
-      ref={wrapperRef}
-      className={`relative flex flex-col items-center ${myInfo?.isTraining ? 'touch-none select-none z-50' : ''}`}
-      style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
-      onMouseDown={handleStart}
-      onMouseMove={handleMove}
-      onMouseUp={handleEnd}
-      onMouseLeave={handleEnd}
-      onTouchStart={handleStart}
-      onTouchMove={handleMove}
-      onTouchEnd={handleEnd}
-      onTouchCancel={handleEnd}
-      onContextMenu={(e) => {
-        if (myInfo?.isTraining) {
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
-        }
-      }}
-    >
-       {myInfo?.isTraining && (
-         <div 
-           className={`absolute bottom-full mb-1 left-1/2 -translate-x-1/2 flex transition-all duration-200 pointer-events-none ${isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}
-           style={{ transformOrigin: 'bottom center' }}
-         >
-           <div className={`relative w-28 h-28 bg-indigo-500/95 backdrop-blur-md rounded-tl-full flex items-center justify-center border-[3px] border-r-[1.5px] border-indigo-300 dark:border-indigo-700 transition-transform duration-200 ${hovered === 'left' ? 'scale-110 bg-indigo-500 z-10 shadow-[0_0_20px_rgba(99,102,241,0.6)]' : 'opacity-70'} origin-bottom-right`}>
-             <div className="flex flex-col items-center justify-center text-white mr-4 mt-6">
-               <AlignLeft size={28} />
-               <span className="text-xs font-bold mt-1 tracking-wider">メニュー</span>
-             </div>
-           </div>
-           <div className={`relative w-28 h-28 bg-emerald-500/95 backdrop-blur-md rounded-tr-full flex items-center justify-center border-[3px] border-l-[1.5px] border-emerald-300 dark:border-emerald-700 transition-transform duration-200 ${hovered === 'right' ? 'scale-110 bg-emerald-500 z-10 shadow-[0_0_20px_rgba(16,185,129,0.6)]' : 'opacity-70'} origin-bottom-left`}>
-             <div className="flex flex-col items-center justify-center text-white ml-4 mt-6">
-               <Edit2 size={28} />
-               <span className="text-xs font-bold mt-1 tracking-wider">記録画面</span>
-             </div>
-           </div>
-         </div>
-       )}
+    <>
+      {isOpen && tapSelectMode && (
+        <div
+          className="fixed inset-0 z-40 bg-black/10"
+          onClick={closeMenu}
+          onTouchStart={(e) => { e.stopPropagation(); closeMenu(); }}
+        />
+      )}
+      <div 
+        ref={wrapperRef}
+        className={`relative flex flex-col items-center ${myInfo?.isTraining ? 'touch-none select-none z-50' : ''}`}
+        style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
+        onTouchStart={(e) => {
+          if (!myInfo?.isTraining) return;
+          if (e.touches && e.touches.length > 0) {
+            handlePointerStart(e.touches[0].clientX, e.touches[0].clientY);
+          }
+        }}
+        onMouseDown={(e) => {
+          if (!myInfo?.isTraining || e.button !== 0) return;
+          handlePointerStart(e.clientX, e.clientY);
+        }}
+        onContextMenu={(e) => {
+          if (myInfo?.isTraining) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+        }}
+      >
+        {myInfo?.isTraining && (
+          <div 
+            className={`absolute bottom-full mb-2 left-1/2 -translate-x-1/2 flex transition-all duration-200 ${
+              isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none'
+            } ${tapSelectMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
+            style={{ transformOrigin: 'bottom center' }}
+          >
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); executeSelection('left'); }}
+              onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); executeSelection('left'); }}
+              className={`relative w-28 h-28 bg-indigo-500/95 backdrop-blur-md rounded-tl-full flex items-center justify-center border-[3px] border-r-[1.5px] border-indigo-300 dark:border-indigo-700 transition-transform duration-150 ${
+                hovered === 'left' ? 'scale-110 bg-indigo-500 z-10 shadow-[0_0_20px_rgba(99,102,241,0.65)]' : 'opacity-85 hover:opacity-100'
+              } origin-bottom-right`}
+            >
+              <div className="flex flex-col items-center justify-center text-white mr-3 mt-5">
+                <AlignLeft size={26} />
+                <span className="text-[11px] font-bold mt-1 tracking-wider">プログラム</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); executeSelection('right'); }}
+              onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); executeSelection('right'); }}
+              className={`relative w-28 h-28 bg-emerald-500/95 backdrop-blur-md rounded-tr-full flex items-center justify-center border-[3px] border-l-[1.5px] border-emerald-300 dark:border-emerald-700 transition-transform duration-150 ${
+                hovered === 'right' ? 'scale-110 bg-emerald-500 z-10 shadow-[0_0_20px_rgba(16,185,129,0.65)]' : 'opacity-85 hover:opacity-100'
+              } origin-bottom-left`}
+            >
+              <div className="flex flex-col items-center justify-center text-white ml-3 mt-5">
+                <Edit2 size={26} />
+                <span className="text-[11px] font-bold mt-1 tracking-wider">記録画面</span>
+              </div>
+            </button>
+          </div>
+        )}
 
-       <div className={`transition-transform duration-200 ${isOpen && myInfo?.isTraining ? 'scale-90 opacity-80' : 'scale-100'}`}>
-         <div className={myInfo?.isTraining ? "pointer-events-none" : ""}>
-           {children}
-         </div>
-       </div>
-    </div>
+        <div
+          className={`transition-transform duration-200 ${isOpen && myInfo?.isTraining ? 'scale-90 opacity-80' : 'scale-100'}`}
+          onClick={() => {
+            if (myInfo?.isTraining && tapSelectMode) {
+              closeMenu();
+            }
+          }}
+        >
+          <div className={myInfo?.isTraining ? "pointer-events-none" : ""}>
+            {children}
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 

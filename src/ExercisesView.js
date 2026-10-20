@@ -1,7 +1,7 @@
 // ==========================================
 // ExercisesView.js — 種目・ジム管理画面コンポーネント
 // ==========================================
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Users, UserPlus, Search, X, Edit2, Trash2, MapPin, EyeOff } from 'lucide-react';
 import { setDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db, appId } from './firebase';
@@ -18,7 +18,11 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
   const [activeTab, setActiveTab] = useState('exercises'); 
   const [gymSearchQuery, setGymSearchQuery] = useState('');
   const [newGymName, setNewGymName] = useState('');
-  const [selectedGymId, setSelectedGymId] = useState(isAdmin ? 'common' : (joinedGyms.find(id => id !== 'common') || ''));
+  const [selectedGymId, setSelectedGymId] = useState(
+    (myInfo?.isTraining && myInfo?.currentGymId)
+      ? myInfo.currentGymId
+      : (isAdmin ? 'common' : (joinedGyms.find(id => id !== 'common') || ''))
+  );
   const [filterGymId, setFilterGymId] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [editingGymId, setEditingGymId] = useState(null);
@@ -42,6 +46,13 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
   
   const [selectedExerciseForChart, setSelectedExerciseForChart] = useState(null);
   const [exerciseSearchQuery, setExerciseSearchQuery] = useState('');
+
+  // トレーニング中は現在いるジムを初期選択に反映
+  useEffect(() => {
+    if (myInfo?.isTraining && myInfo?.currentGymId) {
+      setSelectedGymId(myInfo.currentGymId);
+    }
+  }, [myInfo?.isTraining, myInfo?.currentGymId]);
 
   const handleAddGym = async (e) => {
     e.preventDefault();
@@ -466,7 +477,14 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                   <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">新しい種目を登録</h3>
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">登録先のジムグループ <span className="text-rose-500">*</span></label>
+                      <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">
+                        登録先のジムグループ <span className="text-rose-500">*</span>
+                        {myInfo?.isTraining && myInfo?.currentGymId === selectedGymId && (
+                          <span className="ml-2 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                            現在トレーニング中のジム
+                          </span>
+                        )}
+                      </label>
                       <div className="relative">
                         <select value={selectedGymId} onChange={e => setSelectedGymId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
                           {gyms.filter(g => joinedGyms.includes(g.id)).map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}

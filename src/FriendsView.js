@@ -10,7 +10,7 @@ import { renderUsernameWithBadge, TimerDisplay } from './CommonUI';
 import { DataView } from './DataView';
 
 // --- フレンド画面 ---
-function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccept, onReject, onRemoveFriend, onSendPartnerRequest, onAcceptPartnerRequest, onRejectPartnerRequest, onRemovePartner, onFriendClick, onGenerateFriendCode, posts, targetFriendTab, setTargetFriendTab, onSendTestPush }) {
+function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccept, onReject, onRemoveFriend, onSendPartnerRequest, onAcceptPartnerRequest, onRejectPartnerRequest, onRemovePartner, onFriendClick, onGenerateFriendCode, posts, targetFriendTab, setTargetFriendTab, onImport, onImportItem, onSendTestPush }) {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [reportsCount, setReportsCount] = useState(0);
 
@@ -308,6 +308,8 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
                currentUser={currentUser} 
                targetUser={partnerName} 
                accountsInfo={accountsInfo} 
+               onImport={onImport}
+               onImportItem={onImportItem}
                onToggleLike={() => {}} 
                onAddComment={() => {}} 
                onDeleteComment={() => {}} 
@@ -582,14 +584,14 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.0.0 (2026.10.19, 13:32, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.1.0 (2026.10.20, updated)</p>
       </div>
     </div>
   );
 }
 
 // --- フレンド詳細モーダル ---
-function FriendDetailModal({ friendUsername, posts, accountsInfo, onClose, onToggleLike, onImport, currentUser, onAddComment, onDeleteComment, onToggleCommentLike }) {
+function FriendDetailModal({ friendUsername, posts, accountsInfo, onClose, onToggleLike, onImport, onImportItem, currentUser, onAddComment, onDeleteComment, onToggleCommentLike, onUserClick }) {
   const friendInfo = accountsInfo[friendUsername] || {};
 
   return (
@@ -613,7 +615,7 @@ function FriendDetailModal({ friendUsername, posts, accountsInfo, onClose, onTog
               </div>
            )}
 
-           <DataView posts={posts} currentUser={currentUser} targetUser={friendUsername} accountsInfo={accountsInfo} onImport={onImport} onToggleLike={onToggleLike} onAddComment={onAddComment} onDeleteComment={onDeleteComment} onToggleCommentLike={onToggleCommentLike} />
+           <DataView posts={posts} currentUser={currentUser} targetUser={friendUsername} accountsInfo={accountsInfo} onImport={onImport} onImportItem={onImportItem} onToggleLike={onToggleLike} onAddComment={onAddComment} onDeleteComment={onDeleteComment} onToggleCommentLike={onToggleCommentLike} onUserClick={onUserClick} />
         </div>
       </div>
     </div>

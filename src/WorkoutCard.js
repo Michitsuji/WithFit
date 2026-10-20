@@ -2,12 +2,12 @@
 // WorkoutCard.js — ワークアウトカード＆タイムライン画面コンポーネント
 // ==========================================
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Clock, MapPin, Edit2, Trash2, MoreVertical, FileText, Scale, ListPlus, Copy, Play, Calendar as CalendarIcon, X, Dumbbell, Flame, Activity, Zap, AlignLeft, Heart, MessageCircle, ArrowDown, ArrowUp, Send } from 'lucide-react';
+import { Clock, MapPin, Edit2, Trash2, MoreVertical, FileText, Scale, ListPlus, Copy, Play, Calendar as CalendarIcon, X, Dumbbell, Flame, Activity, Zap, AlignLeft, Heart, MessageCircle, ArrowDown, ArrowUp, Send, Plus } from 'lucide-react';
 import { generateColor, calculateWorkoutTotals, formatShortDateTime, formatDuration, getVolumeMetaphor, getCategoryColor, getRelativeTime } from './utils';
 import { UserAvatar, renderUsernameWithBadge, AdBanner } from './CommonUI';
 
 // --- 共通コンポーネント：ワークアウトカード ---
-function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onToggleLike, onImport, onAddComment, onDeleteComment, onToggleCommentLike, onUserClick }) {
+function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onToggleLike, onImport, onImportItem, onAddComment, onDeleteComment, onToggleCommentLike, onUserClick }) {
   const [localComments, setLocalComments] = useState(post.comments || []);
   const [showComments, setShowComments] = useState(localComments.length > 0);
   const [commentText, setCommentText] = useState('');
@@ -549,7 +549,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
       `}</style>
       <div className="pl-3 mb-4 flex overflow-x-auto snap-x snap-mandatory gap-3 pb-2 pr-3 hide-scrollbar">
         {processedItems.map((item, idx) => (
-          <div key={idx} className="snap-center shrink-0 w-[85%] sm:w-[280px] bg-slate-50 dark:bg-slate-950/50 rounded-xl p-3 border border-slate-100 dark:border-slate-800">
+          <div key={idx} className="snap-center shrink-0 w-[85%] sm:w-[280px] bg-slate-50 dark:bg-slate-950/50 rounded-xl p-3 border border-slate-100 dark:border-slate-800 flex flex-col">
             <div className="flex items-center justify-between mb-3">
               <div className="flex flex-col gap-1.5 flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -573,7 +573,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 flex-1">
               {item.sets && Array.isArray(item.sets) && item.sets.map((set, sIdx) => (
                 <div key={sIdx} className="bg-white/40 dark:bg-slate-900/40 p-2 rounded-lg border border-slate-200/40 dark:border-slate-800/40">
                   {renderSetRow(set, item.weightType, 'main', false, `set ${sIdx + 1}`)}
@@ -613,6 +613,16 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
               <div className="mt-2 text-sm text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 p-2 rounded border border-slate-200 dark:border-slate-800">
                 <AlignLeft size={12} className="inline mr-1 text-slate-400"/>{item.memo}
               </div>
+            )}
+
+            {onImportItem && (
+              <button
+                type="button"
+                onClick={() => onImportItem(item, post)}
+                className="mt-3 w-full py-2 px-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/80 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/80 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+              >
+                <Plus size={14} /> この種目を現在の記録に追加
+              </button>
             )}
           </div>
         ))}
@@ -789,7 +799,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
 }
 
 // --- タイムライン画面 ---
-function TimelineView({ posts, onToggleLike, onImport, currentUser, onDelete, onEdit, accountsInfo, onAddComment, onDeleteComment, onToggleCommentLike, onUserClick, scrollToPostId, setScrollToPostId }) {
+function TimelineView({ posts, onToggleLike, onImport, onImportItem, currentUser, onDelete, onEdit, accountsInfo, onAddComment, onDeleteComment, onToggleCommentLike, onUserClick, scrollToPostId, setScrollToPostId }) {
   const [displayLimit, setDisplayLimit] = useState(10);
 
   useEffect(() => {
@@ -828,7 +838,7 @@ function TimelineView({ posts, onToggleLike, onImport, currentUser, onDelete, on
         <>
           {displayedPosts.map((post, index) => (
             <React.Fragment key={post.id}>
-              <WorkoutCard post={post} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={onEdit} onDelete={onDelete} onToggleLike={onToggleLike} onImport={onImport} onAddComment={onAddComment} onDeleteComment={onDeleteComment} onToggleCommentLike={onToggleCommentLike} onUserClick={onUserClick} />
+              <WorkoutCard post={post} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={onEdit} onDelete={onDelete} onToggleLike={onToggleLike} onImport={onImport} onImportItem={onImportItem} onAddComment={onAddComment} onDeleteComment={onDeleteComment} onToggleCommentLike={onToggleCommentLike} onUserClick={onUserClick} />
               {(index + 1) % 5 === 0 && <AdBanner />}
             </React.Fragment>
           ))}

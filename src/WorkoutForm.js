@@ -2,7 +2,7 @@
 // WorkoutForm.js — ワークアウト入力フォーム・種目並び替え・編集モーダル
 // ==========================================
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { CheckCircle, Trash2, Clock, GripVertical, X, TrendingDown, Plus, Zap, Edit2, ArrowUp, ArrowDown, Settings, ListPlus } from 'lucide-react';
+import { CheckCircle, Trash2, Clock, GripVertical, X, TrendingDown, Plus, Zap, Edit2, ArrowUp, ArrowDown, Settings, ListPlus, Copy } from 'lucide-react';
 import { generateId, formatDateWithDay, formatDateFromTimestamp, formatTimeFromTimestamp, MASTER_USER } from './utils';
 import { FormInput, CategoryFilterGrid } from './CommonUI';
 
@@ -153,10 +153,34 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
     if (!prevRecord || !prevRecord.fullItem) return;
     const prevItem = prevRecord.fullItem;
     const newSets = prevItem.sets.map(s => {
-      const clearReps = (ds) => ({ ...ds, id: generateId(), reps: '', lReps: '', rReps: '', forcedReps: '', superReps: '', superLReps: '', superRReps: '', superForcedReps: '', superReps3: '', superLReps3: '', superRReps3: '', superForcedReps3: '' });
+      const clearReps = (ds) => ({
+        ...ds,
+        id: generateId(),
+        targetReps: ds.reps || '',
+        targetLReps: ds.lReps || '',
+        targetRReps: ds.rReps || '',
+        targetSuperReps: ds.superReps || '',
+        targetSuperLReps: ds.superLReps || '',
+        targetSuperRReps: ds.superRReps || '',
+        targetSuperReps3: ds.superReps3 || '',
+        targetSuperLReps3: ds.superLReps3 || '',
+        targetSuperRReps3: ds.superRReps3 || '',
+        reps: '', lReps: '', rReps: '', forcedReps: '',
+        superReps: '', superLReps: '', superRReps: '', superForcedReps: '',
+        superReps3: '', superLReps3: '', superRReps3: '', superForcedReps3: ''
+      });
       return {
         ...s,
         id: generateId(),
+        targetReps: s.reps || '',
+        targetLReps: s.lReps || '',
+        targetRReps: s.rReps || '',
+        targetSuperReps: s.superReps || '',
+        targetSuperLReps: s.superLReps || '',
+        targetSuperRReps: s.superRReps || '',
+        targetSuperReps3: s.superReps3 || '',
+        targetSuperLReps3: s.superLReps3 || '',
+        targetSuperRReps3: s.superRReps3 || '',
         reps: '', lReps: '', rReps: '', forcedReps: '', distance: '', time: '', calories: '',
         superReps: '', superLReps: '', superRReps: '', superForcedReps: '',
         superReps3: '', superLReps3: '', superRReps3: '', superForcedReps3: '',
@@ -346,9 +370,18 @@ function WorkoutItemForm({ item, index, availableExercises, updateItem, removeIt
       <div className={`transition-all overflow-hidden ${isAnyDragging ? 'h-0 opacity-0' : 'h-auto opacity-100'}`}>
         <div className={`transition-all duration-300 ${isConfirmed ? 'pointer-events-none opacity-60 select-none' : ''}`}>
       {prevRecord && !isJointPartner && (
-        <div className="mb-4 pl-8 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950/50 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
-          <span className="text-emerald-600 dark:text-emerald-400 mr-2 flex items-center inline-flex gap-1"><Clock size={12}/>前回 ({formatDateWithDay(prevRecord.date)})</span>
-          <div className="mt-1 flex flex-wrap gap-2">
+        <div className="mb-4 pl-3 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1"><Clock size={12}/>前回 ({formatDateWithDay(prevRecord.date)})</span>
+            <button
+              type="button"
+              onClick={handleCopyPrevRecord}
+              className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900 px-2 py-1 rounded-md border border-emerald-200 dark:border-emerald-800 flex items-center gap-1 transition-colors"
+            >
+              <Copy size={10} /> 前回セットを反映
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
             {prevRecord.sets.map((s, i) => (
                <span key={i} className="bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
                   {prevRecord.weightType === 'cardio' ? 

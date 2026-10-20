@@ -161,7 +161,7 @@ function BodyCompositionInfo({ info, dailyCalories = 0, dateLabel = '' }) {
 }
 
 // --- データ画面 (カレンダー・グラフ・レポート) ---
-function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport, targetUser, onToggleLike, onAddComment, onDeleteComment, onToggleCommentLike, onUserClick, onOpenCoach }) {
+function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport, onImportItem, targetUser, onToggleLike, onAddComment, onDeleteComment, onToggleCommentLike, onUserClick, onOpenCoach }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDateStr, setSelectedDateStr] = useState(formatDateFromTimestamp(Date.now()));
   const displayUser = targetUser || currentUser;
@@ -406,7 +406,7 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
           <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-3">{selectedDateStr.replace(/-/g, '/')} の記録</h3>
 
           {selectedPosts.length > 0 ? (
-            selectedPosts.map(post => <WorkoutCard key={post.id} post={post} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={onEdit} onDelete={onDelete} onImport={onImport} onToggleLike={onToggleLike} onAddComment={onAddComment} onDeleteComment={onDeleteComment} onToggleCommentLike={onToggleCommentLike} onUserClick={onUserClick} />)
+            selectedPosts.map(post => <WorkoutCard key={post.id} post={post} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={onEdit} onDelete={onDelete} onImport={onImport} onImportItem={onImportItem} onToggleLike={onToggleLike} onAddComment={onAddComment} onDeleteComment={onDeleteComment} onToggleCommentLike={onToggleCommentLike} onUserClick={onUserClick} />)
           ) : (
              <div className="bg-slate-100 dark:bg-slate-900 p-4 rounded-xl text-center text-slate-400 dark:text-slate-500 text-sm font-bold border border-slate-200 dark:border-slate-800">記録はありません</div>
           )}
@@ -425,8 +425,8 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
       {!hideMetrics && (
       <div className="space-y-6 pt-4">
          <h3 className="text-lg font-bold text-slate-900 dark:text-white">体重・体脂肪率の推移</h3>
-         <SimpleChart data={weightData} color="#10b981" title={`${accountsInfo[displayUser]?.displayName || displayUser}の体重推移 (kg)`} />
-         <SimpleChart data={fatData} color="#6366f1" title={`${accountsInfo[displayUser]?.displayName || displayUser}の体脂肪率推移 (%)`} />
+         <SimpleChart data={weightData} color="#10b981" unit="kg" title={`${accountsInfo[displayUser]?.displayName || displayUser}の体重推移 (kg)`} />
+         <SimpleChart data={fatData} color="#6366f1" unit="%" title={`${accountsInfo[displayUser]?.displayName || displayUser}の体脂肪率推移 (%)`} />
       </div>
       )}
     </div>
