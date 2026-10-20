@@ -1,11 +1,11 @@
 // ==========================================
 // App.js — メインアプリケーションコンポーネント
 // ==========================================
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Activity, Bell, Heart, MessageCircle, UserPlus, LogOut, Flame, ChevronRight, ChevronLeft, MapPin, Clock, VolumeX, Volume2, X, Play, Lock, Home, Dumbbell, PlusCircle, Calendar as CalendarIcon, Users, Settings } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { Activity, Bell, Heart, MessageCircle, UserPlus, LogOut, Flame, ChevronRight, ChevronLeft, MapPin, Clock, VolumeX, Volume2, X, Play, Lock, Home, Dumbbell, PlusCircle, Calendar as CalendarIcon, Users, Settings, CheckCircle, Trash2 } from 'lucide-react';
 import { GoogleAuthProvider, signInWithCredential, getRedirectResult, signInAnonymously, onAuthStateChanged, signInWithPopup } from 'firebase/auth';
 import { setDoc, doc, getDoc, deleteField, collection, onSnapshot, query, where, getDocs, limit, deleteDoc } from 'firebase/firestore';
-import { getMessaging, getToken } from 'firebase/messaging';
+import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging';
 import { db, appId, auth, app } from './firebase';
 import { generateId, generateFriendCode, calculateWorkoutTotals, getRelativeTime } from './utils';
 import { useAutoScrollDisable, WithFitLogo, UserAvatar, renderUsernameWithBadge, TimerDisplay, NavButton, RecordWheelWrapper } from './CommonUI';
@@ -19,6 +19,7 @@ import { LoginScreen, ProfileModal, UserProfileModal } from './ProfileModals';
 import { CoachChatModal, SecretGame } from './CoachAndGame';
 
 const VAPID_PUBLIC_KEY = 'BAty8GYk1zuoZVh-ZaSdcJsq_o-7vXJLXPNVNzlgsq9rd3wP-jQtclYEdu1MnnLN_0BnlmiKuoWH3X2YvOFl7aM';
+const DEVICE_TOKEN_STORAGE_KEY = 'withfit_device_fcm_token';
 
 export default function App() {
   useAutoScrollDisable();
@@ -27,16 +28,125 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const pendingPushToken = useRef(null);
   const hasRefreshedTokenForUser = useRef(null);
+  const mountTimeRef = useRef(Date.now());
+  const shownToastIdsRef = useRef(new Set());
+  const toastTimerRef = useRef(null);
+
+  const [deviceFcmToken, setDeviceFcmToken] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(DEVICE_TOKEN_STORAGE_KEY) || null;
+    }
+    return null;
+  });
+  const [isPushSupported, setIsPushSupported] = useState(true);
+  const [activeToast, setActiveToast] = useState(null);
+
+  const showInAppToast = useCallback((notifData) => {
+    if (!notifData) return;
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setActiveToast(notifData);
+    toastTimerRef.current = setTimeout(() => {
+      setActiveToast(null);
+    }, 5000);
+  }, []);
+
+  // 端末トークンをユーザーのFirestoreドキュメント（fcmTokens配列 + fcmToken）へ安全に保存するヘルパー
+  const saveTokenToUserAccount = useCallback(async (username, token) => {
+    if (!username || !token || !db) return;
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(DEVICE_TOKEN_STORAGE_KEY, token);
+      }
+      setDeviceFcmToken(token);
+
+      const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username);
+      const snap = await getDoc(userRef);
+      const existingData = snap.exists() ? snap.data() : {};
+      const existingTokens = Array.isArray(existingData.fcmTokens)
+        ? existingData.fcmTokens
+        : (existingData.fcmToken ? [existingData.fcmToken] : []);
+      const mergedTokens = [...new Set([...existingTokens.filter(Boolean), token])].slice(-5);
+
+      await setDoc(userRef, {
+        fcmToken: token,
+        fcmTokens: mergedTokens,
+        fcmTokenUpdatedAt: Date.now()
+      }, { merge: true });
+    } catch (e) {
+      console.error('Failed to save FCM token:', e);
+    }
+  }, []);
+
+  // 現在の端末のトークンのみをユーザーのFirestoreドキュメントから削除するヘルパー（他端末のトークンは壊さない）
+  const removeDeviceTokenFromUserAccount = useCallback(async (username) => {
+    if (!username || !db) return;
+    const localToken = typeof window !== 'undefined' ? localStorage.getItem(DEVICE_TOKEN_STORAGE_KEY) : deviceFcmToken;
+    try {
+      const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'accounts', username);
+      const snap = await getDoc(userRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        const existingTokens = Array.isArray(data.fcmTokens)
+          ? data.fcmTokens
+          : (data.fcmToken ? [data.fcmToken] : []);
+        const remainingTokens = localToken
+          ? existingTokens.filter(t => t && t !== localToken)
+          : [];
+        const nextPrimary = remainingTokens.length > 0 ? remainingTokens[remainingTokens.length - 1] : deleteField();
+
+        await setDoc(userRef, {
+          fcmTokens: remainingTokens,
+          fcmToken: nextPrimary,
+          fcmTokenUpdatedAt: Date.now()
+        }, { merge: true });
+      }
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(DEVICE_TOKEN_STORAGE_KEY);
+      }
+      setDeviceFcmToken(null);
+    } catch (e) {
+      console.error('Failed to remove device FCM token:', e);
+    }
+  }, [deviceFcmToken]);
+
+  // Service Workerを確実に登録し、FCMトークンを取得するコア関数
+  const registerSwAndFetchToken = useCallback(async () => {
+    if (typeof window === 'undefined' || !app) return null;
+    try {
+      const supported = await isSupported().catch(() => false);
+      setIsPushSupported(supported);
+      if (!supported) return null;
+
+      let swReg = null;
+      if ('serviceWorker' in navigator) {
+        try {
+          swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
+          await navigator.serviceWorker.ready;
+        } catch (swErr) {
+          console.warn('Service worker registration warning:', swErr);
+          swReg = await navigator.serviceWorker.getRegistration();
+        }
+      }
+
+      const messaging = getMessaging(app);
+      const tokenOptions = { vapidKey: VAPID_PUBLIC_KEY };
+      if (swReg) {
+        tokenOptions.serviceWorkerRegistration = swReg;
+      }
+      const token = await getToken(messaging, tokenOptions);
+      return token || null;
+    } catch (err) {
+      console.warn('registerSwAndFetchToken error:', err);
+      return null;
+    }
+  }, []);
 
   useEffect(() => {
     if (currentUser && pendingPushToken.current) {
-      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), {
-        fcmToken: pendingPushToken.current,
-        fcmTokenUpdatedAt: Date.now()
-      }, { merge: true }).catch(console.error);
+      saveTokenToUserAccount(currentUser, pendingPushToken.current);
       pendingPushToken.current = null;
     }
-  }, [currentUser]);
+  }, [currentUser, saveTokenToUserAccount]);
 
   useEffect(() => {
     const handleNativeMessage = (event) => {
@@ -45,12 +155,9 @@ export default function App() {
         if (!rawData) return;
         const data = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
         
-        if (data.type === 'PUSH_TOKEN') {
+        if (data.type === 'PUSH_TOKEN' && data.token) {
           if (currentUser) {
-            setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), {
-              fcmToken: data.token,
-              fcmTokenUpdatedAt: Date.now()
-            }, { merge: true });
+            saveTokenToUserAccount(currentUser, data.token);
           } else {
             pendingPushToken.current = data.token;
           }
@@ -59,16 +166,67 @@ export default function App() {
         } else if (data.type === 'NATIVE_GOOGLE_LOGIN' && data.idToken) {
           const credential = GoogleAuthProvider.credential(data.idToken);
           signInWithCredential(auth, credential).catch(err => console.error("Native login error:", err));
+        } else if (data.type === 'NOTIFICATION_CLICK' && data.data) {
+          const nData = data.data;
+          if (nData.type === 'joint') {
+            setCurrentTab('record');
+          } else if (nData.type === 'request') {
+            setCurrentTab('friends');
+          } else if (nData.postId) {
+            setCurrentTab('timeline');
+            setScrollToPostId(nData.postId);
+          }
         }
       } catch (e) {}
     };
     window.addEventListener('message', handleNativeMessage);
     document.addEventListener('message', handleNativeMessage);
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleNativeMessage);
+    }
     return () => {
       window.removeEventListener('message', handleNativeMessage);
       document.removeEventListener('message', handleNativeMessage);
+      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleNativeMessage);
+      }
     };
-  }, [currentUser]); 
+  }, [currentUser, saveTokenToUserAccount]);
+
+  // フォアグラウンドでのFCMプッシュ受信リスナー
+  useEffect(() => {
+    if (typeof window === 'undefined' || !app || !currentUser) return;
+    let unsubscribeMsg = null;
+    isSupported().then((supported) => {
+      setIsPushSupported(supported);
+      if (!supported) return;
+      try {
+        const messaging = getMessaging(app);
+        unsubscribeMsg = onMessage(messaging, (payload) => {
+          const title = payload?.notification?.title || payload?.data?.title || 'WithFit';
+          const body = payload?.notification?.body || payload?.data?.body || '';
+          const type = payload?.data?.type || 'general';
+          const postId = payload?.data?.postId || null;
+          if (body) {
+            showInAppToast({
+              id: `fcm_${Date.now()}`,
+              title,
+              message: body,
+              type,
+              postId,
+              fromUser: payload?.data?.fromUser || 'system',
+              timestamp: Date.now()
+            });
+          }
+        });
+      } catch (e) {}
+    }).catch(() => {});
+
+    return () => {
+      if (unsubscribeMsg) unsubscribeMsg();
+    };
+  }, [currentUser, showInAppToast]);
+
   const [currentTab, setCurrentTab] = useState('timeline');
   const [isRecordManual, setIsRecordManual] = useState(false);
   const [importGymId, setImportGymId] = useState('');
@@ -168,7 +326,6 @@ export default function App() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-       // ご自身で用意される音楽ファイル名（パス）に合わせて変更してください
        alarmAudio.current = new Audio('alarm.mp3');
        alarmAudio.current.loop = true;
        alarmAudio.current.volume = timerVolume;
@@ -331,11 +488,12 @@ export default function App() {
         else transformX = screenW - cardW - 16;
      }
      
-if (timerState.y === 'top') {
-                  const hasActiveFriends = currentUser && accountsInfo[currentUser]?.friends?.some(f => accountsInfo[f]?.isTraining);
-                                  transformY = hasActiveFriends ? 112 : 80;             } else {
-                                                    transformY = screenH - cardH - 90;
-                                                               }
+     if (timerState.y === 'top') {
+        const hasActiveFriends = currentUser && accountsInfo[currentUser]?.friends?.some(f => accountsInfo[f]?.isTraining);
+        transformY = hasActiveFriends ? 112 : 80;
+     } else {
+        transformY = screenH - cardH - 90;
+     }
   }
   const isHidden = timerState.hidden;
 
@@ -366,16 +524,6 @@ if (timerState.y === 'top') {
         } catch(e) {}
       }
       
-      if (navigator.serviceWorker) {
-         try {
-            const reg = await navigator.serviceWorker.getRegistration();
-            if (reg && reg.pushManager) {
-               const pmState = await reg.pushManager.permissionState({ userVisibleOnly: true });
-               if (pmState) current = pmState === 'prompt' ? 'default' : pmState;
-            }
-         } catch(e) {}
-      }
-      
       setOsPermission(prev => prev !== current ? current : prev);
     };
 
@@ -383,7 +531,7 @@ if (timerState.y === 'top') {
 
     let intervalId;
     if (typeof window !== 'undefined') {
-       intervalId = setInterval(checkPermission, 1500);
+       intervalId = setInterval(checkPermission, 2500);
        window.addEventListener('focus', checkPermission);
        window.addEventListener('visibilitychange', () => {
           if (document.visibilityState === 'visible') checkPermission();
@@ -398,39 +546,97 @@ if (timerState.y === 'top') {
     };
   }, []);
 
-  const sendNotification = async (targetUsername, title, body, type = 'general', relatedPostId = null) => {
-    if (!targetUsername || targetUsername === currentUser) return;
-    const targetUser = accountsInfo[targetUsername];
-    if (!targetUser) return;
+  // =========================================================
+  // 新・統合通知配信エンジン (Firestoreリアルタイム通知 + 多端末WebPush)
+  // =========================================================
+  const sendNotification = useCallback(async (targetUsername, title, body, type = 'general', relatedPostId = null, options = {}) => {
+    const { allowSelf = false, fromUserOverride = null } = options;
+    if (!targetUsername || !db) return { inAppSuccess: false, pushSuccess: false };
+    if (!allowSelf && targetUsername === currentUser) return { inAppSuccess: false, pushSuccess: false };
 
-    if (type === 'post' && targetUser.notifyPost === false) return;
-    if (type === 'comment' && targetUser.notifyComment === false) return;
-    if (type === 'like' && targetUser.notifyLike === false) return;
-
+    // accountsInfoにまだ読み込まれていない相手（フレンドコード検索からの申請等）でも確実に届くようFirestoreから最新データを取得
+    let targetUser = accountsInfo[targetUsername] || null;
     try {
-      const notifId = `notif_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      const targetDocSnap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', targetUsername));
+      if (targetDocSnap.exists()) {
+        targetUser = targetDocSnap.data();
+      }
+    } catch (e) {
+      // オフライン等の場合はキャッシュされたaccountsInfoを使用
+    }
+    if (!targetUser) return { inAppSuccess: false, pushSuccess: false };
+
+    // 受信側のカテゴリ別通知設定を判定
+    if (type === 'post' && targetUser.notifyPost === false) return { inAppSuccess: false, pushSuccess: false };
+    if (type === 'comment' && targetUser.notifyComment === false) return { inAppSuccess: false, pushSuccess: false };
+    if (type === 'like' && targetUser.notifyLike === false) return { inAppSuccess: false, pushSuccess: false };
+
+    const senderId = fromUserOverride || currentUser || 'system';
+    const notifId = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    let inAppSuccess = false;
+    let pushSuccess = false;
+
+    // 1. アプリ内通知ドキュメントをFirestoreへ保存
+    try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notifications', notifId), {
         targetUser: targetUsername,
-        fromUser: currentUser,
+        fromUser: senderId,
         type,
         title,
         message: body,
-        postId: relatedPostId,
+        postId: relatedPostId || null,
+        read: false,
         timestamp: Date.now()
       });
-    } catch (e) { console.error('Firestore notif error:', e); }
+      inAppSuccess = true;
+    } catch (e) {
+      console.error('Firestore notification write error:', e);
+    }
 
-    if (targetUser.fcmToken) {
+    // 2. 登録されているすべての端末トークン（fcmTokens配列 + fcmToken）へFCMプッシュ通知を送信
+    const targetTokens = [...new Set([
+      ...(Array.isArray(targetUser.fcmTokens) ? targetUser.fcmTokens : []),
+      targetUser.fcmToken
+    ].filter(t => typeof t === 'string' && t.trim().length > 0))];
+
+    if (targetTokens.length > 0) {
       try {
-        await fetch('/api/sendPush', {
+        const res = await fetch('/api/sendPush', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ targetToken: targetUser.fcmToken, title, body })
+          body: JSON.stringify({
+            targetToken: targetTokens[targetTokens.length - 1],
+            targetTokens,
+            title,
+            body,
+            data: {
+              type,
+              postId: relatedPostId || '',
+              fromUser: senderId,
+              notifId,
+              url: '/'
+            }
+          })
         });
-      } catch (e) { console.error('Push error:', e); }
+        if (res.ok) {
+          const resJson = await res.json().catch(() => ({}));
+          pushSuccess = Boolean(resJson.success);
+          // 無効化された古いトークンがあれば自動的にFirestoreからクリーンアップ
+          if (Array.isArray(resJson.invalidTokens) && resJson.invalidTokens.length > 0) {
+            const validTokens = targetTokens.filter(t => !resJson.invalidTokens.includes(t));
+            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', targetUsername), {
+              fcmTokens: validTokens,
+              fcmToken: validTokens.length > 0 ? validTokens[validTokens.length - 1] : deleteField()
+            }, { merge: true }).catch(() => {});
+          }
+        }
+      } catch (e) {
+        console.warn('Push API call error:', e);
+      }
     }
-  };
 
+    return { inAppSuccess, pushSuccess, tokenCount: targetTokens.length };
+  }, [accountsInfo, currentUser]);
 
   const handleAddComment = async (postId, text, parentId = null) => {
     if (!currentUser || !db || !text.trim()) return;
@@ -562,7 +768,7 @@ if (timerState.y === 'top') {
     }
   }, [firebaseUser, dataLoaded.accounts, currentUser]);
 
-  // 毎起動時（およびフォアグラウンド復帰時）にプッシュ通知トークンを必ず再取得して最新化する
+  // 起動時・ログイン時にプッシュ通知トークンを安全に同期する（他端末のトークンを上書き消去しない）
   useEffect(() => {
     if (!currentUser) {
       hasRefreshedTokenForUser.current = null;
@@ -573,7 +779,6 @@ if (timerState.y === 'top') {
     const myData = accountsInfo[currentUser];
     if (!myData) return;
 
-    // ReactNativeWebView環境の場合は起動ごとにネイティブ側へ最新トークンを要求
     if (window.ReactNativeWebView && hasRefreshedTokenForUser.current !== currentUser) {
       hasRefreshedTokenForUser.current = currentUser;
       try {
@@ -582,46 +787,27 @@ if (timerState.y === 'top') {
     }
 
     if ('Notification' in window) {
-      if (Notification.permission === 'denied' && myData.fcmToken) {
-        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { fcmToken: deleteField() }, { merge: true }).catch(()=>{});
-      }
-
       if (Notification.permission === 'granted') {
-        // 毎起動時（ログインユーザーごと）に必ずトークンを再取得してFirestoreを更新
         if (hasRefreshedTokenForUser.current !== currentUser) {
           hasRefreshedTokenForUser.current = currentUser;
-          const refreshPushToken = async () => {
-            try {
-              const messaging = getMessaging(app);
-              const token = await getToken(messaging, { vapidKey: VAPID_PUBLIC_KEY });
-              if (token) {
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), {
-                  fcmToken: token,
-                  fcmTokenUpdatedAt: Date.now()
-                }, { merge: true });
-              }
-            } catch (e) {
-              console.warn('FCM token refresh failed:', e);
+          registerSwAndFetchToken().then((token) => {
+            if (token) {
+              saveTokenToUserAccount(currentUser, token);
             }
-          };
-          refreshPushToken();
+          });
         }
       } else {
         const hasPromptedThisSession = sessionStorage.getItem('withfit_push_prompted');
         if (!hasPromptedThisSession) {
-          if (!myData.fcmToken && Notification.permission === 'default') {
+          if (Notification.permission === 'default') {
             setPushPromptType('request');
-            const timer = setTimeout(() => { setShowPushPrompt(true); sessionStorage.setItem('withfit_push_prompted', 'true'); }, 1500);
-            return () => clearTimeout(timer);
-          } else if (Notification.permission === 'denied') {
-            setPushPromptType('warning');
             const timer = setTimeout(() => { setShowPushPrompt(true); sessionStorage.setItem('withfit_push_prompted', 'true'); }, 1500);
             return () => clearTimeout(timer);
           }
         }
       }
     }
-  }, [currentUser, dataLoaded.accounts, accountsInfo]);
+  }, [currentUser, dataLoaded.accounts, accountsInfo, registerSwAndFetchToken, saveTokenToUserAccount]);
 
   useEffect(() => {
     if (currentUser && db) {
@@ -853,7 +1039,8 @@ if (timerState.y === 'top') {
     const myFriends = accountsInfo[currentUser].friends || [];
     const friendRequests = accountsInfo[currentUser].friendRequests || [];
     const partnerRequests = accountsInfo[currentUser].partnerRequests || [];
-    const targetUsers = [...new Set([...myFriends, ...friendRequests, ...partnerRequests])];
+    const jointRequests = accountsInfo[currentUser].jointTrainingRequests || [];
+    const targetUsers = [...new Set([...myFriends, ...friendRequests, ...partnerRequests, ...jointRequests])];
     
     const unsubs = [];
     targetUsers.forEach(fId => {
@@ -865,7 +1052,7 @@ if (timerState.y === 'top') {
        }));
     });
     return () => unsubs.forEach(u => u());
-  }, [db, currentUser, accountsInfo[currentUser]?.friends?.join(','), accountsInfo[currentUser]?.friendRequests?.join(','), accountsInfo[currentUser]?.partnerRequests?.join(',')]);
+  }, [db, currentUser, accountsInfo[currentUser]?.friends?.join(','), accountsInfo[currentUser]?.friendRequests?.join(','), accountsInfo[currentUser]?.partnerRequests?.join(','), accountsInfo[currentUser]?.jointTrainingRequests?.join(',')]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -1033,8 +1220,8 @@ if (timerState.y === 'top') {
     if (!window.confirm("ログアウトしますか？")) return;
     if (currentUser && db) {
       try {
-        // ログアウト時に通知トークンを削除し、他のアカウントに通知が届かないようにする
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isAppOnline: false, lastActive: Date.now(), fcmToken: deleteField() }, { merge: true });
+        await removeDeviceTokenFromUserAccount(currentUser);
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isAppOnline: false, lastActive: Date.now() }, { merge: true });
       } catch (e) {}
     }
     localStorage.removeItem('withfit_login_session');
@@ -1150,7 +1337,9 @@ if (timerState.y === 'top') {
     if (!window.confirm(`${accountsInfo[partnerId]?.displayName || partnerId}さんに合トレを申請しますか？`)) return;
     const targetRequests = accountsInfo[partnerId]?.jointTrainingRequests || [];
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', partnerId), { jointTrainingRequests: [...new Set([...targetRequests, currentUser])] }, { merge: true });
-    alert('申請を送信しました。');
+    const authorName = accountsInfo[currentUser]?.displayName || currentUser;
+    sendNotification(partnerId, '🔥 合トレ申請', `${authorName}さんから合トレの申請が届きました！`, 'joint');
+    alert('合トレ申請を送信しました。');
   };
 
   const handleAcceptJointTraining = async (requesterId) => {
@@ -1167,6 +1356,8 @@ if (timerState.y === 'top') {
     const myRequests = myInfo.jointTrainingRequests || [];
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { jointPartnerId: requesterId, currentWorkoutItems: newMItems, jointTrainingRequests: myRequests.filter(id => id !== requesterId) }, { merge: true });
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', requesterId), { jointPartnerId: currentUser, currentWorkoutItems: newPItems }, { merge: true });
+    const authorName = accountsInfo[currentUser]?.displayName || currentUser;
+    sendNotification(requesterId, '🔥 合トレ開始！', `${authorName}さんが合トレ申請を承諾しました！`, 'joint');
   };
 
   const handleRejectJointTraining = async (requesterId) => {
@@ -1235,14 +1426,14 @@ if (timerState.y === 'top') {
         const authorName = myInfo.displayName || currentUser;
         const gymName = allGyms.find(g => g.id === myInfo.currentGymId)?.name || 'ジム';
         myFriends.forEach(friendId => {
-          sendNotification(friendId, '🔥 トレーニング開始！', `${authorName}さんが${gymName}でトレーニングを開始しました！`, 'general');
+          sendNotification(friendId, '🔥 トレーニング開始！', `${authorName}さんが${gymName}でトレーニングを開始しました！`, 'post');
         });
       } catch (e) { console.error(e); }
     };
 
     if (timeUntilNotify <= 0) { sendStartNotification(); } 
     else { const timer = setTimeout(sendStartNotification, timeUntilNotify); return () => clearTimeout(timer); }
-  }, [currentUser, db, myInfo?.isTraining, myInfo?.trainingStartTime, myInfo?.hasSentStartNotification, myInfo?.friends, myInfo?.displayName, myInfo?.currentGymId, allGyms]);
+  }, [currentUser, db, myInfo?.isTraining, myInfo?.trainingStartTime, myInfo?.hasSentStartNotification, myInfo?.friends, myInfo?.displayName, myInfo?.currentGymId, allGyms, sendNotification]);
 
   useEffect(() => {
     if (!currentUser || !db || !myInfo?.isTraining || !myInfo?.trainingStartTime) return;
@@ -1255,23 +1446,22 @@ if (timerState.y === 'top') {
     const sendForgotNotification = async () => {
       try {
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { hasSentForgotNotification: true }, { merge: true });
-        const token = myInfo.fcmToken;
-        if (token) {
-          fetch('/api/sendPush', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ targetToken: token, title: '⏳ 記録忘れはありませんか？', body: '開始または最後の記録から30分以上経過しています。終了する場合は記録を保存してください。' })
-          }).catch(console.error);
-        }
-        const notifId = `notif_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notifications', notifId), { targetUser: currentUser, fromUser: 'system', type: 'general', title: '⏳ 記録忘れはありませんか？', message: '開始または最後の記録から30分以上経過しています。終了する場合は記録を保存してください。', timestamp: Date.now() });
+        await sendNotification(
+          currentUser,
+          '⏳ 記録忘れはありませんか？',
+          '開始または最後の記録から30分以上経過しています。終了する場合は記録を保存してください。',
+          'reminder',
+          null,
+          { allowSelf: true, fromUserOverride: 'system' }
+        );
       } catch (e) { console.error(e); }
     };
 
     if (timeUntilNotify <= 0) { sendForgotNotification(); } 
     else { const timer = setTimeout(sendForgotNotification, timeUntilNotify); return () => clearTimeout(timer); }
-  }, [currentUser, db, myInfo?.isTraining, myInfo?.trainingStartTime, myInfo?.lastActive, myInfo?.draftUpdatedAt, myInfo?.hasSentForgotNotification, myInfo?.fcmToken]);
+  }, [currentUser, db, myInfo?.isTraining, myInfo?.trainingStartTime, myInfo?.lastActive, myInfo?.draftUpdatedAt, myInfo?.hasSentForgotNotification, sendNotification]);
 
+  // リアルタイム通知購読 ＆ 新着通知のトーストバナー/ローカルSW通知発火
   const [notifications, setNotifications] = useState([]);
   useEffect(() => {
     if (!db || !currentUser) return;
@@ -1279,12 +1469,49 @@ if (timerState.y === 'top') {
     const q = query(notifsRef, where('targetUser', '==', currentUser));
     const unsub = onSnapshot(q, (snapshot) => {
       const data = [];
-      snapshot.forEach(doc => data.push({ id: doc.id, ...doc.data() }));
-      data.sort((a, b) => b.timestamp - a.timestamp);
-      setNotifications(data.slice(0, 30));
+      snapshot.forEach(d => data.push({ id: d.id, ...d.data() }));
+      data.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      setNotifications(data.slice(0, 40));
+
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const notif = { id: change.doc.id, ...change.doc.data() };
+          if (
+            notif.timestamp &&
+            notif.timestamp > mountTimeRef.current &&
+            !shownToastIdsRef.current.has(notif.id)
+          ) {
+            shownToastIdsRef.current.add(notif.id);
+            showInAppToast(notif);
+
+            // アプリがバックグラウンドにある場合はService Worker経由でローカルOS通知も補助表示（tagで重複排除）
+            if (
+              typeof document !== 'undefined' &&
+              document.visibilityState === 'hidden' &&
+              typeof Notification !== 'undefined' &&
+              Notification.permission === 'granted' &&
+              'serviceWorker' in navigator
+            ) {
+              navigator.serviceWorker.ready.then((reg) => {
+                reg.showNotification(notif.title || 'WithFit', {
+                  body: notif.message || '',
+                  icon: '/logo192.png',
+                  badge: '/logo192.png',
+                  tag: notif.id,
+                  data: {
+                    type: notif.type || 'general',
+                    postId: notif.postId || '',
+                    url: '/'
+                  }
+                }).catch(() => {});
+              }).catch(() => {});
+            }
+          }
+        }
+      });
     });
     return () => unsub();
-  }, [db, currentUser]);
+  }, [db, currentUser, showInAppToast]);
 
   // 単一種目を過去データから現在の記録中メニューに追加するヘルパー
   const formatItemForImport = (item) => {
@@ -1430,11 +1657,11 @@ if (timerState.y === 'top') {
     }
   };
 
-  const unreadNotifs = notifications.filter(n => n.timestamp > (myInfo.lastNotificationCheck || 0));
+  const unreadNotifs = notifications.filter(n => !n.read && n.timestamp > (myInfo.lastNotificationCheck || 0));
   const unreadNotificationCount = unreadNotifs.length;
   const unreadLikes = unreadNotifs.filter(n => n.type === 'like').length;
   const unreadComments = unreadNotifs.filter(n => n.type === 'comment').length;
-  const unreadRequests = unreadNotifs.filter(n => n.type === 'request').length;
+  const unreadRequests = unreadNotifs.filter(n => n.type === 'request' || n.type === 'joint').length;
 
   const handleOpenNotifications = () => {
     setShowNotifications(!showNotifications);
@@ -1443,14 +1670,50 @@ if (timerState.y === 'top') {
     }
   };
 
+  const handleMarkAllNotificationsRead = async () => {
+    if (!db || !currentUser) return;
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { lastNotificationCheck: Date.now() }, { merge: true });
+      const unreadDocs = notifications.filter(n => !n.read);
+      await Promise.all(
+        unreadDocs.map(n => setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notifications', n.id), { read: true }, { merge: true }).catch(() => {}))
+      );
+    } catch (e) {}
+  };
+
+  const handleDeleteNotification = async (e, notifId) => {
+    if (e) e.stopPropagation();
+    if (!db || !notifId) return;
+    try {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notifications', notifId));
+    } catch (err) {}
+  };
+
+  const handleClearAllNotifications = async () => {
+    if (!db || !currentUser || notifications.length === 0) return;
+    if (!window.confirm('通知履歴をすべて消去しますか？')) return;
+    try {
+      await Promise.all(
+        notifications.map(n => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notifications', n.id)).catch(() => {}))
+      );
+    } catch (err) {}
+  };
+
   const handleNotificationClick = (notif) => {
+    if (!notif) return;
     setShowNotifications(false);
-    if (notif.type === 'request') {
-       setCurrentTab('friends');
-       setTargetFriendTab(notif.title.includes('パートナー') ? 'partner' : 'friends');
+    setActiveToast(null);
+    if (db && notif.id && !String(notif.id).startsWith('fcm_')) {
+      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notifications', notif.id), { read: true }, { merge: true }).catch(() => {});
+    }
+    if (notif.type === 'joint' || notif.type === 'reminder') {
+      setCurrentTab('record');
+    } else if (notif.type === 'request') {
+      setCurrentTab('friends');
+      setTargetFriendTab(notif.title?.includes('パートナー') ? 'partner' : 'friends');
     } else if (notif.postId) {
-       setCurrentTab('timeline');
-       setScrollToPostId(notif.postId);
+      setCurrentTab('timeline');
+      setScrollToPostId(notif.postId);
     }
   };
 
@@ -1497,9 +1760,9 @@ if (timerState.y === 'top') {
 
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', friendUsername), { friendRequests: [...targetRequests, currentUser] }, { merge: true });
-      alert(`${friendData.displayName || friendUsername}さんにフレンド申請を送信しました！`);
       const authorName = accountsInfo[currentUser]?.displayName || currentUser;
-      sendNotification(friendUsername, '🤝 フレンド申請', `${authorName}さんからフレンド申請が届きました`, 'request');
+      await sendNotification(friendUsername, '🤝 フレンド申請', `${authorName}さんからフレンド申請が届きました`, 'request');
+      alert(`${friendData.displayName || friendUsername}さんにフレンド申請を送信しました！`);
     } catch (e) {}
   };
 
@@ -1531,9 +1794,9 @@ if (timerState.y === 'top') {
     if (!window.confirm(`${partnerData.displayName || partnerUsername}さんにパートナー申請を送りますか？`)) return;
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', partnerUsername), { partnerRequests: [...new Set([...targetRequests, currentUser])] }, { merge: true });
-      alert(`${partnerData.displayName || partnerUsername}さんにパートナー申請を送信しました！`);
       const authorName = accountsInfo[currentUser]?.displayName || currentUser;
-      sendNotification(partnerUsername, '🤝 パートナー申請', `${authorName}さんからパートナー申請が届きました`, 'request');
+      await sendNotification(partnerUsername, '🤝 パートナー申請', `${authorName}さんからパートナー申請が届きました`, 'request');
+      alert(`${partnerData.displayName || partnerUsername}さんにパートナー申請を送信しました！`);
     } catch (e) {}
   };
 
@@ -1572,7 +1835,8 @@ if (timerState.y === 'top') {
     if (!currentUser || !db) return;
     const myFriends = myInfo.friends || [];
     const myRequests = myInfo.friendRequests || [];
-    const requesterFriends = accountsInfo[requesterUsername]?.friends || [];
+    const requesterSnap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', requesterUsername)).catch(() => null);
+    const requesterFriends = (requesterSnap && requesterSnap.exists() ? requesterSnap.data().friends : accountsInfo[requesterUsername]?.friends) || [];
     
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { 
@@ -1615,42 +1879,81 @@ if (timerState.y === 'top') {
     } catch (e) {}
   };
 
+  // プッシュ通知のON/OFF切り替え
   const handleTogglePushPermission = async (isCurrentlyOn) => {
     if (!currentUser || !db || !app) return;
     if (isCurrentlyOn) {
-      try {
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { fcmToken: deleteField() }, { merge: true });
-        alert('プッシュ通知をオフにしました。');
-      } catch (error) {
-        console.error('Push toggle error:', error);
-      }
-    } else {
-      if (typeof window !== 'undefined' && window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'REQUEST_PUSH_PERMISSION' }));
-        setShowPushPrompt(false);
-        return;
-      }
-      try {
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-          const messaging = getMessaging(app);
-          const token = await getToken(messaging, { vapidKey: VAPID_PUBLIC_KEY });
-          if (token) {
-            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), {
-              fcmToken: token,
-              fcmTokenUpdatedAt: Date.now()
-            }, { merge: true });
-            alert('プッシュ通知をオンにしました。');
-          }
+      await removeDeviceTokenFromUserAccount(currentUser);
+      alert('この端末のプッシュ通知をオフにしました。');
+      return;
+    }
+
+    if (typeof window !== 'undefined' && window.ReactNativeWebView) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'REQUEST_PUSH_PERMISSION' }));
+      setShowPushPrompt(false);
+      return;
+    }
+
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      alert('お使いのブラウザはWebプッシュ通知に対応していません。iPhoneの場合はSafariの「ホーム画面に追加」から開いてください。');
+      setShowPushPrompt(false);
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      setOsPermission(permission);
+      if (permission === 'granted') {
+        const token = await registerSwAndFetchToken();
+        if (token) {
+          await saveTokenToUserAccount(currentUser, token);
+          alert('プッシュ通知をオンにしました！');
         } else {
-          alert('通知が許可されませんでした。端末の設定から許可してください。');
+          alert('通知権限は許可されましたが、トークンの取得に失敗しました。通信環境をご確認のうえ再試行してください。');
         }
-      } catch (error) {
-        console.error('Push permission error:', error);
-        alert('通知の設定に失敗しました。');
-      } finally {
-        setShowPushPrompt(false);
+      } else {
+        alert('通知が許可されませんでした。端末またはブラウザの設定から許可してください。');
       }
+    } catch (error) {
+      console.error('Push permission error:', error);
+      alert('通知の設定中にエラーが発生しました。');
+    } finally {
+      setShowPushPrompt(false);
+    }
+  };
+
+  const handleRefreshPushToken = async () => {
+    if (!currentUser) return;
+    if (typeof window !== 'undefined' && window.ReactNativeWebView) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'REQUEST_PUSH_TOKEN' }));
+      alert('ネイティブ端末の通知トークンを再同期しました。');
+      return;
+    }
+    const token = await registerSwAndFetchToken();
+    if (token) {
+      await saveTokenToUserAccount(currentUser, token);
+      alert('通知トークンを最新の状態に再同期しました！');
+    } else {
+      alert('トークンの再取得に失敗しました。');
+    }
+  };
+
+  const handleSendSelfTestPush = async () => {
+    if (!currentUser) return;
+    const res = await sendNotification(
+      currentUser,
+      '🔔 通知システムテスト',
+      'WithFitの新しい通知システムが正常に稼働しています！',
+      'general',
+      null,
+      { allowSelf: true }
+    );
+    if (res.pushSuccess) {
+      alert('テスト通知（アプリ内＋プッシュ通知）を送信しました！');
+    } else if (res.inAppSuccess) {
+      alert('アプリ内テスト通知を送信しました！（※サーバー環境変数が未設定またはローカル環境のため、アプリ内バナーで表示されます）');
+    } else {
+      alert('テスト通知の送信に失敗しました。');
     }
   };
 
@@ -1758,6 +2061,25 @@ if (timerState.y === 'top') {
   
   const visiblePosts = posts.filter(p => p.author === currentUser || myFriends.includes(p.author));
 
+  const userTokenList = Array.isArray(myInfo.fcmTokens)
+    ? myInfo.fcmTokens
+    : (myInfo.fcmToken ? [myInfo.fcmToken] : []);
+  const isDeviceRegistered = Boolean(
+    (deviceFcmToken && userTokenList.includes(deviceFcmToken)) ||
+    (osPermission === 'granted' && userTokenList.length > 0)
+  );
+  const isIosNotStandalone = typeof window !== 'undefined' &&
+    /iPad|iPhone|iPod/.test(navigator.userAgent || '') &&
+    !window.navigator.standalone &&
+    !window.matchMedia('(display-mode: standalone)').matches;
+
+  const pushStatus = {
+    permission: osPermission,
+    isSupported: isPushSupported,
+    isDeviceRegistered,
+    isIosNotStandalone
+  };
+
   return (
     <div className={`min-h-screen font-sans pb-32 overflow-x-hidden select-none transition-colors duration-300 ${isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'} ${themeContainerClass}`}>
       <style>{`
@@ -1830,6 +2152,42 @@ if (timerState.y === 'top') {
           }
         `}</style>
       )}
+
+      {/* リアルタイム新着通知フローティングトーストバナー */}
+      {activeToast && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[120] w-[calc(100%-24px)] max-w-sm animate-in slide-in-from-top-5 fade-in duration-200">
+          <div
+            onClick={() => handleNotificationClick(activeToast)}
+            className="bg-slate-900/95 dark:bg-slate-800/95 text-white backdrop-blur-md border border-slate-700/80 rounded-2xl p-3.5 shadow-2xl flex items-center gap-3 cursor-pointer"
+          >
+            <div className="relative shrink-0">
+              {activeToast.fromUser && activeToast.fromUser !== 'system' ? (
+                <UserAvatar userId={activeToast.fromUser} accountsInfo={accountsInfo} size={38} className="border-transparent" />
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <Bell size={18} />
+                </div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              {activeToast.title && (
+                <p className="text-xs font-extrabold text-emerald-400 truncate">{activeToast.title}</p>
+              )}
+              <p className="text-xs font-bold text-slate-100 line-clamp-2 leading-snug mt-0.5">
+                {activeToast.message}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setActiveToast(null); }}
+              className="p-1.5 text-slate-400 hover:text-white rounded-full shrink-0"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
       <header className="fixed top-0 left-0 right-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-30 shadow-sm flex flex-col transition-colors">
         <div className="p-4 flex justify-between items-center relative">
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-1">
@@ -1839,13 +2197,18 @@ if (timerState.y === 'top') {
             <button onClick={handleOpenNotifications} className="relative p-1.5 text-slate-400 hover:text-emerald-500 dark:hover:text-emerald-400 transition-colors">
               <Bell size={20} />
               {unreadNotificationCount > 0 && (
-                <div className="absolute top-10 right-0 bg-rose-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1.5 shadow-sm whitespace-nowrap z-50 pointer-events-none animate-in zoom-in duration-200">
-                  <div className="absolute -top-1.5 right-3.5 w-0 h-0 border-l-[5px] border-l-transparent border-b-[6px] border-b-rose-500 border-r-[5px] border-r-transparent"></div>
-                  {unreadLikes > 0 && <span className="flex items-center gap-0.5"><Heart size={10} fill="currentColor" /> {unreadLikes}</span>}
-                  {unreadComments > 0 && <span className="flex items-center gap-0.5"><MessageCircle size={10} fill="currentColor" /> {unreadComments}</span>}
-                  {unreadRequests > 0 && <span className="flex items-center gap-0.5"><UserPlus size={10} fill="currentColor" /> {unreadRequests}</span>}
-                  {unreadLikes === 0 && unreadComments === 0 && unreadRequests === 0 && <span>{unreadNotificationCount}</span>}
-                </div>
+                <>
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
+                    {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                  </span>
+                  <div className="absolute top-10 right-0 bg-rose-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1.5 shadow-sm whitespace-nowrap z-50 pointer-events-none animate-in zoom-in duration-200">
+                    <div className="absolute -top-1.5 right-3.5 w-0 h-0 border-l-[5px] border-l-transparent border-b-[6px] border-b-rose-500 border-r-[5px] border-r-transparent"></div>
+                    {unreadLikes > 0 && <span className="flex items-center gap-0.5"><Heart size={10} fill="currentColor" /> {unreadLikes}</span>}
+                    {unreadComments > 0 && <span className="flex items-center gap-0.5"><MessageCircle size={10} fill="currentColor" /> {unreadComments}</span>}
+                    {unreadRequests > 0 && <span className="flex items-center gap-0.5"><UserPlus size={10} fill="currentColor" /> {unreadRequests}</span>}
+                    {unreadLikes === 0 && unreadComments === 0 && unreadRequests === 0 && <span>{unreadNotificationCount}</span>}
+                  </div>
+                </>
               )}
             </button>
             <div onClick={handleHeaderOnlineTap} className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-950 px-2 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 cursor-pointer select-none">
@@ -1894,39 +2257,122 @@ if (timerState.y === 'top') {
         {showNotifications && (
           <>
           <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)}></div>
-          <div className="absolute top-16 right-4 w-72 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div className="absolute top-16 right-3 w-80 max-w-[calc(100vw-24px)] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="p-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 font-bold text-sm text-slate-700 dark:text-slate-300 flex justify-between items-center">
-              <span>通知</span>
-              {unreadNotificationCount > 0 && <span className="text-[10px] bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded-full">{unreadNotificationCount}件の未読</span>}
+              <div className="flex items-center gap-2">
+                <Bell size={15} className="text-emerald-500" />
+                <span>通知センター</span>
+                {unreadNotificationCount > 0 && (
+                  <span className="text-[10px] bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-400 px-1.5 py-0.5 rounded-full">
+                    {unreadNotificationCount}件未読
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5">
+                {notifications.some(n => !n.read) && (
+                  <button
+                    type="button"
+                    onClick={handleMarkAllNotificationsRead}
+                    className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline px-1.5 py-0.5"
+                  >
+                    すべて既読
+                  </button>
+                )}
+                {notifications.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClearAllNotifications}
+                    className="text-[10px] font-bold text-slate-400 hover:text-rose-500 px-1.5 py-0.5"
+                    title="履歴をすべて消去"
+                  >
+                    クリア
+                  </button>
+                )}
+              </div>
             </div>
+
+            {!isDeviceRegistered && osPermission !== 'denied' && (
+              <div className="px-3 py-2 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200/70 dark:border-amber-900/60 flex items-center justify-between gap-2">
+                <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300">
+                  プッシュ通知がオフです
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleTogglePushPermission(false)}
+                  className="shrink-0 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg shadow-sm transition-colors"
+                >
+                  オンにする
+                </button>
+              </div>
+            )}
+
             <div className="max-h-80 overflow-y-auto p-2 space-y-1">
                {notifications.length === 0 ? (
-                  <div className="text-center text-xs text-slate-400 p-4">通知はありません</div>
+                  <div className="text-center text-xs font-bold text-slate-400 py-8">通知はありません</div>
                ) : (
                   notifications.map(notif => {
-                     const isUnread = notif.timestamp > (myInfo.lastNotificationCheck || 0);
+                     const isUnread = !notif.read && notif.timestamp > (myInfo.lastNotificationCheck || 0);
                      return (
-                       <div key={notif.id} onClick={() => handleNotificationClick(notif)} className={`flex gap-3 items-center p-2 rounded-xl cursor-pointer transition-colors ${isUnread ? 'bg-emerald-50/50 dark:bg-emerald-950/20 hover:bg-emerald-100/50 dark:hover:bg-emerald-950/40' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                       <div
+                         key={notif.id}
+                         onClick={() => handleNotificationClick(notif)}
+                         className={`flex gap-3 items-start p-2.5 rounded-xl cursor-pointer transition-colors group ${
+                           isUnread
+                             ? 'bg-emerald-50/60 dark:bg-emerald-950/30 hover:bg-emerald-100/60 dark:hover:bg-emerald-950/50'
+                             : 'hover:bg-slate-50 dark:hover:bg-slate-800/70'
+                         }`}
+                       >
                           <div className="relative shrink-0 mt-0.5">
-                             <UserAvatar userId={notif.fromUser} accountsInfo={accountsInfo} size={36} className="border-transparent" />
+                             {notif.fromUser && notif.fromUser !== 'system' ? (
+                               <UserAvatar userId={notif.fromUser} accountsInfo={accountsInfo} size={36} className="border-transparent" />
+                             ) : (
+                               <div className="w-9 h-9 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-500 flex items-center justify-center">
+                                 <Bell size={16} />
+                               </div>
+                             )}
                              {notif.type === 'like' && (
                                 <div className="absolute -bottom-0.5 -right-0.5 bg-rose-500 text-white w-4 h-4 rounded-full flex items-center justify-center border-[1.5px] border-white dark:border-slate-900 shadow-sm">
-                                   <Heart size={7} fill="currentColor" />
+                                   <Heart size={8} fill="currentColor" />
                                 </div>
                              )}
                              {notif.type === 'comment' && (
                                 <div className="absolute -bottom-0.5 -right-0.5 bg-emerald-500 text-white w-4 h-4 rounded-full flex items-center justify-center border-[1.5px] border-white dark:border-slate-900 shadow-sm">
-                                   <MessageCircle size={7} fill="currentColor" />
+                                   <MessageCircle size={8} fill="currentColor" />
+                                </div>
+                             )}
+                             {(notif.type === 'request' || notif.type === 'joint') && (
+                                <div className="absolute -bottom-0.5 -right-0.5 bg-indigo-500 text-white w-4 h-4 rounded-full flex items-center justify-center border-[1.5px] border-white dark:border-slate-900 shadow-sm">
+                                   <UserPlus size={8} />
+                                </div>
+                             )}
+                             {notif.type === 'post' && (
+                                <div className="absolute -bottom-0.5 -right-0.5 bg-amber-500 text-white w-4 h-4 rounded-full flex items-center justify-center border-[1.5px] border-white dark:border-slate-900 shadow-sm">
+                                   <Flame size={8} fill="currentColor" />
                                 </div>
                              )}
                           </div>
                           <div className="flex-1 min-w-0">
-                             <p className="text-xs font-bold text-slate-800 dark:text-slate-200 break-words whitespace-pre-wrap">
+                             {notif.title && (
+                               <p className="text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400 truncate mb-0.5">
+                                 {notif.title}
+                               </p>
+                             )}
+                             <p className="text-xs font-bold text-slate-800 dark:text-slate-200 break-words whitespace-pre-wrap leading-snug">
                                 {notif.message}
                              </p>
-                             <p className="text-[10px] text-slate-400 mt-0.5">{getRelativeTime(notif.timestamp)}</p>
+                             <p className="text-[10px] font-bold text-slate-400 mt-1">{getRelativeTime(notif.timestamp)}</p>
                           </div>
-                          {isUnread && <div className="w-2 h-2 rounded-full bg-rose-500 shrink-0"></div>}
+                          <div className="flex flex-col items-end gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteNotification(e, notif.id)}
+                              className="p-1 text-slate-300 hover:text-rose-500 rounded-full transition-colors"
+                              title="この通知を削除"
+                            >
+                              <X size={13} />
+                            </button>
+                            {isUnread && <div className="w-2 h-2 rounded-full bg-rose-500 mr-1"></div>}
+                          </div>
                        </div>
                      );
                   })
@@ -2046,27 +2492,21 @@ if (timerState.y === 'top') {
         {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} onRequestJointTraining={handleRequestJointTraining} onAcceptJointTraining={handleAcceptJointTraining} onRejectJointTraining={handleRejectJointTraining} onCancelJointTraining={handleCancelJointTraining} onImportItem={handleImportExerciseItem} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} onImportItem={handleImportExerciseItem} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} onOpenCoach={() => setShowCoachChat(true)} />}
         {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onSendPartnerRequest={handleSendPartnerRequest} onAcceptPartnerRequest={handleAcceptPartnerRequest} onRejectPartnerRequest={handleRejectPartnerRequest} onRemovePartner={handleRemovePartner} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} posts={posts} targetFriendTab={targetFriendTab} setTargetFriendTab={setTargetFriendTab} onImport={handleImportWorkout} onImportItem={handleImportExerciseItem} onSendTestPush={async (targetUser, message) => {
-          if (!db) return;
-          const targetToken = accountsInfo[targetUser]?.fcmToken;
-          if (!targetToken) {
-            alert('相手の端末でプッシュ通知がオンになっていません（トークン未登録）。');
-            return;
-          }
-          try {
-            const res = await fetch('/api/sendPush', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                targetToken,
-                title: '管理者からのメッセージ',
-                body: message
-              })
-            });
-            if (!res.ok) throw new Error('送信エラーが発生しました');
-            alert('プッシュ通知を送信しました！');
-          } catch (e) {
-            console.error(e);
-            alert('送信に失敗しました。');
+          if (!db || !targetUser || !message) return;
+          const res = await sendNotification(
+            targetUser,
+            '📣 管理者からのメッセージ',
+            message,
+            'general',
+            null,
+            { allowSelf: true }
+          );
+          if (res.pushSuccess) {
+            alert(`${accountsInfo[targetUser]?.displayName || targetUser}さんへプッシュ通知とアプリ内通知を送信しました！`);
+          } else if (res.inAppSuccess) {
+            alert(`${accountsInfo[targetUser]?.displayName || targetUser}さんへアプリ内通知を送信しました！（※Push登録端末数: ${res.tokenCount || 0}台）`);
+          } else {
+            alert('通知の送信に失敗しました。');
           }
         }} />}
       </main>
@@ -2108,12 +2548,9 @@ if (timerState.y === 'top') {
                 <div className="w-16 h-16 bg-rose-100 dark:bg-rose-950/50 rounded-full flex items-center justify-center mb-4 text-rose-500">
                   <Settings size={32} />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">通知が届かない状態です</h3>
-                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">iPhone本体の設定で通知が拒否されています。<br/>iPhoneの「設定」アプリから通知を許可してください。</p>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">通知がブロックされています</h3>
+                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">端末またはブラウザの設定で通知がオフになっています。<br/>設定アプリから通知を許可してください。</p>
                 <div className="w-full space-y-3">
-                  <button onClick={() => { setShowPushPrompt(false); alert('Webアプリ（PWA）の仕様上、ここから直接設定画面を開くことは技術的に不可能です。\nお手数ですが、iPhoneのホーム画面から「設定」アプリを開き、本アプリ（またはSafari）の通知を許可してください。'); }} className="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3.5 rounded-xl shadow-md transition-colors">
-                    本体設定からオンに設定してください
-                  </button>
                   <button onClick={() => setShowPushPrompt(false)} className="w-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold py-3.5 rounded-xl transition-colors">
                     閉じる
                   </button>
@@ -2125,13 +2562,13 @@ if (timerState.y === 'top') {
                   <Bell size={32} />
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">プッシュ通知をオンにしませんか？</h3>
-                <p className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-6">フレンドのトレーニング完了や、いいね・コメントの通知をリアルタイムで受け取ることができます。</p>
+                <p className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-6">フレンドのトレーニング開始・完了や、ナイス・コメント・合トレ申請をリアルタイムで受け取れます。</p>
                 <div className="w-full space-y-3">
                   <button onClick={() => handleTogglePushPermission(false)} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-xl shadow-md transition-colors flex items-center justify-center gap-2">
                     通知を許可する
                   </button>
                   <button onClick={() => setShowPushPrompt(false)} className="w-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold py-3.5 rounded-xl transition-colors">
-                    あとで設定する
+                    あとで設定する（プロフィール設定から可能）
                   </button>
                 </div>
               </>
@@ -2140,7 +2577,19 @@ if (timerState.y === 'top') {
         </div>
       )}
 
-      <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} userInfo={myInfo} onSave={handleSaveProfile} currentUser={currentUser} onLinkGoogle={handleLinkGoogle} onDeleteAccount={handleDeleteAccount} onTogglePush={handleTogglePushPermission} />
+      <ProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        userInfo={myInfo}
+        onSave={handleSaveProfile}
+        currentUser={currentUser}
+        onLinkGoogle={handleLinkGoogle}
+        onDeleteAccount={handleDeleteAccount}
+        onTogglePush={handleTogglePushPermission}
+        onRefreshPush={handleRefreshPushToken}
+        onSendSelfTestPush={handleSendSelfTestPush}
+        pushStatus={pushStatus}
+      />
       <UserProfileModal isOpen={!!selectedUserProfile} onClose={() => setSelectedUserProfile(null)} targetUser={selectedUserProfile} accountsInfo={accountsInfo} currentUser={currentUser} onSendRequest={handleSendFriendRequest} />
       <CoachChatModal isOpen={showCoachChat} onClose={() => setShowCoachChat(false)} currentUser={currentUser} accountsInfo={accountsInfo} posts={posts} appId={appId} />
       {showSecretGame && <SecretGame onClose={() => setShowSecretGame(false)} />}

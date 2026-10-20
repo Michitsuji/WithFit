@@ -2,14 +2,26 @@
 // ProfileModals.js — ログイン画面・プロフィール設定・ユーザープロフィールモーダル
 // ==========================================
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Activity, PlusCircle, Trash2, Settings, Sun, Moon, Droplet, Sparkles, AlertTriangle, Users, UserPlus, ChevronLeft } from 'lucide-react';
+import { X, Activity, PlusCircle, Trash2, Settings, Sun, Moon, Droplet, Sparkles, AlertTriangle, Users, UserPlus, ChevronLeft, Bell, CheckCircle, RefreshCw, Send } from 'lucide-react';
 import { GoogleAuthProvider, signInWithRedirect, getAuth, signInWithPopup } from 'firebase/auth';
 import { UserAvatar, ToggleSwitch, WithFitLogo, AdBanner } from './CommonUI';
 
 // --- プロフィール設定モーダル ---
-function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGoogle, onDeleteAccount, onTogglePush }) {
-  const isPushEnabled = !!userInfo?.fcmToken;
+function ProfileModal({
+  isOpen,
+  onClose,
+  userInfo,
+  onSave,
+  currentUser,
+  onLinkGoogle,
+  onDeleteAccount,
+  onTogglePush,
+  onRefreshPush,
+  onSendSelfTestPush,
+  pushStatus
+}) {
   const [osPermission, setOsPermission] = useState('default');
+  const [isPushBusy, setIsPushBusy] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [goal, setGoal] = useState(userInfo?.goal || '');
   const [theme, setTheme] = useState(userInfo?.theme || 'light');
@@ -37,6 +49,16 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
   const [imageObj, setImageObj] = useState(null);
   const touchRef = useRef({ startDist: 0, startScale: 1, startX: 0, startY: 0, lastX: 0, lastY: 0 });
   const isFirstMount = useRef(true);
+
+  const deviceToken = typeof window !== 'undefined' ? localStorage.getItem('withfit_device_fcm_token') : null;
+  const userTokens = Array.isArray(userInfo?.fcmTokens)
+    ? userInfo.fcmTokens
+    : (userInfo?.fcmToken ? [userInfo.fcmToken] : []);
+  const isPushEnabled = Boolean(
+    pushStatus?.isDeviceRegistered ||
+    (deviceToken && userTokens.includes(deviceToken)) ||
+    (osPermission === 'granted' && userTokens.length > 0)
+  );
 
   useEffect(() => {
     if (!isOpen) {
@@ -75,13 +97,10 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
       setDeleteAgreed(false);
       if (typeof window !== 'undefined') {
         const checkModalPermission = async () => {
-          let current = 'default';
+          let current = pushStatus?.permission || 'default';
           if ('Notification' in window) current = Notification.permission;
           if (navigator.permissions && navigator.permissions.query) {
             try { const status = await navigator.permissions.query({ name: 'notifications' }); if (status && status.state) current = status.state === 'prompt' ? 'default' : status.state; } catch(e) {}
-          }
-          if (navigator.serviceWorker) {
-            try { const reg = await navigator.serviceWorker.getRegistration(); if (reg && reg.pushManager) { const pmState = await reg.pushManager.permissionState({ userVisibleOnly: true }); if (pmState) current = pmState === 'prompt' ? 'default' : pmState; } } catch(e) {}
           }
           setOsPermission(current);
         };
@@ -166,8 +185,17 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
     setImageObj(null);
   };
 
-  const handleSave = () => {
-    onSave({ displayName: displayName.trim() || currentUser, photoUrl, userColor, goal: goal.trim(), theme, birthDate, gender, height: Number(height)||null, weight: Number(weight)||null, hideBodyMetrics, enablePartnerFeature, notifyPost, notifyComment, notifyLike }, true);
+  const handlePushAction = async (actionFn) => {
+    if (!actionFn || isPushBusy) return;
+    setIsPushBusy(true);
+    try {
+      await actionFn();
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        setOsPermission(Notification.permission);
+      }
+    } finally {
+      setIsPushBusy(false);
+    }
   };
 
   if (cropImageSrc) {
@@ -223,8 +251,6 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
                 Googleアカウントと連携
              </button>
           )}
-          
-          
         </div>
         <div className="flex flex-col items-center space-y-6">
           <div className="relative">
@@ -301,30 +327,104 @@ function ProfileModal({ isOpen, onClose, userInfo, onSave, currentUser, onLinkGo
             <div className="text-right text-xs text-slate-400 dark:text-slate-500 mt-1">{goal.length} / 100</div>
           </div>
           
-          <div>             
-            <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">プッシュ通知設定</label>
-          <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
-            {osPermission === 'denied' && (
-              <div className="bg-rose-50 border border-rose-200 p-3 rounded-xl flex flex-col gap-3">
-                <div className="flex items-start gap-2">
-                  <Settings size={16} className="text-rose-500 shrink-0 mt-0.5" />
-                  <p className="text-xs text-rose-700 font-bold leading-relaxed">端末の設定で通知がオフになっています。<br/>iPhoneの設定アプリからアプリの通知を許可してください。</p>
-                </div>
-              </div>
-            )}
-            {!isPushEnabled && osPermission === 'default' && (
-              <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex flex-col gap-3">
-                <p className="text-xs text-amber-700 font-bold leading-relaxed">通知が許可されていません。<br/>後日表示されるポップアップから許可を行ってください。</p>
-              </div>
-            )}
-            
-            <div className={`space-y-3 ${(osPermission === 'denied' || (!isPushEnabled && osPermission === 'default')) ? 'opacity-50 pointer-events-none' : ''}`}>
-              <ToggleSwitch label="フレンドのトレーニング完了" checked={notifyPost} onChange={e => setNotifyPost(e.target.checked)} />
-              <ToggleSwitch label="コメントの受信" checked={notifyComment} onChange={e => setNotifyComment(e.target.checked)} />
-              <ToggleSwitch label="ナイス！の受信" checked={notifyLike} onChange={e => setNotifyLike(e.target.checked)} />
-              <p className="text-[10px] text-slate-400 font-bold mt-2">※すべての通知を完全に停止する場合は、iPhoneの設定アプリから通知をオフにしてください。</p>
+          {/* 新・通知システム設定セクション */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <Bell size={16} className="text-emerald-500" /> 通知システム設定
+              </label>
+              <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                isPushEnabled && osPermission === 'granted'
+                  ? 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800'
+                  : osPermission === 'denied'
+                  ? 'bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/60 dark:text-rose-400 dark:border-rose-800'
+                  : 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/60 dark:text-amber-400 dark:border-amber-800'
+              }`}>
+                {isPushEnabled && osPermission === 'granted'
+                  ? `プッシュ通知: オン (${userTokens.length}台登録)`
+                  : osPermission === 'denied'
+                  ? '端末設定でブロック中'
+                  : 'プッシュ通知: オフ'}
+              </span>
             </div>
-          </div>
+
+            <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3">
+              {pushStatus?.isIosNotStandalone && (
+                <div className="bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 p-3 rounded-xl">
+                  <p className="text-xs text-indigo-700 dark:text-indigo-300 font-bold leading-relaxed">
+                    📱 iPhoneでプッシュ通知を受け取るには、Safariの共有ボタンから「ホーム画面に追加」してアプリを開いてください（アプリ内通知はそのまま届きます）。
+                  </p>
+                </div>
+              )}
+
+              {osPermission === 'denied' && (
+                <div className="bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 p-3 rounded-xl flex items-start gap-2">
+                  <Settings size={16} className="text-rose-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-rose-700 dark:text-rose-300 font-bold leading-relaxed">
+                    端末またはブラウザの設定で通知がブロックされています。設定アプリ（またはブラウザのサイト設定）から通知を「許可」に変更してください。
+                  </p>
+                </div>
+              )}
+
+              {/* プッシュ通知の有効化・再同期・テスト送信ボタン */}
+              {!isPushEnabled || osPermission !== 'granted' ? (
+                <button
+                  type="button"
+                  disabled={isPushBusy || osPermission === 'denied'}
+                  onClick={() => handlePushAction(() => onTogglePush && onTogglePush(false))}
+                  className="w-full py-3 px-4 rounded-xl font-bold text-xs text-white bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 shadow-sm flex items-center justify-center gap-2 transition-colors"
+                >
+                  {isPushBusy ? <Activity size={16} className="animate-spin" /> : <Bell size={16} />}
+                  この端末でプッシュ通知をオンにする
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 px-3 py-2 rounded-xl">
+                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
+                      <CheckCircle size={14} className="text-emerald-500 shrink-0" />
+                      この端末でプッシュ通知を受信できます
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {onSendSelfTestPush && (
+                      <button
+                        type="button"
+                        disabled={isPushBusy}
+                        onClick={() => handlePushAction(onSendSelfTestPush)}
+                        className="py-2 px-3 rounded-xl font-bold text-xs bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <Send size={13} /> テスト通知送信
+                      </button>
+                    )}
+                    {onRefreshPush && (
+                      <button
+                        type="button"
+                        disabled={isPushBusy}
+                        onClick={() => handlePushAction(onRefreshPush)}
+                        className="py-2 px-3 rounded-xl font-bold text-xs bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <RefreshCw size={13} className={isPushBusy ? "animate-spin" : ""} /> トークン再同期
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isPushBusy}
+                    onClick={() => handlePushAction(() => onTogglePush && onTogglePush(true))}
+                    className="w-full py-2 px-3 rounded-xl font-bold text-[11px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900 hover:text-rose-500 border border-slate-200 dark:border-slate-800 transition-colors"
+                  >
+                    この端末のプッシュ通知をオフにする
+                  </button>
+                </div>
+              )}
+
+              <div className="pt-2 border-t border-slate-200/70 dark:border-slate-800 space-y-2.5">
+                <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400">受信する通知の種類（アプリ内＆プッシュ共通）</p>
+                <ToggleSwitch label="フレンドのトレーニング開始・完了" checked={notifyPost} onChange={e => setNotifyPost(e.target.checked)} />
+                <ToggleSwitch label="コメント・返信の受信" checked={notifyComment} onChange={e => setNotifyComment(e.target.checked)} />
+                <ToggleSwitch label="ナイス！の受信" checked={notifyLike} onChange={e => setNotifyLike(e.target.checked)} />
+              </div>
+            </div>
           </div>
 
           <div>
@@ -431,7 +531,6 @@ function UserProfileModal({ isOpen, onClose, targetUser, accountsInfo, currentUs
                   const isMe = fId === currentUser;
                   const isMyFriend = (accountsInfo[currentUser]?.friends || []).includes(fId);
                   const hasRequested = (fInfo?.friendRequests || []).includes(currentUser);
-                  const userColor = fInfo?.userColor || '#10b981';
 
                   return (
                     <div key={fId} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800">

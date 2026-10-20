@@ -40,8 +40,9 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
   const [reportText, setReportText] = useState('');
   const [isSendingReport, setIsSendingReport] = useState(false);
   const [showReportsModal, setShowReportsModal] = useState(false);
-  const [testPushTarget, setTestPushTarget] = useState('');
+  const [testPushTarget, setTestPushTarget] = useState(currentUser || '');
   const [testPushMessage, setTestPushMessage] = useState('');
+  const [isSendingTestPush, setIsSendingTestPush] = useState(false);
 
   const handlePartnerSearchSubmit = (e) => {
     e.preventDefault();
@@ -108,16 +109,11 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
   const myFriends = myInfo.friends || [];
 
   let partnerPosts = [];
-  let weightData = [];
-  let fatData = [];
   let totalMonthVolume = 0;
   let myMonthVolume = 0;
   let partnerMonthVolume = 0;
   let myPercent = 0;
   let partnerPercent = 0;
-  let partnerCompositionInfo = {};
-  let partnerDailyCalories = 0;
-  let dateLabel = '';
   let cardGradient = 'bg-gradient-to-br from-slate-400 to-slate-500 shadow-slate-500/20'; 
   let iconBorder = 'border-slate-300';
   let badgeColor = 'bg-slate-400';
@@ -135,8 +131,6 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       else if (isPartnerOnline) { cardGradient = 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/20'; iconBorder = 'border-emerald-400'; badgeColor = 'bg-emerald-400'; }
 
       partnerPosts = posts ? posts.filter(p => p.author === partnerName) : [];
-      weightData = partnerPosts.filter(p => p.bodyWeight && !isNaN(p.bodyWeight)).map(p => ({ date: p.date, value: Number(p.bodyWeight) })).reverse();
-      fatData = partnerPosts.filter(p => p.bodyFat && !isNaN(p.bodyFat)).map(p => ({ date: p.date, value: Number(p.bodyFat) })).reverse();
 
       const currentMonth = new Date().getMonth();
       const currentYear = new Date().getFullYear();
@@ -152,14 +146,6 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       
       myPercent = Math.min(100, (myMonthVolume / targetVolume) * 100);
       partnerPercent = Math.min(100 - myPercent, (partnerMonthVolume / targetVolume) * 100);
-
-      const lastPartnerFat = partnerPosts.find(p => p.bodyFat);
-      partnerCompositionInfo = { ...partnerInfo, lastFat: lastPartnerFat ? lastPartnerFat.bodyFat : null };
-
-      const todayStr = formatDateFromTimestamp(Date.now());
-      const todayPartnerPosts = partnerPosts.filter(p => formatDateFromTimestamp(p.timestamp) === todayStr);
-      partnerDailyCalories = todayPartnerPosts.reduce((sum, p) => sum + (Number(p.calories) || 0), 0);
-      dateLabel = todayStr.substring(5).replace('-', '/');
   }
 
   return (
@@ -363,20 +349,26 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
               </button>
               <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-2xl p-5 shadow-sm mt-4">
                 <h3 className="text-sm font-bold text-amber-700 dark:text-amber-400 mb-4 flex items-center gap-2">
-                  <Bell size={18} /> 【マスター限定】プッシュ通知テスト
+                  <Bell size={18} /> 【マスター限定】通知システム配信テスト
                 </h3>
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">送信先フレンド</label>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">送信先ユーザー</label>
                     <select 
                       value={testPushTarget} 
                       onChange={(e) => setTestPushTarget(e.target.value)}
                       className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-amber-500 text-sm"
                     >
                       <option value="" disabled>送信先を選択</option>
-                      {[currentUser, ...myFriends].map(f => (
-                        <option key={f} value={f}>{accountsInfo[f]?.displayName || f}{f === currentUser ? ' (自分)' : ''}</option>
-                      ))}
+                      {[currentUser, ...myFriends].map(f => {
+                        const acc = accountsInfo[f];
+                        const tCount = Array.isArray(acc?.fcmTokens) ? acc.fcmTokens.length : (acc?.fcmToken ? 1 : 0);
+                        return (
+                          <option key={f} value={f}>
+                            {acc?.displayName || f}{f === currentUser ? ' (自分)' : ''} — {tCount > 0 ? `Push登録:${tCount}台` : 'アプリ内通知のみ'}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                   <div>
@@ -390,14 +382,21 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
                     />
                   </div>
                   <button 
-                    onClick={() => {
-                      if (onSendTestPush) onSendTestPush(testPushTarget, testPushMessage);
-                      setTestPushMessage('');
+                    onClick={async () => {
+                      if (!onSendTestPush || isSendingTestPush) return;
+                      setIsSendingTestPush(true);
+                      try {
+                        await onSendTestPush(testPushTarget, testPushMessage);
+                        setTestPushMessage('');
+                      } finally {
+                        setIsSendingTestPush(false);
+                      }
                     }}
-                    disabled={!testPushTarget || !testPushMessage.trim()}
-                    className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl text-sm shadow-md transition-colors disabled:opacity-50 flex justify-center items-center"
+                    disabled={!testPushTarget || !testPushMessage.trim() || isSendingTestPush}
+                    className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl text-sm shadow-md transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
                   >
-                    通知を送信する
+                    {isSendingTestPush ? <Activity size={16} className="animate-spin" /> : <Bell size={16} />}
+                    通知を送信する（アプリ内＋Push）
                   </button>
                 </div>
               </div>
@@ -584,7 +583,7 @@ function FriendsView({ currentUser, myInfo, accountsInfo, onSendRequest, onAccep
       <ReportsModal isOpen={showReportsModal} onClose={() => setShowReportsModal(false)} db={db} accountsInfo={accountsInfo} />
 
       <div className="mt-12 text-center pb-4 pt-6 border-t border-slate-200/50 dark:border-slate-800/50">
-        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.1.0 (2026.10.20, updated)</p>
+        <p className="text-xs font-bold text-slate-400 dark:text-slate-500">WithFit v1.2.0 (2026.10.20, Notification System Rebuilt)</p>
       </div>
     </div>
   );
