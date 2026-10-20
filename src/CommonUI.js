@@ -156,8 +156,8 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
       <div className="w-full bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center">
         <div className="flex justify-between items-center w-full mb-4">
           <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }}></span>
-            {title}
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }}></span>
+            <span className="truncate">{title}</span>
           </h4>
         </div>
         <p className="text-sm font-bold text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-950 p-6 rounded-2xl text-center border border-slate-100 dark:border-slate-800 w-full">
@@ -182,12 +182,12 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
   const yMax = Math.ceil((maxVal + pad) * 10) / 10;
   const yRange = yMax - yMin === 0 ? 1 : yMax - yMin;
 
-  // SVG座標設計 (レスポンシブViewBox)
+  // SVG座標設計 (レスポンシブViewBox・上部ツールチップ領域を確保)
   const svgW = 360;
-  const svgH = 195;
+  const svgH = 205;
   const padL = 38;
   const padR = 16;
-  const padT = 26;
+  const padT = 34;
   const padB = 30;
   const plotW = svgW - padL - padR;
   const plotH = svgH - padT - padB;
@@ -281,13 +281,13 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
 
   return (
     <div className="w-full bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col transition-all">
-      {/* ヘッダー＆期間セレクター */}
-      <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
-        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}80` }}></span>
-          {title}
+      {/* ヘッダー＆期間セレクター（スマホでも綺麗に揃う2段構成） */}
+      <div className="flex flex-col gap-3 mb-4">
+        <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 min-w-0">
+          <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}80` }}></span>
+          <span className="truncate">{title}</span>
         </h4>
-        <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200/70 dark:border-slate-700/70">
+        <div className="grid grid-cols-4 gap-1 w-full bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200/70 dark:border-slate-700/70">
           {rangeOptions.map(opt => {
             const active = rangeType === opt.key;
             return (
@@ -295,7 +295,7 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
                 key={opt.key}
                 type="button"
                 onClick={() => setRangeType(opt.key)}
-                className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-all ${
+                className={`py-1.5 text-xs font-bold rounded-lg text-center whitespace-nowrap transition-all ${
                   active
                     ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
@@ -322,50 +322,64 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
         </div>
       ) : (
         <>
-          {/* 選択中のポイント詳細 ＆ サマリーカード */}
-          <div className="bg-slate-50/90 dark:bg-slate-950/70 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-3.5 mb-4 flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-0.5">
-                <span>{activePoint ? activePoint.fullDate : '-'}</span>
-                {activePoint && activePoint.idx === points.length - 1 && (
-                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300">最新</span>
-                )}
-              </div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-black tracking-tight text-slate-900 dark:text-white font-mono">
-                  {activePoint ? activePoint.val.toFixed(1) : '-'}
-                </span>
-                <span className="text-xs font-bold text-slate-400">{inferredUnit}</span>
-                {activePoint && activePoint.prevDiff !== null && (
-                  <span className={`ml-1 text-[11px] font-bold px-1.5 py-0.5 rounded-md inline-flex items-center gap-0.5 ${
-                    activePoint.prevDiff > 0
-                      ? 'bg-rose-50 text-rose-500 dark:bg-rose-950/60 dark:text-rose-400'
-                      : activePoint.prevDiff < 0
-                      ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400'
-                      : 'bg-slate-200/60 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-                  }`}>
-                    {activePoint.prevDiff > 0 ? `+${activePoint.prevDiff}` : activePoint.prevDiff}{inferredUnit}
+          {/* 選択中のポイント詳細 ＆ サマリーカード（上下2段で文字潰れ・重なりを完全防止） */}
+          <div className="bg-slate-50/90 dark:bg-slate-950/70 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-3.5 mb-4 flex flex-col gap-3">
+            {/* 上段：選択日の数値 ＆ 前回比バッジ */}
+            <div className="flex items-end justify-between gap-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-xs font-bold text-slate-400 dark:text-slate-500 font-mono whitespace-nowrap">
+                    {activePoint ? activePoint.fullDate : '-'}
                   </span>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 text-right shrink-0 border-l border-slate-200/70 dark:border-slate-800 pl-3">
-              <div>
-                <div className="text-[9px] font-bold text-slate-400">期間変化</div>
-                <div className={`text-xs font-bold font-mono flex items-center justify-end gap-0.5 ${
-                  periodDiff > 0 ? 'text-rose-500' : periodDiff < 0 ? 'text-emerald-500' : 'text-slate-600 dark:text-slate-300'
-                }`}>
-                  {periodDiff > 0 ? `+${periodDiff}` : periodDiff}
+                  {activePoint && activePoint.idx === points.length - 1 && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0 leading-none">
+                      最新
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-baseline gap-1 whitespace-nowrap">
+                  <span className="text-3xl font-black tracking-tight text-slate-900 dark:text-white font-mono leading-none">
+                    {activePoint ? activePoint.val.toFixed(1) : '-'}
+                  </span>
+                  <span className="text-xs font-bold text-slate-400">{inferredUnit}</span>
                 </div>
               </div>
-              <div>
-                <div className="text-[9px] font-bold text-slate-400">平均</div>
-                <div className="text-xs font-bold font-mono text-slate-700 dark:text-slate-200">{avgVal.toFixed(1)}</div>
+
+              {activePoint && activePoint.prevDiff !== null && (
+                <div className="flex flex-col items-end shrink-0">
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-1 whitespace-nowrap">前回比</span>
+                  <span className={`text-xs font-bold font-mono px-2.5 py-1 rounded-lg whitespace-nowrap inline-flex items-center ${
+                    activePoint.prevDiff > 0
+                      ? 'bg-rose-50 text-rose-500 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/50'
+                      : activePoint.prevDiff < 0
+                      ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/50'
+                      : 'bg-slate-200/60 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                  }`}>
+                    {activePoint.prevDiff > 0 ? `+${activePoint.prevDiff.toFixed(1)}` : activePoint.prevDiff.toFixed(1)}{inferredUnit}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* 下段：期間変化・平均・最小/最大の3カラム均等配置 */}
+            <div className="grid grid-cols-3 divide-x divide-slate-200/70 dark:divide-slate-800 border-t border-slate-200/70 dark:border-slate-800 pt-2.5 text-center">
+              <div className="px-1 flex flex-col items-center justify-center">
+                <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-0.5 whitespace-nowrap">期間変化</div>
+                <div className={`text-xs font-bold font-mono whitespace-nowrap ${
+                  periodDiff > 0 ? 'text-rose-500' : periodDiff < 0 ? 'text-emerald-500' : 'text-slate-600 dark:text-slate-300'
+                }`}>
+                  {periodDiff > 0 ? `+${periodDiff.toFixed(1)}` : periodDiff.toFixed(1)}{inferredUnit}
+                </div>
               </div>
-              <div>
-                <div className="text-[9px] font-bold text-slate-400">最小/最大</div>
-                <div className="text-[10px] font-bold font-mono text-slate-600 dark:text-slate-300">
+              <div className="px-1 flex flex-col items-center justify-center">
+                <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-0.5 whitespace-nowrap">平均</div>
+                <div className="text-xs font-bold font-mono text-slate-700 dark:text-slate-200 whitespace-nowrap">
+                  {avgVal.toFixed(1)}{inferredUnit}
+                </div>
+              </div>
+              <div className="px-1 flex flex-col items-center justify-center">
+                <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-0.5 whitespace-nowrap">最小 / 最大</div>
+                <div className="text-xs font-bold font-mono text-slate-700 dark:text-slate-200 whitespace-nowrap">
                   {minVal.toFixed(1)}<span className="text-slate-400 mx-0.5">/</span>{maxVal.toFixed(1)}
                 </div>
               </div>
@@ -493,13 +507,12 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
                 );
               })}
 
-              {/* 選択ポイントのフローティングツールチップ */}
+              {/* 選択ポイントのフローティングツールチップ（常にポイント上部に配置し線との重なりを防止） */}
               {activePoint && (() => {
-                const boxW = 78;
+                const boxW = 84;
                 const boxH = 22;
                 const clampedX = Math.min(Math.max(activePoint.x, padL + boxW / 2), svgW - padR - boxW / 2);
-                const placeBelow = activePoint.y < padT + 26;
-                const boxY = placeBelow ? activePoint.y + 10 : activePoint.y - boxH - 9;
+                const boxY = Math.max(2, activePoint.y - boxH - 8);
 
                 return (
                   <g className="pointer-events-none">
@@ -520,7 +533,7 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
                       textAnchor="middle"
                       className="font-bold font-mono"
                     >
-                      {activePoint.shortDate} {activePoint.val}{inferredUnit}
+                      {activePoint.shortDate} {activePoint.val.toFixed(1)}{inferredUnit}
                     </text>
                   </g>
                 );
