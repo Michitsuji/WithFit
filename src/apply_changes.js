@@ -2,21 +2,27 @@ const fs = require('fs');
 const path = require('path');
 
 // ==========================================
-// 【設定】対象ファイルの名前をここに指定します
-// 別のプロジェクトで使う場合は、ここを書き換えるだけでOKです
-const TARGET_FILE = 'App.js'; 
+// 【設定】分割後の全ソースファイルを自動検索して変更を適用します
 // ==========================================
+const TARGET_FILES = [
+  'App.js',
+  'firebase.js',
+  'utils.js',
+  'CommonUI.js',
+  'WorkoutCard.js',
+  'WorkoutForm.js',
+  'DataView.js',
+  'RecordView.js',
+  'ExercisesView.js',
+  'FriendsView.js',
+  'ProfileModals.js',
+  'CoachAndGame.js'
+];
 
 const changesFile = path.join(__dirname, 'changes.json');
-const targetFile = path.join(__dirname, TARGET_FILE);
 
 if (!fs.existsSync(changesFile)) {
     process.exit(0);
-}
-
-if (!fs.existsSync(targetFile)) {
-    console.error(`エラー: 対象ファイル (${TARGET_FILE}) が見つかりません。`);
-    process.exit(1);
 }
 
 const now = new Date();
@@ -37,28 +43,55 @@ try {
     }
 
     const modifications = JSON.parse(fileContent);
-    let code = fs.readFileSync(targetFile, 'utf8');
+    const fileContents = {};
+    const dirtyFiles = new Set();
+
+    TARGET_FILES.forEach((fname) => {
+        const fpath = path.join(__dirname, fname);
+        if (fs.existsSync(fpath)) {
+            fileContents[fname] = fs.readFileSync(fpath, 'utf8');
+        }
+    });
+
     let updatedCount = 0;
 
-    // fileの指定をなくし、直接変更箇所を探す
     modifications.forEach((change, index) => {
-        if (code.includes(change.search)) {
-            code = code.replace(change.search, change.replace);
-            updatedCount++;
+        let matchedFile = null;
+        if (change.file && fileContents[change.file] && fileContents[change.file].includes(change.search)) {
+            matchedFile = change.file;
         } else {
-            console.warn(`警告: ${index + 1} 番目の置換対象文字列が見つかりません。`);
+            for (const fname of Object.keys(fileContents)) {
+                if (fileContents[fname].includes(change.search)) {
+                    matchedFile = fname;
+                    break;
+                }
+            }
+        }
+
+        if (matchedFile) {
+            fileContents[matchedFile] = fileContents[matchedFile].replace(change.search, change.replace);
+            dirtyFiles.add(matchedFile);
+            updatedCount++;
+            console.log(`[${matchedFile}] ${index + 1} 番目の変更を適用しました。`);
+        } else {
+            console.warn(`警告: ${index + 1} 番目の置換対象文字列がいずれのファイルにも見つかりません。`);
         }
     });
 
     const versionRegex = /(WithFit v\d+\.\d+\.\d+)(?: \([^)]+\))?/;
-    if (versionRegex.test(code)) {
-        code = code.replace(versionRegex, `$1 (${currentDateTimeStr})`);
-        console.log(`バージョン更新日時を (${currentDateTimeStr}) に自動更新しました。`);
+    for (const fname of Object.keys(fileContents)) {
+        if (versionRegex.test(fileContents[fname])) {
+            fileContents[fname] = fileContents[fname].replace(versionRegex, `$1 (${currentDateTimeStr})`);
+            dirtyFiles.add(fname);
+            console.log(`[${fname}] バージョン更新日時を (${currentDateTimeStr}) に自動更新しました。`);
+        }
     }
 
     if (updatedCount > 0) {
-        fs.writeFileSync(targetFile, code, 'utf8');
-        console.log(`${TARGET_FILE} のコード置換が完了しました（${updatedCount}箇所）。`);
+        dirtyFiles.forEach((fname) => {
+            fs.writeFileSync(path.join(__dirname, fname), fileContents[fname], 'utf8');
+        });
+        console.log(`コード置換が完了しました（計${updatedCount}箇所 / 更新ファイル: ${[...dirtyFiles].join(', ')}）。`);
     }
 
     fs.writeFileSync(changesFile, '', 'utf8');
