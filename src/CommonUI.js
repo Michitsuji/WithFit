@@ -239,7 +239,7 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
     : '';
 
   // X軸の日付メモリ（最大5個、重ならないように間引く）
-  const xTicks = useMemo(() => {
+  const xTicks = (() => {
     if (points.length === 0) return [];
     if (points.length <= 5) return points;
     const tickCount = 5;
@@ -249,7 +249,7 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
       result.push(points[targetIdx]);
     }
     return result;
-  }, [points]);
+  })();
 
   // タッチ・マウス操作で最も近いデータ点を選択
   const handlePointerInteract = (e) => {
