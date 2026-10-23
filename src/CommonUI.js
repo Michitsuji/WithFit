@@ -620,7 +620,7 @@ function CategoryFilterGrid({ selectedCategories, toggleCategory }) {
   );
 }
 
-// --- 記録ボタン長押しホイール（短時間長押し＆ドラッグ選択の両対応） ---
+// --- 記録ボタン長押しホイール（短時間長押し＆ドラッグ選択の両対応） --- 
 const LONG_PRESS_DURATION_MS = 105; // 従来の220msから大幅に短縮し、素早い長押しで即座に起動
 
 function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
