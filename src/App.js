@@ -2,7 +2,7 @@
 // App.js — メインアプリケーションコンポーネント
 // ==========================================
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Activity, Bell, Heart, MessageCircle, UserPlus, LogOut, Flame, ChevronRight, ChevronLeft, MapPin, Clock, VolumeX, Volume2, X, Play, Lock, Home, Dumbbell, PlusCircle, Calendar as CalendarIcon, Users, Settings } from 'lucide-react';
+import { Activity, Bell, Heart, MessageCircle, UserPlus, LogOut, Flame, ChevronRight, ChevronLeft, MapPin, Clock, VolumeX, Volume2, X, Play, Lock, Home, Dumbbell, PlusCircle, Users, Settings } from 'lucide-react';
 import { GoogleAuthProvider, signInWithCredential, getRedirectResult, signInAnonymously, onAuthStateChanged, signInWithPopup } from 'firebase/auth';
 import { setDoc, doc, getDoc, deleteField, collection, onSnapshot, query, where, getDocs, limit, deleteDoc } from 'firebase/firestore';
 import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging';
@@ -933,40 +933,18 @@ export default function App() {
       setDataLoaded(prev => ({ ...prev, gyms: true }));
     });
 
-    const joinedGyms = accountsInfo[currentUser].joinedGyms || ['common'];
-    const myFriends = accountsInfo[currentUser].friends || [];
-    const friendGymIds = [];
-    myFriends.forEach(f => {
-       if (accountsInfo[f]?.joinedGyms) {
-          friendGymIds.push(...accountsInfo[f].joinedGyms);
-       }
-    });
-    const targetGymIds = [...new Set([...joinedGyms, 'common', ...friendGymIds])];
-    
-    const chunks = [];
-    for (let i = 0; i < targetGymIds.length; i += 10) {
-      chunks.push(targetGymIds.slice(i, i + 10));
-    }
-
     const exercisesRef = collection(db, 'artifacts', appId, 'public', 'data', 'exercises');
-    
-    const unsubs = [unsubGyms];
-    chunks.forEach((chunk, index) => {
-      const exQuery = query(exercisesRef, where('gymId', 'in', chunk));
-      unsubs.push(onSnapshot(exQuery, (snapshot) => {
-        const chunkExs = [];
-        snapshot.forEach(doc => { chunkExs.push({ id: doc.id, ...doc.data() }); });
-        exercisesByChunkRef.current[index] = chunkExs;
-        
-        const allExs = Object.values(exercisesByChunkRef.current).flat();
-        allExs.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-        setExercises(allExs);
-        setDataLoaded(prev => ({ ...prev, exercises: true }));
-      }, (err) => {
-        console.error(err);
-        setDataLoaded(prev => ({ ...prev, exercises: true }));
-      }));
+    const unsubEx = onSnapshot(exercisesRef, (snapshot) => {
+      const allExs = [];
+      snapshot.forEach(doc => { allExs.push({ id: doc.id, ...doc.data() }); });
+      allExs.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      setExercises(allExs);
+      setDataLoaded(prev => ({ ...prev, exercises: true }));
+    }, (err) => {
+      console.error(err);
+      setDataLoaded(prev => ({ ...prev, exercises: true }));
     });
+    const unsubs = [unsubGyms, unsubEx];
 
     return () => {
       unsubs.forEach(unsub => unsub());
@@ -2580,7 +2558,7 @@ export default function App() {
       />
       <UserProfileModal isOpen={!!selectedUserProfile} onClose={() => setSelectedUserProfile(null)} targetUser={selectedUserProfile} accountsInfo={accountsInfo} currentUser={currentUser} onSendRequest={handleSendFriendRequest} />
       <CoachChatModal isOpen={showCoachChat} onClose={() => setShowCoachChat(false)} currentUser={currentUser} accountsInfo={accountsInfo} posts={posts} appId={appId} />
-      {showSecretGame && <SecretGame onClose={() => setShowSecretGame(false)} />}
+      {showSecretGame && <SecretGame onClose={() => setShowSecretGame(false)} currentUser={currentUser} accountsInfo={accountsInfo} appId={appId} />}
     </div>
   );
 }

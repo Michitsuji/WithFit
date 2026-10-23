@@ -2,7 +2,7 @@
 // RecordView.js — トレーニング記録入力画面・プログラム生成＆管理コンポーネント
 // ==========================================
 import React, { useState, useMemo, useEffect } from 'react';
-import { Target, X, AlignLeft, Trash2, CheckCircle, ArrowUp, ArrowDown, Zap, Plus, Activity, Scale, MapPin, Dumbbell, Play, Calendar as CalendarIcon, Flame, UserPlus, ListPlus, Sparkles, Clock, Search } from 'lucide-react';
+import { Target, X, AlignLeft, Trash2, CheckCircle, ArrowUp, ArrowDown, Zap, Plus, Activity, Scale, MapPin, Dumbbell, Play, Flame, UserPlus, ListPlus, Sparkles, Clock, Search } from 'lucide-react';
 import { setDoc, doc, deleteField } from 'firebase/firestore';
 import { db, appId } from './firebase';
 import { formatDateFromTimestamp, formatDateWithDay, generateId, MASTER_USER, getCategoryColor, MUSCLE_CATEGORIES } from './utils';
@@ -464,9 +464,6 @@ function RecordView({ onStart, onPost, onCancel, onRequestJointTraining, onAccep
       if (mutedExercises.includes(ex.name)) return false;
       if (ex.gymId === 'common') {
         if (ex.author && ex.author !== currentUser && ex.author !== MASTER_USER) return false;
-      } else {
-        const gym = gyms.find(g => g.id === ex.gymId);
-        if (gym && ex.author && ex.author !== gym.owner && ex.author !== currentUser && ex.author !== MASTER_USER) return false;
       }
       return true;
     });

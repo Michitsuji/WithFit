@@ -1,11 +1,12 @@
 // ==========================================
-// CoachAndGame.js — AIコーチ＆台帳モーダル・シークレットゲームコンポーネント
+// CoachAndGame.js — AIコーチ＆台帳モーダル・シークレットゲーム（フレンドランキング対応）コンポーネント
 // ==========================================
-import React, { useState, useRef, useEffect } from 'react';
-import { X, Sparkles, ListPlus, Send, Activity, CheckCircle } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { X, Sparkles, ListPlus, Send, Activity, CheckCircle, Trophy, Award } from 'lucide-react';
 import { setDoc, doc } from 'firebase/firestore';
 import { db } from './firebase';
 import { formatDateFromTimestamp, calculateWorkoutTotals } from './utils';
+import { UserAvatar } from './CommonUI';
 
 // --- シークレットゲームコンポーネント ---
 const CAT_DESIGNS = {
@@ -157,7 +158,7 @@ const BackgroundCats = () => (
 
 let sharedAudioCtx = null;
 
-function SecretGame({ onClose }) {
+function SecretGame({ onClose, currentUser, accountsInfo = {}, appId }) {
   const playSound = (type) => {
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -203,25 +204,95 @@ function SecretGame({ onClose }) {
     } catch(e) {}
   };
 
-  const [screen, setScreen] = useState('TITLE');
+  const userMaxKey = currentUser ? `ossanMax_${currentUser}` : 'ossanMax';
+  const userHighKey = currentUser ? `ossanHigh_${currentUser}` : 'ossanHigh';
+
+  const [screen, setScreen] = useState('TITLE'); // 'TITLE' | 'PLAY' | 'RESULT' | 'ZUKAN' | 'RANKING'
   const [tiles, setTiles] = useState([]);
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [isNewRecord, setIsNewRecord] = useState(false);
   
   const [zukanPage, setZukanPage] = useState(0);
   const [selectedCat, setSelectedCat] = useState(null);
   
-  const [maxLevel, setMaxLevel] = useState(() => parseInt(localStorage.getItem('ossanMax')) || 1);
-  const [highScore, setHighScore] = useState(() => parseInt(localStorage.getItem('ossanHigh')) || 0);
+  const [maxLevel, setMaxLevel] = useState(() => {
+    const localMax = parseInt(localStorage.getItem(userMaxKey)) || parseInt(localStorage.getItem('ossanMax')) || 1;
+    const remoteMax = Number(accountsInfo?.[currentUser]?.ossanMaxLevel) || 1;
+    return Math.max(localMax, remoteMax);
+  });
+  const [highScore, setHighScore] = useState(() => {
+    const localHigh = parseInt(localStorage.getItem(userHighKey)) || parseInt(localStorage.getItem('ossanHigh')) || 0;
+    const remoteHigh = Number(accountsInfo?.[currentUser]?.ossanHighScore) || 0;
+    return Math.max(localHigh, remoteHigh);
+  });
+
   const nextId = useRef(1);
   const touchRef = useRef({ x: 0, y: 0, r: null, c: null, active: false });
 
+  // ローカル＆Firestoreへベストスコア・最大レベルを自動同期
   useEffect(() => {
+    localStorage.setItem(userMaxKey, maxLevel);
+    localStorage.setItem(userHighKey, highScore);
     localStorage.setItem('ossanMax', maxLevel);
     localStorage.setItem('ossanHigh', highScore);
-  }, [maxLevel, highScore]);
+
+    if (db && currentUser && appId) {
+      const remoteHigh = Number(accountsInfo?.[currentUser]?.ossanHighScore) || 0;
+      const remoteMax = Number(accountsInfo?.[currentUser]?.ossanMaxLevel) || 1;
+      if (highScore > remoteHigh || maxLevel > remoteMax) {
+        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), {
+          ossanHighScore: Math.max(highScore, remoteHigh),
+          ossanMaxLevel: Math.max(maxLevel, remoteMax),
+          ossanUpdatedAt: Date.now()
+        }, { merge: true }).catch(() => {});
+      }
+    }
+  }, [maxLevel, highScore, currentUser, appId, userMaxKey, userHighKey, accountsInfo]);
+
+  // 自分とフレンドのランキング集計
+  const rankingList = useMemo(() => {
+    const myFriends = accountsInfo?.[currentUser]?.friends || [];
+    const participants = Array.from(new Set([currentUser, ...myFriends].filter(Boolean)));
+    const entries = participants.map(uid => {
+      const info = accountsInfo?.[uid] || {};
+      const isMe = uid === currentUser;
+      const bestScore = isMe
+        ? Math.max(highScore, Number(info.ossanHighScore) || 0)
+        : (Number(info.ossanHighScore) || 0);
+      const bestCatLevel = isMe
+        ? Math.max(maxLevel, Number(info.ossanMaxLevel) || 1)
+        : (Number(info.ossanMaxLevel) || 1);
+      return {
+        uid,
+        isMe,
+        displayName: info.displayName || uid,
+        score: bestScore,
+        maxLevel: Math.min(14, Math.max(1, bestCatLevel)),
+      };
+    });
+
+    entries.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (b.maxLevel !== a.maxLevel) return b.maxLevel - a.maxLevel;
+      return a.displayName.localeCompare(b.displayName, 'ja');
+    });
+
+    // 順位付け（同点の場合は同順位）
+    let currentRank = 1;
+    return entries.map((entry, idx) => {
+      if (idx > 0 && entry.score < entries[idx - 1].score) {
+        currentRank = idx + 1;
+      }
+      return { ...entry, rank: currentRank };
+    });
+  }, [accountsInfo, currentUser, highScore, maxLevel]);
+
+  const myRankEntry = useMemo(() => {
+    return rankingList.find(r => r.isMe) || null;
+  }, [rankingList]);
 
   const resetGame = () => {
     let initialTiles = [];
@@ -241,6 +312,7 @@ function SecretGame({ onClose }) {
     setScore(0);
     setCombo(0);
     setGameOver(false);
+    setIsNewRecord(false);
   };
 
   const handleSwipe = (startR, startC, dir) => {
@@ -320,7 +392,10 @@ function SecretGame({ onClose }) {
       let addScore = Math.pow(2, mergedLevel) * (currentCombo > 1 ? currentCombo : 1);
       setScore(s => {
         const ns = s + addScore;
-        if (ns > highScore) setHighScore(ns);
+        if (ns > highScore) {
+          setHighScore(ns);
+          setIsNewRecord(true);
+        }
         return ns;
       });
       if (mergedLevel > newMax) {
@@ -393,50 +468,214 @@ function SecretGame({ onClose }) {
       return (
         <div className="w-full h-full relative flex flex-col items-center justify-center p-6 bg-[#F4F1E1]">
           <BackgroundCats />
-          <div className="z-10 flex flex-col items-center mb-6 w-full">
+          <div className="z-10 flex flex-col items-center mb-5 w-full">
             <div className="relative mb-2">
-              <h1 className="text-[54px] font-black text-white title-text-stroke absolute inset-0 tracking-wide text-center drop-shadow-md">おっさん猫</h1>
-              <h1 className="text-[54px] font-black text-white relative z-10 tracking-wide text-center">おっさん猫</h1>
+              <h1 className="text-[52px] font-black text-white title-text-stroke absolute inset-0 tracking-wide text-center drop-shadow-md">おっさん猫</h1>
+              <h1 className="text-[52px] font-black text-white relative z-10 tracking-wide text-center">おっさん猫</h1>
             </div>
             <div className="text-[#A4997C] text-lg tracking-widest my-1 relative z-10">ossan cat puzzle</div>
-            <div className="relative flex items-center justify-center w-full mt-2">
+            <div className="relative flex items-center justify-center w-full mt-1">
               <div className="relative">
-                <h1 className="text-[68px] font-black text-white title-text-stroke absolute inset-0 tracking-widest text-center drop-shadow-md">パズル</h1>
-                <h1 className="text-[68px] font-black text-white relative z-10 tracking-widest text-center">パズル</h1>
+                <h1 className="text-[64px] font-black text-white title-text-stroke absolute inset-0 tracking-widest text-center drop-shadow-md">パズル</h1>
+                <h1 className="text-[64px] font-black text-white relative z-10 tracking-widest text-center">パズル</h1>
               </div>
             </div>
           </div>
-          <div className="z-10 flex flex-col items-center mb-10">
-            <div className="text-[#B5A585] text-2xl mb-1">Best Score</div>
-            <div className="text-[#B5A585] text-4xl mb-4">{highScore}</div>
+
+          <div className="z-10 flex flex-col items-center mb-6">
+            <div className="text-[#B5A585] text-xl font-bold mb-0.5">Best Score</div>
+            <div className="text-[#8B7D60] text-4xl font-black mb-2">{highScore.toLocaleString()}</div>
+            {myRankEntry && (
+              <button
+                onClick={() => setScreen('RANKING')}
+                className="bg-white/90 border-2 border-[#E58E26] text-[#B36A14] px-4 py-1 rounded-full text-sm font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-transform"
+              >
+                <Trophy size={15} className="text-[#E58E26]" />
+                <span>フレンド内 {myRankEntry.rank}位 / {rankingList.length}人中</span>
+              </button>
+            )}
           </div>
-          <div className="z-10 grid grid-cols-2 gap-x-4 gap-y-4 w-[90%] max-w-[300px]">
-            <button onClick={() => { resetGame(); setScreen('PLAY'); }} className="bg-[#FF6B6B] text-white text-3xl font-bold py-4 rounded-2xl shadow-[0_5px_0_#D15456] active:translate-y-1 active:shadow-none transition-all flex justify-center items-center">
+
+          <div className="z-10 flex flex-col gap-3.5 w-[92%] max-w-[310px]">
+            <button onClick={() => { resetGame(); setScreen('PLAY'); }} className="w-full bg-[#FF6B6B] text-white text-3xl font-bold py-4 rounded-2xl shadow-[0_5px_0_#D15456] active:translate-y-1 active:shadow-none transition-all flex justify-center items-center">
               <span className="drop-shadow-sm">スタート</span>
             </button>
-            <button onClick={() => { setZukanPage(0); setScreen('ZUKAN'); }} className="bg-[#1ABC9C] text-white text-2xl font-bold py-4 rounded-2xl shadow-[0_5px_0_#129C81] active:translate-y-1 active:shadow-none transition-all flex justify-center items-center">
-              <span className="drop-shadow-sm tracking-tighter">コレクション</span>
-            </button>
+            <div className="grid grid-cols-2 gap-3.5 w-full">
+              <button onClick={() => { setZukanPage(0); setScreen('ZUKAN'); }} className="bg-[#1ABC9C] text-white text-xl font-bold py-3.5 rounded-2xl shadow-[0_5px_0_#129C81] active:translate-y-1 active:shadow-none transition-all flex justify-center items-center">
+                <span className="drop-shadow-sm tracking-tighter">コレクション</span>
+              </button>
+              <button onClick={() => setScreen('RANKING')} className="bg-[#E58E26] text-white text-xl font-bold py-3.5 rounded-2xl shadow-[0_5px_0_#B86D14] active:translate-y-1 active:shadow-none transition-all flex justify-center items-center gap-1">
+                <Trophy size={20} />
+                <span className="drop-shadow-sm tracking-tighter">ランキング</span>
+              </button>
+            </div>
           </div>
         </div>
       );
     }
+
+    if (screen === 'RANKING') {
+      return (
+        <div className="w-full h-full relative flex flex-col items-center justify-between p-5 bg-[#F4F1E1]">
+          <div className="w-full flex flex-col items-center mt-4 mb-3">
+            <div className="flex items-center gap-2 text-[#8B7D60] text-2xl font-black tracking-wide">
+              <Trophy size={26} className="text-[#E58E26]" />
+              <h2>フレンドランキング</h2>
+            </div>
+            <p className="text-xs font-bold text-[#A4997C] mt-1">
+              おっさん猫パズル ハイスコア順位
+            </p>
+          </div>
+
+          <div className="flex-1 w-full bg-white hand-drawn-border p-3.5 overflow-y-auto space-y-2.5 shadow-sm mb-4">
+            {rankingList.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-[#A4997C] font-bold text-center">
+                ランキングデータがありません
+              </div>
+            ) : (
+              rankingList.map((entry) => {
+                const catInfo = CAT_DESIGNS[entry.maxLevel] || CAT_DESIGNS[1];
+                const isTop1 = entry.rank === 1 && entry.score > 0;
+                const isTop2 = entry.rank === 2 && entry.score > 0;
+                const isTop3 = entry.rank === 3 && entry.score > 0;
+
+                const rankBadgeBg = isTop1
+                  ? 'bg-[#FFD700] text-[#7A5900] border-[#E5B800]'
+                  : isTop2
+                  ? 'bg-[#E2E8F0] text-[#475569] border-[#CBD5E1]'
+                  : isTop3
+                  ? 'bg-[#F6AD55] text-[#7B341E] border-[#DD6B20]'
+                  : 'bg-[#F4F1E1] text-[#8B7D60] border-[#DFD9C5]';
+
+                return (
+                  <div
+                    key={entry.uid}
+                    className={`flex items-center justify-between gap-2.5 p-2.5 rounded-2xl border-2 transition-all ${
+                      entry.isMe
+                        ? 'bg-[#FFF9E6] border-[#E58E26] shadow-sm'
+                        : 'bg-[#FAF8F1] border-[#EAE5D4]'
+                    }`}
+                  >
+                    {/* 順位バッジ */}
+                    <div className={`w-9 h-9 rounded-xl border-2 flex flex-col items-center justify-center shrink-0 font-black ${rankBadgeBg}`}>
+                      <span className="text-sm leading-none">{entry.rank}</span>
+                      <span className="text-[9px] leading-none mt-0.5">位</span>
+                    </div>
+
+                    {/* ユーザーアバター＆名前 */}
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <UserAvatar userId={entry.uid} accountsInfo={accountsInfo} size={36} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="font-bold text-gray-800 text-sm truncate">
+                            {entry.displayName}
+                          </span>
+                          {entry.isMe && (
+                            <span className="text-[10px] font-bold bg-[#FF6B6B] text-white px-1.5 py-0.5 rounded-full leading-none">
+                              あなた
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] font-bold text-[#A4997C] truncate mt-0.5">
+                          到達: Lv.{entry.maxLevel} {catInfo.name}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 到達おっさん猫アイコン＆スコア */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div
+                        onClick={() => setSelectedCat({ ...catInfo, id: entry.maxLevel })}
+                        className="w-10 h-10 rounded-xl border-2 border-[#4a4a4a] p-0.5 cursor-pointer active:scale-95 transition-transform shrink-0"
+                        style={{ backgroundColor: catInfo.bg }}
+                        title={`Lv.${entry.maxLevel} ${catInfo.name}`}
+                      >
+                        <CatSvg level={entry.maxLevel} />
+                      </div>
+                      <div className="text-right min-w-[68px]">
+                        {entry.score > 0 ? (
+                          <>
+                            <div className="text-base font-black text-gray-800 leading-tight">
+                              {entry.score.toLocaleString()}
+                            </div>
+                            <div className="text-[10px] font-bold text-[#A4997C]">pt</div>
+                          </>
+                        ) : (
+                          <div className="text-xs font-bold text-[#C1B79E]">未プレイ</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div className="flex gap-3 w-full max-w-[340px]">
+            <button
+              onClick={() => setScreen('TITLE')}
+              className="flex-1 bg-[#1ABC9C] text-white text-xl font-bold py-3.5 rounded-2xl shadow-[0_5px_0_#129C81] active:translate-y-1 active:shadow-none transition-all"
+            >
+              タイトルへ
+            </button>
+            <button
+              onClick={() => { resetGame(); setScreen('PLAY'); }}
+              className="flex-1 bg-[#FF6B6B] text-white text-xl font-bold py-3.5 rounded-2xl shadow-[0_5px_0_#D15456] active:translate-y-1 active:shadow-none transition-all"
+            >
+              プレイする
+            </button>
+          </div>
+
+          {selectedCat && (
+            <div className="absolute inset-0 bg-[#F4F1E1] flex flex-col items-center justify-center z-50 p-6 animate-pop">
+              <div className="bg-white hand-drawn-border w-full max-w-[340px] p-8 flex flex-col items-center shadow-md relative mb-8">
+                <div className="w-44 h-44 mb-5"><CatSvg level={selectedCat.id} /></div>
+                <div className="w-full text-center">
+                  <div className="text-sm font-bold text-[#A4997C] mb-1">Lv.{selectedCat.id}</div>
+                  <h3 className="text-3xl font-bold text-gray-800 mb-2">{selectedCat.name}</h3>
+                  <p className="text-lg text-gray-700 font-bold mb-4">{selectedCat.desc}</p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedCat(null)} className="bg-[#FF6B6B] text-white text-2xl py-3 px-16 rounded-2xl shadow-[0_5px_0_#D15456] active:translate-y-1 active:shadow-none transition-all">
+                閉じる
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     if (screen === 'RESULT') {
       return (
         <div className="w-full h-full relative flex flex-col items-center justify-center p-6 bg-[#F4F1E1]">
-          <div className="bg-white hand-drawn-border w-full max-w-[340px] p-8 flex flex-col items-center mb-8 shadow-sm">
-            <div className="relative mb-4 mt-2">
-              <h2 className="text-5xl font-black text-[#FFCC00] absolute inset-0 score-text-stroke text-center tracking-wide">High Score</h2>
-              <h2 className="text-5xl font-black text-[#FFCC00] relative z-10 text-center tracking-wide">High Score</h2>
+          <div className="bg-white hand-drawn-border w-full max-w-[340px] p-6 flex flex-col items-center mb-6 shadow-sm">
+            {isNewRecord && (
+              <div className="bg-[#FF6B6B] text-white text-xs font-bold px-3 py-1 rounded-full mb-2 animate-bounce flex items-center gap-1">
+                <Award size={14} /> NEW RECORD!!
+              </div>
+            )}
+            <div className="relative mb-2 mt-1">
+              <h2 className="text-4xl font-black text-[#FFCC00] absolute inset-0 score-text-stroke text-center tracking-wide">Score</h2>
+              <h2 className="text-4xl font-black text-[#FFCC00] relative z-10 text-center tracking-wide">Score</h2>
             </div>
-            <div className="text-[72px] text-[#7A7A7A] mb-8 leading-none">{score}</div>
+            <div className="text-[64px] font-black text-[#7A7A7A] mb-3 leading-none">{score.toLocaleString()}</div>
+            <div className="text-sm font-bold text-[#A4997C]">
+              自己ベスト: {highScore.toLocaleString()} pt
+              {myRankEntry && ` （フレンド内 ${myRankEntry.rank}位）`}
+            </div>
           </div>
-          <div className="flex gap-4 w-full max-w-[340px]">
-            <button onClick={() => setScreen('TITLE')} className="flex-1 bg-[#1ABC9C] text-white text-2xl font-bold py-4 rounded-2xl shadow-[0_5px_0_#129C81] active:translate-y-1 active:shadow-none transition-all text-center flex justify-center items-center">
-              <span className="drop-shadow-sm">タイトルヘ</span>
-            </button>
-            <button onClick={() => { resetGame(); setScreen('PLAY'); }} className="flex-1 bg-[#1ABC9C] text-white text-2xl font-bold py-4 rounded-2xl shadow-[0_5px_0_#129C81] active:translate-y-1 active:shadow-none transition-all text-center flex justify-center items-center">
-              <span className="drop-shadow-sm">リトライ</span>
+          <div className="flex flex-col gap-3 w-full max-w-[340px]">
+            <div className="flex gap-3 w-full">
+              <button onClick={() => setScreen('TITLE')} className="flex-1 bg-[#1ABC9C] text-white text-xl font-bold py-3.5 rounded-2xl shadow-[0_5px_0_#129C81] active:translate-y-1 active:shadow-none transition-all text-center flex justify-center items-center">
+                <span className="drop-shadow-sm">タイトルへ</span>
+              </button>
+              <button onClick={() => { resetGame(); setScreen('PLAY'); }} className="flex-1 bg-[#FF6B6B] text-white text-xl font-bold py-3.5 rounded-2xl shadow-[0_5px_0_#D15456] active:translate-y-1 active:shadow-none transition-all text-center flex justify-center items-center">
+                <span className="drop-shadow-sm">リトライ</span>
+              </button>
+            </div>
+            <button onClick={() => setScreen('RANKING')} className="w-full bg-[#E58E26] text-white text-xl font-bold py-3.5 rounded-2xl shadow-[0_5px_0_#B86D14] active:translate-y-1 active:shadow-none transition-all flex justify-center items-center gap-2">
+              <Trophy size={20} />
+              <span className="drop-shadow-sm">フレンドランキングを見る</span>
             </button>
           </div>
         </div>
@@ -521,7 +760,14 @@ function SecretGame({ onClose }) {
                </div>
              )}
           </div>
-          <div className="w-12 h-12"></div>
+          <button
+            onClick={() => setScreen('RANKING')}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="w-12 h-12 bg-[#E58E26] text-white rounded-xl shadow-[0_4px_0_#B86D14] flex items-center justify-center active:translate-y-1 active:shadow-none z-50 transition-all pointer-events-auto"
+            title="ランキング"
+          >
+            <Trophy size={22} />
+          </button>
         </div>
         <div className="flex-1 flex flex-col items-center justify-center p-4 relative w-full mx-auto">
           <div className="w-full aspect-square bg-white hand-drawn-border p-2 relative shadow-sm flex-shrink-0">
@@ -548,13 +794,13 @@ function SecretGame({ onClose }) {
             </div>
           </div>
           <div className="w-full flex justify-between mt-6 gap-3 px-1 flex-shrink-0">
-            <div className="flex-1 bg-[#1ABC9C] text-white rounded-2xl py-3 px-6 flex justify-between items-center shadow-md">
-               <span className="text-xl font-bold">Score:</span> 
-               <span className="text-3xl font-bold">{score}</span>
+            <div className="flex-1 bg-[#1ABC9C] text-white rounded-2xl py-3 px-5 flex justify-between items-center shadow-md">
+               <span className="text-lg font-bold">Score:</span> 
+               <span className="text-2xl font-bold">{score}</span>
             </div>
-            <div className="flex-1 bg-[#FF6B6B] text-white rounded-2xl py-3 px-6 flex justify-between items-center shadow-md">
-               <span className="text-xl font-bold">Best:</span> 
-               <span className="text-3xl font-bold">{highScore}</span>
+            <div className="flex-1 bg-[#FF6B6B] text-white rounded-2xl py-3 px-5 flex justify-between items-center shadow-md">
+               <span className="text-lg font-bold">Best:</span> 
+               <span className="text-2xl font-bold">{highScore}</span>
             </div>
           </div>
         </div>

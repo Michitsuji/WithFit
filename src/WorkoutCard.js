@@ -2,7 +2,7 @@
 // WorkoutCard.js — ワークアウトカード＆タイムライン画面コンポーネント
 // ==========================================
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Clock, MapPin, Edit2, Trash2, MoreVertical, FileText, Scale, ListPlus, Copy, Play, Calendar as CalendarIcon, X, Dumbbell, Flame, Activity, Zap, AlignLeft, Heart, MessageCircle, ArrowDown, ArrowUp, Send, Plus } from 'lucide-react';
+import { Clock, MapPin, Edit2, Trash2, MoreVertical, FileText, Scale, ListPlus, Copy, Play, X, Dumbbell, Flame, Activity, Zap, AlignLeft, Heart, MessageCircle, ArrowDown, ArrowUp, Send, Plus } from 'lucide-react';
 import { generateColor, calculateWorkoutTotals, formatShortDateTime, formatDuration, getVolumeMetaphor, getCategoryColor, getRelativeTime } from './utils';
 import { UserAvatar, renderUsernameWithBadge, AdBanner } from './CommonUI';
 
@@ -433,6 +433,12 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
     );
   };
 
+  const hasWorkoutStats = displaySets > 0 || displayVolumeCalc > 0 || displayCalories > 0;
+  const hasBodyMetrics = Boolean(post.bodyWeight || post.bodyFat);
+  const lbmValue = (!hideMetrics && post.bodyWeight && post.bodyFat)
+    ? (Number(post.bodyWeight) * (1 - Number(post.bodyFat) / 100)).toFixed(1)
+    : null;
+
   return (
     <div id={`post-${post.id}`} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm overflow-hidden relative mb-4">
       <div className="absolute top-0 left-0 w-1.5 h-full" style={{ backgroundColor: authorColor }}></div>
@@ -461,9 +467,13 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                 <span>{formatShortDateTime(post.timestamp)}</span>
                 {post.duration && <span className="flex items-center gap-0.5"><Clock size={12}/> {formatDuration(post.duration)}</span>}
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                {post.gymName && <span className="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-900"><MapPin size={10}/> {post.gymName}</span>}
-                {categories.length > 0 && <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-900">部位: {categories.join(', ')}</span>}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {post.gymName && <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-900"><MapPin size={10}/> {post.gymName}</span>}
+                {categories.map(cat => (
+                  <span key={cat} className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${getCategoryColor(cat)}`}>
+                    {cat}
+                  </span>
+                ))}
               </div>
             </div>
           </div>
@@ -486,62 +496,157 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
         )}
       </div>
 
-      <div className="pl-3 mb-3 flex flex-wrap items-center gap-2">
-        {(post.bodyWeight || post.bodyFat) && (
-          <div className="flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 text-xs font-bold px-2.5 py-1 rounded-md border border-indigo-100 dark:border-indigo-900">
-            <Scale size={14} />
-            {hideMetrics ? 'ないしょ♡' : (
-              <>
-                {post.bodyWeight && `${post.bodyWeight}kg`}
-                {post.bodyWeight && post.bodyFat && ' / '}
-                {post.bodyFat && `${post.bodyFat}%`}
-              </>
-            )}
-          </div>
-        )}
-        {displaySets > 0 && (
-          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700">
-             <ListPlus size={14} /> 計 {displaySets} Set
-          </div>
-        )}
-        {onImport && post.items && post.items.length > 0 && (
-          <div className="relative ml-auto">
-            {!showImportOptions ? (
-              <button onClick={() => setShowImportOptions(true)} className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-2 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/80 transition-colors border border-emerald-100 dark:border-emerald-900">
-                <Copy size={14} /> 構成コピー
-              </button>
-            ) : (
-              <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
-                <button onClick={() => { setShowImportOptions(false); onImport(post, false); }} className="flex items-center gap-1 text-[11px] font-bold text-white bg-emerald-500 px-2 py-1.5 rounded hover:bg-emerald-600 transition-colors shadow-sm">
-                  <Play size={10} fill="currentColor" /> 今から
-                </button>
-                <button onClick={() => { setShowImportOptions(false); onImport(post, true); }} className="flex items-center gap-1 text-[11px] font-bold text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-300 px-2 py-1.5 rounded border border-slate-200 dark:border-slate-700 transition-colors shadow-sm">
-                  <CalendarIcon size={10} /> 過去
-                </button>
-                <button onClick={() => setShowImportOptions(false)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-slate-50 dark:bg-slate-800 rounded-full">
-                  <X size={14} />
-                </button>
+      {/* 種目の上のサマリーダッシュボード（体組成グラフのサマリーカードと同じ見やすくスタイリッシュなUI） */}
+      {(hasWorkoutStats || hasBodyMetrics) && (
+        <div className="ml-3 mb-4 bg-slate-50/95 dark:bg-slate-950/75 border border-slate-200/80 dark:border-slate-800/90 rounded-2xl p-3.5 space-y-3 shadow-sm">
+          {/* ワークアウト統計セクション（総負荷量・セット数・消費カロリー） */}
+          {hasWorkoutStats && (
+            <div>
+              {/* 上部バー：負荷量メタファー＆構成コピーボタン */}
+              {(displayVolumeCalc > 0 || (onImport && post.items && post.items.length > 0)) && (
+                <div className="flex items-center justify-between gap-2 mb-2.5 pb-2 border-b border-slate-200/60 dark:border-slate-800/80">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 shadow-[0_0_6px_rgba(16,185,129,0.7)]"></span>
+                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 truncate">
+                      {displayVolumeCalc > 0 ? getVolumeMetaphor(displayVolumeCalc) : 'ワークアウトサマリー'}
+                    </span>
+                  </div>
+                  {onImport && post.items && post.items.length > 0 && (
+                    <div className="relative shrink-0 ml-auto">
+                      {!showImportOptions ? (
+                        <button
+                          onClick={() => setShowImportOptions(true)}
+                          className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/70 transition-colors border border-emerald-200/80 dark:border-emerald-800/80 shadow-sm"
+                        >
+                          <Copy size={12} /> 構成コピー
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-150">
+                          <button onClick={() => { setShowImportOptions(false); onImport(post, false); }} className="flex items-center gap-1 text-[10px] font-bold text-white bg-emerald-500 px-2 py-1 rounded-md hover:bg-emerald-600 transition-colors shadow-sm">
+                            <Play size={9} fill="currentColor" /> 今から
+                          </button>
+                          <button onClick={() => { setShowImportOptions(false); onImport(post, true); }} className="flex items-center gap-1 text-[10px] font-bold text-slate-600 bg-white dark:bg-slate-800 dark:text-slate-300 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 transition-colors shadow-sm">
+                            <CalendarIcon size={9} /> 過去
+                          </button>
+                          <button onClick={() => setShowImportOptions(false)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-white dark:bg-slate-800 rounded-full">
+                            <X size={12} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 3カラムメトリクスグリッド */}
+              <div className="grid grid-cols-3 divide-x divide-slate-200/70 dark:divide-slate-800 text-center">
+                <div className="px-1 flex flex-col items-center justify-center">
+                  <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-0.5 flex items-center gap-1 whitespace-nowrap">
+                    <Dumbbell size={11} className="text-emerald-500 shrink-0" />
+                    <span>総負荷量</span>
+                  </div>
+                  <div className="flex items-baseline justify-center gap-0.5 whitespace-nowrap">
+                    <span className="text-lg sm:text-xl font-black tracking-tight font-mono text-emerald-600 dark:text-emerald-400 leading-tight">
+                      {Number(displayVolumeCalc).toLocaleString()}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400">kg</span>
+                  </div>
+                </div>
+
+                <div className="px-1 flex flex-col items-center justify-center">
+                  <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-0.5 flex items-center gap-1 whitespace-nowrap">
+                    <ListPlus size={11} className="text-indigo-500 shrink-0" />
+                    <span>セット数</span>
+                  </div>
+                  <div className="flex items-baseline justify-center gap-0.5 whitespace-nowrap">
+                    <span className="text-lg sm:text-xl font-black tracking-tight font-mono text-slate-800 dark:text-slate-100 leading-tight">
+                      {displaySets}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400">set</span>
+                    {processedItems.length > 0 && (
+                      <span className="text-[10px] font-bold text-slate-400 ml-0.5">({processedItems.length}種)</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="px-1 flex flex-col items-center justify-center">
+                  <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-0.5 flex items-center gap-1 whitespace-nowrap">
+                    <Flame size={11} className="text-amber-500 shrink-0" />
+                    <span>消費カロリー</span>
+                  </div>
+                  <div className="flex items-baseline justify-center gap-0.5 whitespace-nowrap">
+                    <span className="text-lg sm:text-xl font-black tracking-tight font-mono text-amber-600 dark:text-amber-400 leading-tight">
+                      {Number(displayCalories).toLocaleString()}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400">kcal</span>
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-        )}
-      </div>
-      
-      <div className="pl-3 mb-4 flex flex-wrap gap-2">
-        {(displayVolumeCalc > 0) ? (
-          <div className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
-            <Dumbbell size={14} className="text-slate-500" />
-            総負荷量: {Number(displayVolumeCalc).toLocaleString()}kg
-            <span className="text-slate-400 dark:text-slate-500 font-normal">（{getVolumeMetaphor(displayVolumeCalc)}）</span>
-          </div>
-        ) : null}
-        {(displayCalories > 0) ? (
-          <div className="inline-flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 text-xs font-bold px-3 py-1.5 rounded-lg border border-amber-200 dark:border-amber-900">
-            <Flame size={14} className="text-amber-500" />
-            総消費: {Number(displayCalories).toLocaleString()} kcal
-          </div>
-        ) : null}
-      </div>
+            </div>
+          )}
+
+          {/* 体組成データセクション（体重・体脂肪率・除脂肪体重LBM） */}
+          {hasBodyMetrics && (
+            <div className={hasWorkoutStats ? "pt-2.5 border-t border-slate-200/70 dark:border-slate-800" : ""}>
+              {hideMetrics ? (
+                <div className="flex items-center justify-between px-2 py-1">
+                  <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                    <Scale size={14} /> 体組成データ
+                  </span>
+                  <span className="text-xs font-bold text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900 px-3 py-1 rounded-full border border-slate-200 dark:border-slate-800">
+                    ないしょ♡
+                  </span>
+                </div>
+              ) : (
+                <div className={`grid ${lbmValue ? 'grid-cols-3' : (post.bodyWeight && post.bodyFat ? 'grid-cols-2' : 'grid-cols-1')} divide-x divide-slate-200/70 dark:divide-slate-800 text-center`}>
+                  {post.bodyWeight && (
+                    <div className="px-1 flex flex-col items-center justify-center">
+                      <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-0.5 flex items-center gap-1 whitespace-nowrap">
+                        <Scale size={11} className="text-emerald-500 shrink-0" />
+                        <span>体重</span>
+                      </div>
+                      <div className="flex items-baseline justify-center gap-0.5 whitespace-nowrap">
+                        <span className="text-base sm:text-lg font-black tracking-tight font-mono text-slate-800 dark:text-slate-100 leading-tight">
+                          {Number(post.bodyWeight).toFixed(1)}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400">kg</span>
+                      </div>
+                    </div>
+                  )}
+                  {post.bodyFat && (
+                    <div className="px-1 flex flex-col items-center justify-center">
+                      <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-0.5 flex items-center gap-1 whitespace-nowrap">
+                        <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0"></span>
+                        <span>体脂肪率</span>
+                      </div>
+                      <div className="flex items-baseline justify-center gap-0.5 whitespace-nowrap">
+                        <span className="text-base sm:text-lg font-black tracking-tight font-mono text-indigo-600 dark:text-indigo-400 leading-tight">
+                          {Number(post.bodyFat).toFixed(1)}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400">%</span>
+                      </div>
+                    </div>
+                  )}
+                  {lbmValue && (
+                    <div className="px-1 flex flex-col items-center justify-center">
+                      <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-0.5 flex items-center gap-1 whitespace-nowrap">
+                        <span className="w-2 h-2 rounded-full bg-cyan-500 shrink-0"></span>
+                        <span>除脂肪体重</span>
+                      </div>
+                      <div className="flex items-baseline justify-center gap-0.5 whitespace-nowrap">
+                        <span className="text-base sm:text-lg font-black tracking-tight font-mono text-cyan-600 dark:text-cyan-400 leading-tight">
+                          {lbmValue}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400">kg</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <style>{`
         .hide-scrollbar::-webkit-scrollbar { display: none; }

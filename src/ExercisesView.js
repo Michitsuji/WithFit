@@ -1,5 +1,5 @@
 // ==========================================
-// ExercisesView.js — 種目・ジム管理画面コンポーネント（よく使う順・一覧型フィルタ対応UI）
+// ExercisesView.js — 種目・ジム管理画面コンポーネント（フリーウェイト先頭固定・よく使う順・メンバー0維持対応）
 // ==========================================
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Users, UserPlus, Search, X, Edit2, Trash2, MapPin, EyeOff, Eye, TrendingUp, ChevronDown, ChevronUp, Award, Dumbbell, Filter } from 'lucide-react';
@@ -163,7 +163,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
     return { myExerciseStatsMap: stats, myGymUsageMap: gymCounts };
   }, [posts, currentUser]);
 
-  // 参加中ジムを「よく使う順」にソート（ジムでの記録回数 ＋ そのジム所属種目の合計実施回数）
+  // 参加中ジムを「フリーウェイト（common）を先頭固定」＋「その他のジムはよく使う順」にソート
   const sortedJoinedGyms = useMemo(() => {
     const list = gyms.filter(g => joinedGyms.includes(g.id));
     const getGymScore = (g) => {
@@ -173,7 +173,11 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
         .reduce((sum, ex) => sum + (myExerciseStatsMap[ex.name]?.count || 0), 0);
       return postHits * 1000 + exHits;
     };
-    return [...list].sort((a, b) => getGymScore(b) - getGymScore(a));
+    return [...list].sort((a, b) => {
+      if (a.id === 'common') return -1;
+      if (b.id === 'common') return 1;
+      return getGymScore(b) - getGymScore(a);
+    });
   }, [gyms, joinedGyms, myGymUsageMap, exercises, myExerciseStatsMap]);
 
   const handleAddGym = async (e) => {
@@ -214,20 +218,25 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
       if (targetGym) {
         const members = targetGym.members || [];
         if (!members.includes(currentUser)) {
-          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gyms', gymId), { 
-            members: [...members, currentUser] 
-          }, { merge: true });
+          const nextMembers = [...members, currentUser];
+          const updatePayload = { members: nextMembers };
+          // メンバー0のジムに再参加した場合、オーナー不在なら参加者をオーナーに設定
+          if (members.length === 0 || !targetGym.owner) {
+            updatePayload.owner = currentUser;
+          }
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gyms', gymId), updatePayload, { merge: true });
         }
       }
     } catch (e) {}
   };
 
+  // ジム退会処理（最後の1人が退会してメンバー0になっても、ジムグループと登録種目は削除せず残す）
   const handleLeaveGym = async (gymId) => {
     if (gymId === 'common') {
       alert("フリーウェイト（共通）グループは退会できません。");
       return;
     }
-    if (!window.confirm("このジムグループから退会しますか？登録されているマシンなどの種目が表示されなくなります。")) return;
+    if (!window.confirm("このジムグループから退会しますか？（メンバーが0人になっても、ジムグループと登録されている種目はそのまま残ります）")) return;
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { 
         joinedGyms: joinedGyms.filter(id => id !== gymId) 
@@ -235,9 +244,18 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
       const targetGym = gyms.find(g => g.id === gymId);
       if (targetGym) {
         const members = targetGym.members || [];
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gyms', gymId), { 
-          members: members.filter(m => m !== currentUser) 
-        }, { merge: true });
+        const remainingMembers = members.filter(m => m !== currentUser);
+        const updatePayload = { members: remainingMembers };
+        if (targetGym.owner === currentUser && remainingMembers.length > 0) {
+          updatePayload.owner = remainingMembers[0];
+        }
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gyms', gymId), updatePayload, { merge: true });
+      }
+      if (selectedGymId === gymId) {
+        setSelectedGymId('common');
+      }
+      if (filterGymId === gymId) {
+        setFilterGymId('all');
       }
     } catch (e) {}
   };
@@ -338,29 +356,6 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
     }
   };
 
-  const handleDeleteGym = async (gymId, gymName) => {
-    if (!window.confirm(`${gymName}を削除しますか？登録されている種目や他の参加メンバーの所属情報も削除されます。`)) return;
-    try {
-      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gyms', gymId));
-      const gymExs = exercises.filter(ex => ex.gymId === gymId);
-      for (let ex of gymExs) {
-        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', ex.id));
-      }
-      const targetGym = gyms.find(g => g.id === gymId);
-      if (targetGym && targetGym.members) {
-        for (let mId of targetGym.members) {
-          const mInfo = accountsInfo[mId];
-          if (mInfo && mInfo.joinedGyms) {
-            const nextJoined = mInfo.joinedGyms.filter(id => id !== gymId);
-            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', mId), { joinedGyms: nextJoined }, { merge: true });
-          } 
-        }
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
   const handleDeleteExercise = async (id) => {
     try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exercises', id)); } catch (e) {}
   };
@@ -379,16 +374,16 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
   
   const friendGymsList = filteredGyms.filter(gym => {
     if (joinedGyms.includes(gym.id)) return false;
-    return myFriends.some(f => (gym.members || []).includes(f) || gym.owner === f);
+    return myFriends.some(f => (gym.members || []).includes(f));
   });
   
   const otherGymsList = filteredGyms.filter(gym => {
     if (joinedGyms.includes(gym.id)) return false;
-    if (myFriends.some(f => (gym.members || []).includes(f) || gym.owner === f)) return false;
+    if (myFriends.some(f => (gym.members || []).includes(f))) return false;
     return true;
   });
 
-  // 参加中ジムに属する有効な種目一覧
+  // 参加中ジムに属する有効な種目一覧（ジムの過去メンバーが作成した種目もそのまま残して表示）
   const accessibleExercises = useMemo(() => {
     const joinedGymObjects = gyms.filter(g => joinedGyms.includes(g.id));
     const gymMap = new Map(joinedGymObjects.map(g => [g.id, g]));
@@ -397,8 +392,6 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
       if (!gym) return false;
       if (ex.gymId === 'common') {
         if (ex.author && ex.author !== currentUser && ex.author !== MASTER_USER) return false;
-      } else {
-        if (ex.author && ex.author !== gym.owner && ex.author !== currentUser) return false;
       }
       return true;
     });
@@ -445,13 +438,16 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
   const renderDiscoverGymCard = (gym) => {
     const membersList = gym.members || [];
     const creatorName = accountsInfo[gym.owner]?.displayName || gym.owner || 'システム';
-    const hasFriend = myFriends.some(f => membersList.includes(f) || gym.owner === f);
+    const hasFriend = myFriends.some(f => membersList.includes(f));
+    const gymExCount = exercises.filter(ex => ex.gymId === gym.id).length;
     return (
       <div key={gym.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex justify-between items-center relative overflow-hidden mb-3">
         {hasFriend && <div className="absolute top-0 right-0 bg-amber-400 text-amber-900 text-[9px] font-bold px-2 py-0.5 rounded-bl-lg">フレンド参加中</div>}
         <div className="flex-1 min-w-0 pr-2">
           <h4 className="font-bold text-slate-800 dark:text-slate-100 text-base truncate">{gym.name}</h4>
-          <div className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1 truncate">作成者: {creatorName} ｜ メンバー: {membersList.length}名</div>
+          <div className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1 truncate">
+            作成者: {creatorName} ｜ メンバー: {membersList.length}名 ｜ 登録種目: {gymExCount}件
+          </div>
         </div>
         <button onClick={() => handleJoinGym(gym.id)} className="shrink-0 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-sm transition-colors flex items-center gap-1">
           <Plus size={14} /> 参加
@@ -462,7 +458,10 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
 
   const renderExerciseCard = (ex, gym) => {
     const isMuted = mutedExercises.includes(ex.name);
-    const canEdit = ex.gymId === 'common' ? (currentUser === MASTER_USER || ex.author === currentUser) : (ex.author === currentUser || gym.owner === currentUser);
+    const isGymMember = (gym.members || []).includes(currentUser) || joinedGyms.includes(gym.id);
+    const canEdit = ex.gymId === 'common'
+      ? (currentUser === MASTER_USER || ex.author === currentUser)
+      : (ex.author === currentUser || gym.owner === currentUser || isGymMember);
     const stats = myExerciseStatsMap[ex.name];
     const equipBadge = getExEquipmentBadge(ex);
     const accentBorder = getCategoryBorderAccent(ex.category);
@@ -564,7 +563,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
           >
             {isMuted ? <Eye size={15} /> : <EyeOff size={15} />}
           </button>
-          {((ex.gymId === 'common' && isAdmin) || ex.author === currentUser || (ex.gymId !== 'common' && gym.owner === currentUser)) && (
+          {canEdit && (
             <>
               <button
                 type="button"
@@ -642,28 +641,32 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                   const isOwner = gym.owner === currentUser;
                   const membersList = gym.members || [];
                   const creatorName = accountsInfo[gym.owner]?.displayName || gym.owner || 'システム';
+                  const gymExCount = exercises.filter(ex => ex.gymId === gym.id).length;
                   return (
                     <div key={gym.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col gap-3">
-                      <div className="flex justify-between items-start">
-                        <div>
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="min-w-0">
                           <span className="font-bold text-slate-800 dark:text-slate-100 text-base">{gym.name}</span>
-                          <div className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1">作成者: {creatorName}</div>
+                          <div className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1">
+                            作成者: {creatorName} ｜ 登録種目: {gymExCount}件
+                          </div>
                         </div>
                         
-                        <div className="flex gap-1">
+                        <div className="flex items-center gap-1.5 shrink-0">
                           {gym.id !== 'common' && (
-                            <button onClick={() => setShowMembersGymId(showMembersGymId === gym.id ? null : gym.id)} className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                            <button onClick={() => setShowMembersGymId(showMembersGymId === gym.id ? null : gym.id)} className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
                               メンバー ({membersList.length})
                             </button>
                           )}
-                          {gym.id !== 'common' && isOwner && ( 
-                            <>
-                              <button onClick={() => { setEditingGymId(gym.id); setEditGymName(gym.name); }} className="p-2 text-slate-400 hover:text-emerald-500 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors"><Edit2 size={16} /></button>
-                              <button onClick={() => handleDeleteGym(gym.id, gym.name)} className="p-2 text-slate-400 hover:text-rose-500 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors"><Trash2 size={16} /></button>
-                            </>
+                          {gym.id !== 'common' && (isOwner || isAdmin) && (
+                            <button onClick={() => { setEditingGymId(gym.id); setEditGymName(gym.name); }} className="p-2 text-slate-400 hover:text-emerald-500 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors" title="ジム名を変更">
+                              <Edit2 size={16} />
+                            </button>
                           )}
-                          {gym.id !== 'common' && !isOwner && (
-                            <button onClick={() => handleLeaveGym(gym.id)} className="px-3 py-1 bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 text-xs font-bold rounded-lg border border-rose-200 dark:border-rose-900 hover:bg-rose-100 dark:hover:bg-rose-900/80 transition-colors">退会</button>
+                          {gym.id !== 'common' && (
+                            <button onClick={() => handleLeaveGym(gym.id)} className="px-3 py-1.5 bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 text-xs font-bold rounded-lg border border-rose-200 dark:border-rose-900 hover:bg-rose-100 dark:hover:bg-rose-900/80 transition-colors">
+                              退会
+                            </button>
                           )}
                         </div>
                       </div>
@@ -722,7 +725,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
 
           {otherGymsList.length > 0 && (
             <div>
-              <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-3 ml-1">その他のジム</h3>
+              <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-3 ml-1">その他のジム（メンバー0名のジムも含む）</h3>
               <div>
                 {otherGymsList.map(gym => renderDiscoverGymCard(gym))}
               </div>
@@ -899,9 +902,9 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                   )}
                 </div>
 
-                {/* ジム・グループ選択ボタン（よく使う順・折り返し一覧表示） */}
+                {/* ジム・グループ選択ボタン（「すべて」の次に「フリーウェイト」、以降はよく使う順で一覧表示） */}
                 <div>
-                  <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-1.5">ジム・器具グループ（よく使う順）</div>
+                  <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-1.5">ジム・器具グループ</div>
                   <div className="flex flex-wrap gap-1.5">
                     <button
                       type="button"
@@ -974,7 +977,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                   </div>
                 </div>
 
-                {/* 器具タイプ ＆ 非表示種目切替バー（並び替えセレクターは廃止し常時よく使う順） */}
+                {/* 器具タイプ ＆ 非表示種目切替バー（常時よく使う順） */}
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                   <div className="flex flex-wrap items-center gap-1">
                     {[
@@ -1015,7 +1018,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                 </div>
               </div>
 
-              {/* 種目一覧（よく使うジム順 × よく使う種目順） */}
+              {/* 種目一覧（フリーウェイト先頭＋よく使うジム順 × よく使う種目順） */}
               <div className="space-y-5">
                 {(() => {
                   const normQ = normalizeText(exerciseSearchQuery);
