@@ -620,53 +620,49 @@ function CategoryFilterGrid({ selectedCategories, toggleCategory }) {
   );
 }
 
-// --- 記録ボタン長押しホイール（短時間長押し＆ドラッグ選択の両対応） ---
-const LONG_PRESS_DURATION_MS = 105; // 従来の220msから大幅に短縮し、素早い長押しで即座に起動
-
-function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
+// --- 記録ボタン即時ホイール（触れた瞬間に常時展開＆タップで開始画面、左右スライドでプログラム/記録画面） ---
+function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, setRecordViewMode, onResetManual, children }) {
   const [isOpen, setIsOpen] = useState(false);
   const [hovered, setHovered] = useState(null);
-  const [tapSelectMode, setTapSelectMode] = useState(false);
   const wrapperRef = useRef(null);
   const hoveredRef = useRef(null);
   const isOpenRef = useRef(false);
   const isPressingRef = useRef(false);
-  const pressTimer = useRef(null);
   const startPosRef = useRef({ x: 0, y: 0 });
   const lastPosRef = useRef({ x: 0, y: 0 });
-
-  const clearPressTimer = () => {
-    if (pressTimer.current) {
-      clearTimeout(pressTimer.current);
-      pressTimer.current = null;
-    }
-  };
+  const lastTouchTimeRef = useRef(0);
 
   const closeMenu = () => {
-    clearPressTimer();
     isPressingRef.current = false;
     isOpenRef.current = false;
     hoveredRef.current = null;
     setIsOpen(false);
     setHovered(null);
-    setTapSelectMode(false);
   };
 
   const executeSelection = (target) => {
     closeMenu();
     if (target === 'left') {
-      if (currentTab !== 'record') {
-        setCurrentTab('record');
-      }
+      if (setRecordViewMode) setRecordViewMode('program');
+      if (currentTab !== 'record') setCurrentTab('record');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('showRecordDashboard'));
+        window.dispatchEvent(new CustomEvent('showProgramScreen'));
       }, 20);
     } else if (target === 'right') {
-      if (currentTab !== 'record') {
-        setCurrentTab('record');
-      }
+      if (setRecordViewMode) setRecordViewMode('record');
+      if (currentTab !== 'record') setCurrentTab('record');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('returnToRecordInput'));
+      }, 20);
+    } else {
+      if (onResetManual) onResetManual();
+      if (setRecordViewMode) setRecordViewMode('start');
+      if (currentTab !== 'record') setCurrentTab('record');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('showRecordDashboard'));
       }, 20);
     }
   };
@@ -681,15 +677,18 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
     const dy = centerY - clientY; // 上方向が正
     const dist = Math.hypot(dx, dy);
 
-    // ボタン中心から少し（10px以上）動かしただけで左右どちらかを確実に判定
-    if (dist >= 10 && dy > -45) {
+    if (dist >= 18 && dy > -35) {
       return dx < 0 ? 'left' : 'right';
     }
     return null;
   };
 
   const updateHover = (clientX, clientY) => {
-    const nextHover = calculateHover(clientX, clientY);
+    const moveDist = Math.hypot(
+      clientX - startPosRef.current.x,
+      clientY - startPosRef.current.y
+    );
+    const nextHover = moveDist >= 14 ? calculateHover(clientX, clientY) : null;
     if (hoveredRef.current !== nextHover) {
       hoveredRef.current = nextHover;
       setHovered(nextHover);
@@ -700,90 +699,37 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
   };
 
   const handlePointerStart = (clientX, clientY) => {
-    if (!myInfo?.isTraining) return;
-    if (tapSelectMode) return; // タップ選択モード中はメニュー側のクリックで処理
-
     isPressingRef.current = true;
     startPosRef.current = { x: clientX, y: clientY };
     lastPosRef.current = { x: clientX, y: clientY };
-    clearPressTimer();
-
-    pressTimer.current = setTimeout(() => {
-      if (!isPressingRef.current) return;
-      isOpenRef.current = true;
-      setIsOpen(true);
-      updateHover(lastPosRef.current.x, lastPosRef.current.y);
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        try { navigator.vibrate(35); } catch (e) {}
-      }
-    }, LONG_PRESS_DURATION_MS);
+    hoveredRef.current = null;
+    setHovered(null);
+    isOpenRef.current = true;
+    setIsOpen(true);
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try { navigator.vibrate(20); } catch (e) {}
+    }
   };
 
   useEffect(() => {
-    if (!myInfo?.isTraining) {
-      closeMenu();
-      return;
-    }
-
     const onWindowTouchMove = (e) => {
       if (!isPressingRef.current) return;
       const touch = e.touches && e.touches[0];
       if (!touch) return;
       lastPosRef.current = { x: touch.clientX, y: touch.clientY };
-
-      if (isOpenRef.current) {
-        if (e.cancelable) e.preventDefault();
-        updateHover(touch.clientX, touch.clientY);
-      } else {
-        const moveDist = Math.hypot(
-          touch.clientX - startPosRef.current.x,
-          touch.clientY - startPosRef.current.y
-        );
-        // 長押し待機中に少しでもスライドを開始した場合は即座にメニューを開く
-        if (moveDist > 8) {
-          clearPressTimer();
-          isOpenRef.current = true;
-          setIsOpen(true);
-          updateHover(touch.clientX, touch.clientY);
-        }
-      }
+      if (e.cancelable) e.preventDefault();
+      updateHover(touch.clientX, touch.clientY);
     };
 
     const onWindowMouseMove = (e) => {
       if (!isPressingRef.current) return;
       lastPosRef.current = { x: e.clientX, y: e.clientY };
-      if (isOpenRef.current) {
-        updateHover(e.clientX, e.clientY);
-      } else {
-        const moveDist = Math.hypot(
-          e.clientX - startPosRef.current.x,
-          e.clientY - startPosRef.current.y
-        );
-        if (moveDist > 8) {
-          clearPressTimer();
-          isOpenRef.current = true;
-          setIsOpen(true);
-          updateHover(e.clientX, e.clientY);
-        }
-      }
+      updateHover(e.clientX, e.clientY);
     };
 
     const onWindowEnd = () => {
       if (!isPressingRef.current) return;
       isPressingRef.current = false;
-      const hadTimer = !!pressTimer.current;
-      clearPressTimer();
-
-      // 短押し（長押しメニューが開く前に離した場合）：記録画面へ遷移
-      if (!isOpenRef.current && hadTimer) {
-        if (currentTab !== 'record') {
-          setCurrentTab('record');
-        }
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('returnToRecordInput'));
-        }, 20);
-        return;
-      }
 
       if (isOpenRef.current) {
         updateHover(lastPosRef.current.x, lastPosRef.current.y);
@@ -791,8 +737,8 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
         if (finalSelected === 'left' || finalSelected === 'right') {
           executeSelection(finalSelected);
         } else {
-          // 指を動かさずに長押しして離した場合はメニューを開いたままにし、タップでも選べるようにする
-          setTapSelectMode(true);
+          // プラスボタンをタップして離した時はワークアウトを開始の画面へ遷移
+          executeSelection('start');
         }
       }
     };
@@ -810,89 +756,64 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
       window.removeEventListener('mousemove', onWindowMouseMove);
       window.removeEventListener('mouseup', onWindowEnd);
     };
-  }, [myInfo?.isTraining, currentTab, tapSelectMode]);
+  }, [currentTab]);
 
   return (
-    <>
-      {isOpen && tapSelectMode && (
-        <div
-          className="fixed inset-0 z-40 bg-black/10"
-          onClick={closeMenu}
-          onTouchStart={(e) => { e.stopPropagation(); closeMenu(); }}
-        />
-      )}
+    <div 
+      ref={wrapperRef}
+      className="relative flex flex-col items-center touch-none select-none z-50"
+      style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
+      onTouchStart={(e) => {
+        lastTouchTimeRef.current = Date.now();
+        if (e.touches && e.touches.length > 0) {
+          handlePointerStart(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      }}
+      onMouseDown={(e) => {
+        if (e.button !== 0) return;
+        if (Date.now() - lastTouchTimeRef.current < 500) return;
+        handlePointerStart(e.clientX, e.clientY);
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }}
+    >
       <div 
-        ref={wrapperRef}
-        className={`relative flex flex-col items-center ${myInfo?.isTraining ? 'touch-none select-none z-50' : ''}`}
-        style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
-        onTouchStart={(e) => {
-          if (!myInfo?.isTraining) return;
-          if (e.touches && e.touches.length > 0) {
-            handlePointerStart(e.touches[0].clientX, e.touches[0].clientY);
-          }
-        }}
-        onMouseDown={(e) => {
-          if (!myInfo?.isTraining || e.button !== 0) return;
-          handlePointerStart(e.clientX, e.clientY);
-        }}
-        onContextMenu={(e) => {
-          if (myInfo?.isTraining) {
-            e.preventDefault();
-            e.stopPropagation();
-            return false;
-          }
-        }}
+        className={`absolute bottom-full mb-2 left-1/2 -translate-x-1/2 flex transition-all duration-150 pointer-events-none ${
+          isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-50'
+        }`}
+        style={{ transformOrigin: 'bottom center' }}
       >
-        {myInfo?.isTraining && (
-          <div 
-            className={`absolute bottom-full mb-2 left-1/2 -translate-x-1/2 flex transition-all duration-150 ${
-              isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none'
-            } ${tapSelectMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
-            style={{ transformOrigin: 'bottom center' }}
-          >
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); executeSelection('left'); }}
-              onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); executeSelection('left'); }}
-              className={`relative w-28 h-28 bg-indigo-500/95 backdrop-blur-md rounded-tl-full flex items-center justify-center border-[3px] border-r-[1.5px] border-indigo-300 dark:border-indigo-700 transition-transform duration-150 ${
-                hovered === 'left' ? 'scale-110 bg-indigo-500 z-10 shadow-[0_0_20px_rgba(99,102,241,0.65)]' : 'opacity-85 hover:opacity-100'
-              } origin-bottom-right`}
-            >
-              <div className="flex flex-col items-center justify-center text-white mr-3 mt-5">
-                <AlignLeft size={26} />
-                <span className="text-[11px] font-bold mt-1 tracking-wider">プログラム</span>
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); executeSelection('right'); }}
-              onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); executeSelection('right'); }}
-              className={`relative w-28 h-28 bg-emerald-500/95 backdrop-blur-md rounded-tr-full flex items-center justify-center border-[3px] border-l-[1.5px] border-emerald-300 dark:border-emerald-700 transition-transform duration-150 ${
-                hovered === 'right' ? 'scale-110 bg-emerald-500 z-10 shadow-[0_0_20px_rgba(16,185,129,0.65)]' : 'opacity-85 hover:opacity-100'
-              } origin-bottom-left`}
-            >
-              <div className="flex flex-col items-center justify-center text-white ml-3 mt-5">
-                <Edit2 size={26} />
-                <span className="text-[11px] font-bold mt-1 tracking-wider">記録画面</span>
-              </div>
-            </button>
-          </div>
-        )}
-
         <div
-          className={`transition-transform duration-150 ${isOpen && myInfo?.isTraining ? 'scale-90 opacity-80' : 'scale-100'}`}
-          onClick={() => {
-            if (myInfo?.isTraining && tapSelectMode) {
-              closeMenu();
-            }
-          }}
+          className={`relative w-28 h-28 bg-indigo-500/95 backdrop-blur-md rounded-tl-full flex items-center justify-center border-[3px] border-r-[1.5px] border-indigo-300 dark:border-indigo-700 transition-transform duration-150 ${
+            hovered === 'left' ? 'scale-110 bg-indigo-500 z-10 shadow-[0_0_20px_rgba(99,102,241,0.65)]' : 'opacity-85'
+          } origin-bottom-right`}
         >
-          <div className={myInfo?.isTraining ? "pointer-events-none" : ""}>
-            {children}
+          <div className="flex flex-col items-center justify-center text-white mr-3 mt-5">
+            <AlignLeft size={26} />
+            <span className="text-[11px] font-bold mt-1 tracking-wider">プログラム</span>
+          </div>
+        </div>
+        <div
+          className={`relative w-28 h-28 bg-emerald-500/95 backdrop-blur-md rounded-tr-full flex items-center justify-center border-[3px] border-l-[1.5px] border-emerald-300 dark:border-emerald-700 transition-transform duration-150 ${
+            hovered === 'right' ? 'scale-110 bg-emerald-500 z-10 shadow-[0_0_20px_rgba(16,185,129,0.65)]' : 'opacity-85'
+          } origin-bottom-left`}
+        >
+          <div className="flex flex-col items-center justify-center text-white ml-3 mt-5">
+            <Edit2 size={26} />
+            <span className="text-[11px] font-bold mt-1 tracking-wider">記録画面</span>
           </div>
         </div>
       </div>
-    </>
+
+      <div className={`transition-transform duration-150 ${isOpen ? 'scale-90 opacity-80' : 'scale-100'}`}>
+        <div className="pointer-events-none">
+          {children}
+        </div>
+      </div>
+    </div>
   );
 }
 

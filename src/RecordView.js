@@ -2,10 +2,10 @@
 // RecordView.js — トレーニング記録入力画面・プログラム生成＆管理コンポーネント
 // ==========================================
 import React, { useState, useMemo, useEffect } from 'react';
-import { Target, X, AlignLeft, Trash2, CheckCircle, ArrowUp, ArrowDown, Zap, Plus, Activity, Scale, MapPin, Dumbbell, Play, Flame, UserPlus, ListPlus, Sparkles, Clock, Search, Calendar as CalendarIcon } from 'lucide-react';
+import { Target, X, AlignLeft, Trash2, CheckCircle, ArrowUp, ArrowDown, Zap, Plus, Activity, Scale, MapPin, Dumbbell, Play, Flame, UserPlus, ListPlus, Edit2, Calendar as CalendarIcon } from 'lucide-react';
 import { setDoc, doc, deleteField } from 'firebase/firestore';
 import { db, appId } from './firebase';
-import { formatDateFromTimestamp, formatDateWithDay, generateId, MASTER_USER, getCategoryColor, MUSCLE_CATEGORIES } from './utils';
+import { formatDateFromTimestamp, generateId, MASTER_USER } from './utils';
 import { FormInput, UserAvatar, CategoryFilterGrid } from './CommonUI';
 import { WorkoutItemForm, ReorderItemsModal } from './WorkoutForm';
 
@@ -228,153 +228,32 @@ function ActiveProgramDisplay({ program, onApply, onToggleComplete, onDelete }) 
   );
 }
 
-// --- 過去のデータから種目ごとに追加するモーダル ---
-function PastExercisePickerModal({ isOpen, onClose, pastPosts, onSelectExerciseItem }) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-
-  const pastExerciseEntries = useMemo(() => {
-    if (!pastPosts) return [];
-    const list = [];
-    pastPosts.forEach(post => {
-      if (!post.items || !Array.isArray(post.items)) return;
-      post.items.forEach((item, idx) => {
-        if (!item.exerciseName) return;
-        list.push({
-          key: `${post.id}_${idx}`,
-          post,
-          item,
-          dateStr: formatDateWithDay(post.date || post.timestamp),
-          gymName: post.gymName || ''
-        });
-      });
-    });
-    return list;
-  }, [pastPosts]);
-
-  const filteredEntries = useMemo(() => {
-    return pastExerciseEntries.filter(entry => {
-      if (categoryFilter !== 'all' && (entry.item.category || 'その他') !== categoryFilter) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchName = entry.item.exerciseName.toLowerCase().includes(q);
-        const matchGym = entry.gymName.toLowerCase().includes(q);
-        const matchSuper = (entry.item.superExerciseName || '').toLowerCase().includes(q);
-        return matchName || matchGym || matchSuper;
-      }
-      return true;
-    });
-  }, [pastExerciseEntries, categoryFilter, searchQuery]);
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={onClose}>
-      <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
-        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950/40">
-          <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 text-sm">
-            <Clock size={18} className="text-emerald-500" /> 過去のデータから種目を追加
-          </h3>
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full transition-colors">
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="p-4 border-b border-slate-100 dark:border-slate-800 space-y-2.5 bg-white dark:bg-slate-900">
-          <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="種目名やジム名で検索..."
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-9 pr-8 py-2 text-sm font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                <X size={16} />
-              </button>
-            )}
-          </div>
-          <div className="flex gap-1.5 overflow-x-auto pb-1 hide-scrollbar">
-            <button
-              onClick={() => setCategoryFilter('all')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 border transition-colors ${
-                categoryFilter === 'all'
-                  ? 'bg-emerald-500 text-white border-emerald-500'
-                  : 'bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800'
-              }`}
-            >
-              すべて
-            </button>
-            {MUSCLE_CATEGORIES.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setCategoryFilter(cat)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 border transition-colors ${
-                  categoryFilter === cat
-                    ? 'bg-emerald-500 text-white border-emerald-500'
-                    : 'bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="p-4 overflow-y-auto space-y-2.5 flex-1 bg-slate-50/50 dark:bg-slate-950/50">
-          {filteredEntries.length === 0 ? (
-            <div className="text-center py-8 text-xs font-bold text-slate-400">
-              該当する過去の種目データがありません
-            </div>
-          ) : (
-            filteredEntries.slice(0, 60).map(({ key, post, item, dateStr, gymName }) => (
-              <div key={key} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3 shadow-sm flex flex-col gap-2">
-                <div className="flex justify-between items-start gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-bold text-sm text-slate-800 dark:text-slate-100 truncate">{item.exerciseName}</span>
-                      {item.category && (
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${getCategoryColor(item.category)}`}>
-                          {item.category}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400 mt-0.5">
-                      <span>{dateStr}</span>
-                      {gymName && <span>・{gymName}</span>}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onSelectExerciseItem(item, post);
-                    }}
-                    className="shrink-0 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-sm flex items-center gap-1 transition-colors"
-                  >
-                    <Plus size={14} /> 追加
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {(item.sets || []).map((s, idx) => (
-                    <span key={idx} className="text-[11px] font-bold bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded border border-slate-200/80 dark:border-slate-800">
-                      {item.weightType === 'cardio'
-                        ? `${s.distance || 0}km / ${s.time || 0}分`
-                        : `${s.weight || 0}${item.weightType === 'plate' ? '枚' : 'kg'} × ${s.reps || Math.max(s.lReps || 0, s.rReps || 0)}回`}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function RecordView({ onStart, onPost, onCancel, onRequestJointTraining, onAcceptJointTraining, onRejectJointTraining, onCancelJointTraining, onImportItem, myInfo, gyms, exercises, workoutItems, setWorkoutItems, selectedCategories, setSelectedCategories, posts, currentUser, isManual, setIsManual, onActiveExerciseChange, accountsInfo }) {
+function RecordView({
+  onStart,
+  onPost,
+  onCancel,
+  onRequestJointTraining,
+  onAcceptJointTraining,
+  onRejectJointTraining,
+  onCancelJointTraining,
+  myInfo,
+  gyms,
+  exercises,
+  workoutItems,
+  setWorkoutItems,
+  selectedCategories,
+  setSelectedCategories,
+  posts,
+  currentUser,
+  isManual,
+  setIsManual,
+  onActiveExerciseChange,
+  accountsInfo,
+  viewMode: externalViewMode,
+  setViewMode: setExternalViewMode,
+  selectedGymId: externalSelectedGymId,
+  setSelectedGymId: setExternalSelectedGymId
+}) {
   const joinedGyms = myInfo.joinedGyms || ['common'];
   const jointPartnerId = myInfo.jointPartnerId;
   const partnerItems = jointPartnerId ? (accountsInfo[jointPartnerId]?.currentWorkoutItems || []) : [];
@@ -397,10 +276,36 @@ function RecordView({ onStart, onPost, onCancel, onRequestJointTraining, onAccep
     });
   }, [gyms, joinedGyms, gymUsageCount]);
 
-  const [selectedGymId, setSelectedGymId] = useState(myInfo.currentGymId || (sortedGyms[0]?.id || ''));
+  const [internalSelectedGymId, setInternalSelectedGymId] = useState(
+    myInfo.currentGymId || (sortedGyms[0]?.id || '')
+  );
+  const selectedGymId = externalSelectedGymId !== undefined ? externalSelectedGymId : internalSelectedGymId;
+  const setSelectedGymId = setExternalSelectedGymId || setInternalSelectedGymId;
+
+  // 初期ジム選択およびトレーニング中ジムとの常時同期
+  useEffect(() => {
+    if (myInfo?.isTraining && myInfo?.currentGymId && selectedGymId !== myInfo.currentGymId) {
+      setSelectedGymId(myInfo.currentGymId);
+    } else if (!selectedGymId && sortedGyms.length > 0) {
+      setSelectedGymId(myInfo?.currentGymId || sortedGyms[0].id);
+    }
+  }, [myInfo?.isTraining, myInfo?.currentGymId, sortedGyms, selectedGymId, setSelectedGymId]);
+
+  const handleGymChange = (newGymId) => {
+    setSelectedGymId(newGymId);
+    if (myInfo?.isTraining && currentUser && db) {
+      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), {
+        currentGymId: newGymId
+      }, { merge: true }).catch(() => {});
+    }
+  };
+
+  const [internalViewMode, setInternalViewMode] = useState('start');
+  const viewMode = externalViewMode !== undefined ? externalViewMode : internalViewMode;
+  const setViewMode = setExternalViewMode || setInternalViewMode;
+
   const [showReorderModal, setShowReorderModal] = useState(false);
   const [showProgramModal, setShowProgramModal] = useState(false);
-  const [showPastExerciseModal, setShowPastExerciseModal] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bodyWeight, setBodyWeight] = useState('');
@@ -411,32 +316,29 @@ function RecordView({ onStart, onPost, onCancel, onRequestJointTraining, onAccep
   const [manualEndTime, setManualEndTime] = useState("13:00");
 
   const [isMetricsOnlyMode, setIsMetricsOnlyMode] = useState(false);
-  const [showImportTextModal, setShowImportTextModal] = useState(false);
-  const [importText, setImportText] = useState('');
-  const [aiErrorMsg, setAiErrorMsg] = useState(null);
-  const [importProgress, setImportProgress] = useState(0);
-  const [showDashboard, setShowDashboard] = useState(!myInfo?.isTraining && !isManual);
 
   useEffect(() => {
-    if (!myInfo?.isTraining && !isManual) {
-      setShowDashboard(true);
-    }
-  }, [myInfo?.isTraining, isManual]);
-
-  useEffect(() => {
-    const handleReturn = () => {
-      setShowDashboard(false);
+    const handleReturnToRecord = () => {
+      setIsMetricsOnlyMode(false);
+      setViewMode('record');
     };
-    const handleShowDashboard = () => {
-      setShowDashboard(true);
+    const handleShowStart = () => {
+      setIsMetricsOnlyMode(false);
+      setViewMode('start');
     };
-    window.addEventListener('returnToRecordInput', handleReturn);
-    window.addEventListener('showRecordDashboard', handleShowDashboard);
+    const handleShowProgram = () => {
+      setIsMetricsOnlyMode(false);
+      setViewMode('program');
+    };
+    window.addEventListener('returnToRecordInput', handleReturnToRecord);
+    window.addEventListener('showRecordDashboard', handleShowStart);
+    window.addEventListener('showProgramScreen', handleShowProgram);
     return () => {
-      window.removeEventListener('returnToRecordInput', handleReturn);
-      window.removeEventListener('showRecordDashboard', handleShowDashboard);
+      window.removeEventListener('returnToRecordInput', handleReturnToRecord);
+      window.removeEventListener('showRecordDashboard', handleShowStart);
+      window.removeEventListener('showProgramScreen', handleShowProgram);
     };
-  }, []);
+  }, [setViewMode]);
 
   const handleContainerRef = (node) => {
     if (node) {
@@ -467,7 +369,7 @@ function RecordView({ onStart, onPost, onCancel, onRequestJointTraining, onAccep
       }
       return true;
     });
-  }, [exercises, selectedGymId, mutedExercises, currentUser, gyms]);
+  }, [exercises, selectedGymId, mutedExercises, currentUser]);
 
   const availableExercises = useMemo(() => {
     if (selectedCategories.length === 0) return allGymExercises;
@@ -477,159 +379,6 @@ function RecordView({ onStart, onPost, onCancel, onRequestJointTraining, onAccep
   const ensureCategory = (cat) => {
     if (!cat) return;
     setSelectedCategories(prev => prev.includes(cat) ? prev : [...prev, cat]);
-  };
-
-  const handleTextImportSubmit = async () => {
-    if (!importText.trim()) {
-      alert("テキストを入力してください。");
-      return;
-    }
-    setIsSubmitting(true);
-    setImportProgress(0);
-    
-    const progressInterval = setInterval(() => {
-      setImportProgress(prev => {
-        if (prev >= 90) return 90;
-        return Math.floor(prev + (90 - prev) * 0.15 + 1);
-      });
-    }, 800);
-
-    try {
-      const prompt = `以下のトレーニング記録テキストを解析し、JSON配列のみを出力してください。
-フォーマット要件:
-[
-  {
-    "exerciseName": "種目名",
-    "category": "胸/背中/肩/腕/脚/腹筋/有酸素/その他のいずれか",
-    "weightType": "total",
-    "isSuperSet": false,
-    "isDropSet": false,
-    "isForcedReps": false,
-    "superExerciseName": "スーパーセット種目名(あれば)",
-    "superWeightType": "total",
-    "superExerciseName3": "ジャイアントセット種目名(あれば)",
-    "superWeightType3": "total",
-    "memo": "アプリの項目で表現しきれない情報やメモがあれば記載",
-    "sets": [
-      {
-        "weight": "重量(自重は0)", "reps": "通常の回数", "lReps": "片側の左の回数", "rReps": "片側の右の回数", "forcedReps": "補助回数",
-        "distance": "有酸素距離", "time": "時間", "calories": "カロリー",
-        "superWeight": "スーパーセット重量", "superReps": "回数", "superLReps": "左回数", "superRReps": "右回数", "superForcedReps": "",
-        "superWeight3": "ジャイアントセット重量", "superReps3": "回数", "superLReps3": "左回数", "superRReps3": "右回数", "superForcedReps3": "",
-        "dropSets": [
-           { "weight": "ドロップ重量", "reps": "通常の回数", "lReps": "左の回数", "rReps": "右の回数", "forcedReps": "", "superWeight": "", "superReps": "", "superWeight3": "", "superReps3": "" }
-        ]
-      }
-    ]
-  }
-]
-※片側種目（ランジやワンアーム系など左右で回数を分ける種目）の場合は、必ず weightType を "lr" とし、reps ではなく lReps と rReps に回数を代入してください。
-アプリで記録できる上記形式で可能な限り抽出し、表現しきれない部分はmemoにまとめてください。JSONのみ出力してください。
-対象テキスト:
-${importText}`;
-
-      setAiErrorMsg(null);
-      
-      const response = await fetch('/api/gemini', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || '解析リクエストに失敗しました');
-      }
-      let textResponse = data.candidates[0].content.parts[0].text;
-      textResponse = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
-      const parsedItems = JSON.parse(textResponse);
-
-      const newItems = parsedItems.map(item => {
-        const matchedEx = allGymExercises.find(ex => ex.name.includes(item.exerciseName) || (item.exerciseName && item.exerciseName.includes(ex.name)));
-        if (matchedEx && !selectedCategories.includes(matchedEx.category)) {
-           toggleCategory(matchedEx.category);
-        }
-        return {
-          id: generateId(),
-          exerciseName: matchedEx ? matchedEx.name : (item.exerciseName || ''),
-          weightType: item.weightType === 'lr' ? 'lr' : (matchedEx ? (matchedEx.weightType || 'total') : (item.weightType || 'total')),
-          category: matchedEx ? (matchedEx.category || 'その他') : (item.category || 'その他'),
-          isSuperSet: item.isSuperSet || !!item.superExerciseName || false,
-          isDropSet: item.isDropSet || (item.sets && item.sets.some(s => s.dropSets && s.dropSets.length > 0)) || false,
-          isForcedReps: item.isForcedReps || (item.sets && item.sets.some(s => s.forcedReps || s.superForcedReps || s.superForcedReps3)) || false,
-          superExerciseName: item.superExerciseName || '',
-          superWeightType: item.superWeightType || 'total',
-          superExerciseName3: item.superExerciseName3 || '',
-          superWeightType3: item.superWeightType3 || 'total',
-          memo: item.memo || '',
-          sets: (item.sets || []).map(set => ({
-            id: generateId(),
-            weight: set.weight || '',
-            reps: '', targetReps: set.reps || '',
-            lReps: '', targetLReps: set.lReps || '',
-            rReps: '', targetRReps: set.rReps || '',
-            forcedReps: set.forcedReps || '',
-            distance: set.distance || '',
-            time: set.time || '',
-            calories: set.calories || '',
-            superWeight: set.superWeight || '',
-            superReps: '', targetSuperReps: set.superReps || '',
-            superLReps: '', targetSuperLReps: set.superLReps || '',
-            superRReps: '', targetSuperRReps: set.superRReps || '',
-            superForcedReps: set.superForcedReps || '',
-            superWeight3: set.superWeight3 || '',
-            superReps3: '', targetSuperReps3: set.superReps3 || '',
-            superLReps3: '', targetSuperLReps3: set.superLReps3 || '',
-            superRReps3: '', targetSuperRReps3: set.superRReps3 || '',
-            superForcedReps3: set.superForcedReps3 || '',
-            dropSets: (set.dropSets || []).map(ds => ({
-                id: generateId(),
-                weight: ds.weight || '',
-                reps: '', targetReps: ds.reps || '',
-                lReps: '', targetLReps: ds.lReps || '',
-                rReps: '', targetRReps: ds.rReps || '',
-                forcedReps: ds.forcedReps || '',
-                superWeight: ds.superWeight,
-                superReps: '', targetSuperReps: ds.superReps || '',
-                superLReps: '', targetSuperLReps: ds.superLReps || '',
-                superRReps: '', targetSuperRReps: ds.superRReps || '',
-                superForcedReps: ds.superForcedReps,
-                superWeight3: ds.superWeight3,
-                superReps3: '', targetSuperReps3: ds.superReps3 || '',
-                superLReps3: '', targetSuperLReps3: ds.superLReps3 || '',
-                superRReps3: '', targetSuperRReps3: ds.superRReps3 || '',
-                superForcedReps3: ds.superForcedReps3
-            }))
-          }))
-        };
-      });
-
-      if (newItems.length > 0) {
-         clearInterval(progressInterval);
-         setImportProgress(100);
-         setTimeout(() => {
-           setWorkoutItems(prev => {
-             const hasOnlyEmpty = prev.length === 1 && !prev[0].exerciseName && prev[0].sets.length === 1 && !prev[0].sets[0].weight && !prev[0].sets[0].reps;
-             return hasOnlyEmpty ? newItems : [...prev, ...newItems];
-           });
-           alert(newItems.length + "種目をインポートしました！微調整を行ってください。");
-           setShowImportTextModal(false);
-           setImportText('');
-           setImportProgress(0);
-         }, 300);
-      } else {
-         clearInterval(progressInterval);
-         setImportProgress(0);
-         alert("トレーニング内容を解析できませんでした。");
-      }
-    } catch (error) {
-      clearInterval(progressInterval);
-      setImportProgress(0);
-      console.error(error);
-      setAiErrorMsg(error.message);
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   const handleGenerateProgram = async (progType, exerciseName, oneRM) => {
@@ -726,7 +475,8 @@ ${importText}`;
       const hasOnlyEmpty = prev.length === 1 && !prev[0].exerciseName && prev[0].sets.length === 1 && !prev[0].sets[0].weight && !prev[0].sets[0].reps;
       return hasOnlyEmpty ? [newItem] : [...prev, newItem];
     });
-    alert("今日のメニューに追加しました！そのまま「トレーニング開始」を押して記録できます。");
+    setViewMode('record');
+    alert("記録画面のメニューに追加しました！");
   };
 
   const handleToggleProgramComplete = async (programId, scheduleId) => {
@@ -758,11 +508,12 @@ ${importText}`;
 
   const handleStart = () => {
     if (!selectedGymId) { alert("ジムを選択してください"); return; }
+    setIsManual(false);
     onStart(selectedGymId);
     if (workoutItems.length === 0) {
-       addExerciseItem('');
+       addExerciseItem(null, '');
     }
-    setShowDashboard(false);
+    setViewMode('record');
   };
 
   const updateItem = (itemId, data) => {
@@ -827,7 +578,7 @@ ${importText}`;
     if (insertAfterIndex !== null) {
       setTimeout(() => {
          const container = document.getElementById('workout-items-container');
-         if (container) {
+         if (container && container.children[0]) {
             const cardWidth = container.children[0].offsetWidth;
             container.scrollTo({ left: (insertAfterIndex + 1) * (cardWidth + 12), behavior: 'smooth' });
          }
@@ -858,7 +609,12 @@ ${importText}`;
          newSet = { id: generateId(), distance: lastSet.distance || '', time: lastSet.time || '', calories: lastSet.calories || '' };
       } else {
          newSet = { 
-          id: generateId(), weight: lastSet.weight || '', reps: lastSet.reps || '', lReps: lastSet.lReps || '', rReps: lastSet.rReps || '',
+          id: generateId(),
+          weight: lastSet.weight || '',
+          weightSign: lastSet.weightSign,
+          reps: lastSet.reps || '',
+          lReps: lastSet.lReps || '',
+          rReps: lastSet.rReps || '',
           dropSets: lastSet.dropSets ? lastSet.dropSets.map(ds => ({ ...ds, id: generateId() })) : undefined,
           superDropSets: lastSet.superDropSets ? lastSet.superDropSets.map(ds => ({ ...ds, id: generateId() })) : undefined,
           superDropSets3: lastSet.superDropSets3 ? lastSet.superDropSets3.map(ds => ({ ...ds, id: generateId() })) : undefined
@@ -1084,6 +840,12 @@ ${importText}`;
           setWorkoutItems([]);
           setSelectedCategories([]);
           setIsManual(false);
+          setViewMode('start');
+      } else if (!myInfo?.isTraining) {
+          if (window.confirm("事前に追加した種目メニューをクリアしますか？")) {
+            setWorkoutItems([]);
+            setSelectedCategories([]);
+          }
       } else {
           onCancel();
       }
@@ -1123,61 +885,17 @@ ${importText}`;
      );
   }
 
-  if (showDashboard) {
+  // --- 1. プログラム画面（独立画面） ---
+  if (viewMode === 'program') {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
-          {myInfo?.isTraining ? 'プログラム・メニュー' : 'ワークアウトを開始'}
-        </h2>
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col items-center">
-          <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4"><MapPin size={28} className="text-slate-400 dark:text-slate-500" /></div>
-          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 text-center">
-            {myInfo?.isTraining ? 'トレーニング中のジム' : '本日のトレーニング場所を選択してください'}
-          </label>
-          <div className="w-full relative mb-6">
-            <select value={selectedGymId} onChange={(e) => setSelectedGymId(e.target.value)} disabled={myInfo?.isTraining} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base disabled:opacity-70" style={{ fontSize: '16px' }}>
-              <option value="" disabled>ジムを選択</option>
-              {sortedGyms.map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
-            </select>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">▼</div>
-          </div>
-          
-          {myInfo?.isTraining ? (
-            <button onClick={() => setShowDashboard(false)} className="w-full py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all shadow-md bg-indigo-500 hover:bg-indigo-600 shadow-indigo-500/30 mb-3">
-              <Dumbbell fill="currentColor" size={20} /> 記録画面に戻る
-            </button>
-          ) : (
-            <>
-              <button onClick={handleStart} className="w-full py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all shadow-md bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30 mb-3">
-                <Play fill="currentColor" size={20} /> トレーニング開始
-              </button>
-              
-              <div className="grid grid-cols-2 gap-3 w-full">
-                <button onClick={() => {setIsManual(true); if(workoutItems.length === 0) addExerciseItem('');}} className="w-full py-3 rounded-xl font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex flex-col items-center justify-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-all">
-                  <CalendarIcon size={18} /> 過去の記録を追加
-                </button>
-                <button onClick={() => { 
-                   const d = new Date();
-                   setManualDate(formatDateFromTimestamp(d.getTime()));
-                   setManualStartTime(`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`);
-                   setIsMetricsOnlyMode(true); 
-                }} className="w-full py-3 rounded-xl font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-950/50 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 flex flex-col items-center justify-center gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-all">
-                  <Scale size={18} /> 体組成のみ記録
-                </button>
-              </div>
-            </>
-          )}
-
+        <div className="flex justify-between items-center mb-2">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <Target size={22} className="text-indigo-500" /> プログラム管理
+          </h2>
         </div>
-        
-        {/* プログラム作成機能 */}
-        <div className="mt-6 w-full">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-               <Target size={16} className="text-indigo-500" /> プログラム管理 (β版)
-            </h3>
-          </div>
-          
+
+        <div className="w-full">
           {activeProgramsList.map(prog => (
             <ActiveProgramDisplay 
               key={prog.id}
@@ -1204,15 +922,97 @@ ${importText}`;
     );
   }
 
+  // --- 2. トレーニング記録開始画面（ワークアウトを開始の画面） ---
+  if (viewMode === 'start') {
+    const preAddedCount = workoutItems.filter(it => it.exerciseName).length;
+    return (
+      <div className="space-y-6 animate-in fade-in duration-300">
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+          ワークアウトを開始
+        </h2>
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col items-center">
+          <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
+            <MapPin size={28} className="text-emerald-500" />
+          </div>
+          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 text-center">
+            {myInfo?.isTraining ? 'トレーニング中のジム（記録画面と同期中）' : '本日のトレーニング場所を選択してください'}
+          </label>
+          <div className="w-full relative mb-6">
+            <select
+              value={selectedGymId}
+              onChange={(e) => handleGymChange(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base"
+              style={{ fontSize: '16px' }}
+            >
+              <option value="" disabled>ジムを選択</option>
+              {sortedGyms.map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
+            </select>
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">▼</div>
+          </div>
+          
+          {myInfo?.isTraining ? (
+            <button onClick={() => setViewMode('record')} className="w-full py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all shadow-md bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30 mb-3">
+              <Dumbbell fill="currentColor" size={20} /> 記録画面へ移動
+            </button>
+          ) : (
+            <>
+              <button onClick={handleStart} className="w-full py-4 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all shadow-md bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30 mb-3">
+                <Play fill="currentColor" size={20} /> トレーニング開始
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsManual(false);
+                  if (workoutItems.length === 0) addExerciseItem(null, '');
+                  setViewMode('record');
+                }}
+                className="w-full py-3 rounded-xl font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-2 hover:bg-slate-200 dark:hover:bg-slate-800 transition-all mb-3 text-sm"
+              >
+                <Edit2 size={16} className="text-emerald-500" />
+                {preAddedCount > 0 ? `事前に追加した種目を編集 (${preAddedCount}種目)` : '開始前に記録画面で種目を追加しておく'}
+              </button>
+              
+              <div className="grid grid-cols-2 gap-3 w-full">
+                <button
+                  onClick={() => {
+                    setIsManual(true);
+                    if (workoutItems.length === 0) addExerciseItem(null, '');
+                    setViewMode('record');
+                  }}
+                  className="w-full py-3 rounded-xl font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex flex-col items-center justify-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-all"
+                >
+                  <CalendarIcon size={18} /> 過去の記録を追加
+                </button>
+                <button
+                  onClick={() => { 
+                    const d = new Date();
+                    setManualDate(formatDateFromTimestamp(d.getTime()));
+                    setManualStartTime(`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`);
+                    setIsMetricsOnlyMode(true); 
+                  }}
+                  className="w-full py-3 rounded-xl font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-950/50 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 flex flex-col items-center justify-center gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-all"
+                >
+                  <Scale size={18} /> 体組成のみ記録
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // --- 3. 記録画面（事前メニュー作成・トレーニング中・過去記録入力） ---
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      {isManual && (
+      {isManual ? (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-4">
            <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2"><CalendarIcon size={18} className="text-emerald-500"/> 過去の記録</h3>
            <div>
              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">ジムを選択</label>
              <div className="w-full relative">
-               <select value={selectedGymId} onChange={(e) => setSelectedGymId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
+               <select value={selectedGymId} onChange={(e) => handleGymChange(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
                  <option value="" disabled>ジムを選択</option>
                  {sortedGyms.map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
                </select>
@@ -1225,9 +1025,44 @@ ${importText}`;
              <FormInput label="終了時間" type="time" value={manualEndTime} onChange={e => setManualEndTime(e.target.value)} className="flex-1" />
            </div>
         </div>
+      ) : (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 shadow-sm flex flex-col gap-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 shrink-0">
+              <MapPin size={14} className="text-emerald-500" />
+              現在のジム
+            </span>
+            <div className="relative flex-1 max-w-[220px]">
+              <select
+                value={selectedGymId}
+                onChange={(e) => handleGymChange(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-3 pr-7 py-1.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-sm"
+                style={{ fontSize: '16px' }}
+              >
+                <option value="" disabled>ジムを選択</option>
+                {sortedGyms.map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
+              </select>
+              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
+            </div>
+          </div>
+          {!myInfo?.isTraining && (
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                開始前に種目を追加・準備できます
+              </span>
+              <button
+                type="button"
+                onClick={handleStart}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm flex items-center gap-1.5 shrink-0 transition-colors"
+              >
+                <Play size={13} fill="currentColor" /> ワークアウト開始
+              </button>
+            </div>
+          )}
+        </div>
       )}
 
-      <div className="mt-6 mb-2">
+      <div className="mt-4 mb-2">
         {(() => {
           const friendsInSameGym = (myInfo.friends || []).filter(f => accountsInfo[f]?.isTraining && accountsInfo[f]?.currentGymId === myInfo.currentGymId && myInfo.currentGymId);
           return (
@@ -1283,15 +1118,10 @@ ${importText}`;
       </div>
 
       <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
-        <h2 className="text-lg font-bold text-slate-900 dark:text-white">{isManual ? '記録内容' : 'ワークアウト中'}</h2>
+        <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+          {isManual ? '記録内容' : myInfo?.isTraining ? 'ワークアウト中' : '記録画面（メニュー準備）'}
+        </h2>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowPastExerciseModal(true)}
-            className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800 flex items-center gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors shadow-sm"
-          >
-            <Clock size={14} /> 過去データから種目追加
-          </button>
           {workoutItems.length > 1 && (
             <button onClick={() => setShowReorderModal(true)} className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 flex items-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-colors shadow-sm">
               <ArrowUp size={14} /><ArrowDown size={14} className="-ml-2" /> 並び替え
@@ -1314,101 +1144,101 @@ ${importText}`;
           .hide-scrollbar::-webkit-scrollbar { display: none; }
           .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         `}</style>
-      <div id="workout-items-container" ref={handleContainerRef} onScroll={handleScroll} className="flex overflow-x-auto gap-3 sm:gap-4 pb-6 pt-5 -mx-4 px-4 hide-scrollbar items-start snap-x snap-mandatory">
-        {workoutItems.length === 0 ? (
-          <div className="snap-center shrink-0 w-[88%] sm:w-[320px] flex flex-col justify-center h-full min-h-[200px]">
-            <button onClick={() => addExerciseItem(null)} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
-              <div className="bg-white dark:bg-slate-800 p-3 rounded-full shadow-sm"><ListPlus size={24} className="text-emerald-500" /></div>
-              <span>種目を追加</span>
-            </button>
-          </div>
-        ) : (
-          Array.from({ length: Math.max(workoutItems.length, partnerItems.length) }).map((_, index) => {
-             const myItem = workoutItems[index];
-             const pItem = partnerItems[index];
-             return (
-               <div key={myItem ? myItem.id : `p_${pItem?.id}`} className="snap-center shrink-0 w-[88%] sm:w-[320px] relative flex flex-col gap-3">
-                 {/* 自分のカード */}
-                 {myItem ? (
-                   <div className="relative">
-                     {jointPartnerId && <div className="absolute -top-3 left-4 z-10 bg-emerald-500 text-white px-2 py-0.5 rounded-full shadow-sm text-[10px] font-bold">あなた</div>}
-                     <WorkoutItemForm 
-                       item={myItem} 
-                       index={index}
-                       availableExercises={availableExercises}
-                       allGymExercises={allGymExercises}
-                       onEnsureCategory={ensureCategory}
-                       updateItem={updateItem} 
-                       removeItem={removeExerciseItem}
-                       addSet={addSet} 
-                       removeSet={removeSet} 
-                       updateSet={updateSetField} 
-                       addDropSet={addDropSet} 
-                       removeDropSet={removeDropSet} 
-                       updateDropSet={updateDropSetField}
-                       reorderSet={reorderSet}
-                       myPastPosts={myPastPosts}
-                       onActive={onActiveExerciseChange}
-                       isDragging={false}
-                       isAnyDragging={false}
-                       dragHandleProps={{}}
-                     />
-                   </div>
-                 ) : (
-                   <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-4 opacity-50 flex items-center justify-center min-h-[150px]"><span className="text-xs font-bold">あなたの種目なし</span></div>
-                 )}
-                 
-                 {/* 相手のカード */}
-                 {jointPartnerId && pItem ? (
-                   <div className="relative opacity-90 scale-[0.98]">
-                     <div className="absolute -top-3 left-4 z-10 bg-orange-500 text-white px-2 py-0.5 rounded-full shadow-sm text-[10px] font-bold flex items-center gap-1">
-                       <UserAvatar userId={jointPartnerId} accountsInfo={accountsInfo} size={16} className="border-transparent" />
-                       {accountsInfo[jointPartnerId]?.displayName || jointPartnerId}
+        <div id="workout-items-container" ref={handleContainerRef} onScroll={handleScroll} className="flex overflow-x-auto gap-3 sm:gap-4 pb-6 pt-5 -mx-4 px-4 hide-scrollbar items-start snap-x snap-mandatory">
+          {workoutItems.length === 0 ? (
+            <div className="snap-center shrink-0 w-[92%] sm:w-[340px] flex flex-col justify-center h-full min-h-[200px]">
+              <button onClick={() => addExerciseItem(null)} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
+                <div className="bg-white dark:bg-slate-800 p-3 rounded-full shadow-sm"><ListPlus size={24} className="text-emerald-500" /></div>
+                <span>種目を追加</span>
+              </button>
+            </div>
+          ) : (
+            Array.from({ length: Math.max(workoutItems.length, partnerItems.length) }).map((_, index) => {
+               const myItem = workoutItems[index];
+               const pItem = partnerItems[index];
+               return (
+                 <div key={myItem ? myItem.id : `p_${pItem?.id}`} className="snap-center shrink-0 w-[92%] sm:w-[340px] relative flex flex-col gap-3">
+                   {/* 自分のカード */}
+                   {myItem ? (
+                     <div className="relative">
+                       {jointPartnerId && <div className="absolute -top-3 left-4 z-10 bg-emerald-500 text-white px-2 py-0.5 rounded-full shadow-sm text-[10px] font-bold">あなた</div>}
+                       <WorkoutItemForm 
+                         item={myItem} 
+                         index={index}
+                         availableExercises={availableExercises}
+                         allGymExercises={allGymExercises}
+                         onEnsureCategory={ensureCategory}
+                         updateItem={updateItem} 
+                         removeItem={removeExerciseItem}
+                         addSet={addSet} 
+                         removeSet={removeSet} 
+                         updateSet={updateSetField} 
+                         addDropSet={addDropSet} 
+                         removeDropSet={removeDropSet} 
+                         updateDropSet={updateDropSetField}
+                         reorderSet={reorderSet}
+                         myPastPosts={myPastPosts}
+                         onActive={onActiveExerciseChange}
+                         isDragging={false}
+                         isAnyDragging={false}
+                         dragHandleProps={{}}
+                       />
                      </div>
-                     <WorkoutItemForm 
-                       item={pItem} 
-                       index={index}
-                       availableExercises={availableExercises}
-                       allGymExercises={allGymExercises}
-                       onEnsureCategory={ensureCategory}
-                       updateItem={updatePartnerItem} 
-                       removeItem={() => {}}
-                       addSet={addPartnerSet} 
-                       removeSet={removePartnerSet} 
-                       updateSet={updatePartnerSetField} 
-                       addDropSet={addPartnerDropSet} 
-                       removeDropSet={removePartnerDropSet} 
-                       updateDropSet={updatePartnerDropSetField}
-                       reorderSet={reorderPartnerSet}
-                       myPastPosts={posts.filter(p => p.author === jointPartnerId)}
-                       onActive={() => {}}
-                       isDragging={false}
-                       isAnyDragging={false}
-                       dragHandleProps={{}}
-                       isJointPartner={true}
-                     />
-                   </div>
-                 ) : jointPartnerId && !pItem ? (
-                   <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-4 opacity-50 flex items-center justify-center min-h-[150px]"><span className="text-xs font-bold text-slate-400">相手の種目なし</span></div>
-                 ) : null}
-                 
-                 <button onClick={() => addExerciseItem(index)} className="w-full py-3 bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 rounded-xl text-sm font-bold flex flex-col items-center justify-center gap-1 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm -mt-2">
-                   <ListPlus size={16} className="text-emerald-500" />
-                   <span>この次に種目を追加</span>
-                 </button>
-               </div>
-             );
-          })
-        )}
-        {jointPartnerId && (
-           <div className="snap-center shrink-0 w-[88%] sm:w-[320px] flex flex-col justify-center h-full min-h-[200px] pb-6">
-             <button onClick={() => addExerciseItem(null)} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
-               <div className="bg-white dark:bg-slate-800 p-3 rounded-full shadow-sm"><ListPlus size={24} className="text-orange-500" /></div>
-               <span>ふたりで種目を追加</span>
-             </button>
-           </div>
-        )}
-      </div>
+                   ) : (
+                     <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-4 opacity-50 flex items-center justify-center min-h-[150px]"><span className="text-xs font-bold">あなたの種目なし</span></div>
+                   )}
+                   
+                   {/* 相手のカード */}
+                   {jointPartnerId && pItem ? (
+                     <div className="relative opacity-90 scale-[0.98]">
+                       <div className="absolute -top-3 left-4 z-10 bg-orange-500 text-white px-2 py-0.5 rounded-full shadow-sm text-[10px] font-bold flex items-center gap-1">
+                         <UserAvatar userId={jointPartnerId} accountsInfo={accountsInfo} size={16} className="border-transparent" />
+                         {accountsInfo[jointPartnerId]?.displayName || jointPartnerId}
+                       </div>
+                       <WorkoutItemForm 
+                         item={pItem} 
+                         index={index}
+                         availableExercises={availableExercises}
+                         allGymExercises={allGymExercises}
+                         onEnsureCategory={ensureCategory}
+                         updateItem={updatePartnerItem} 
+                         removeItem={() => {}}
+                         addSet={addPartnerSet} 
+                         removeSet={removePartnerSet} 
+                         updateSet={updatePartnerSetField} 
+                         addDropSet={addPartnerDropSet} 
+                         removeDropSet={removePartnerDropSet} 
+                         updateDropSet={updatePartnerDropSetField}
+                         reorderSet={reorderPartnerSet}
+                         myPastPosts={posts.filter(p => p.author === jointPartnerId)}
+                         onActive={() => {}}
+                         isDragging={false}
+                         isAnyDragging={false}
+                         dragHandleProps={{}}
+                         isJointPartner={true}
+                       />
+                     </div>
+                   ) : jointPartnerId && !pItem ? (
+                     <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-4 opacity-50 flex items-center justify-center min-h-[150px]"><span className="text-xs font-bold text-slate-400">相手の種目なし</span></div>
+                   ) : null}
+                   
+                   <button onClick={() => addExerciseItem(index)} className="w-full py-3 bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 rounded-xl text-sm font-bold flex flex-col items-center justify-center gap-1 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shadow-sm -mt-2">
+                     <ListPlus size={16} className="text-emerald-500" />
+                     <span>この次に種目を追加</span>
+                   </button>
+                 </div>
+               );
+            })
+          )}
+          {jointPartnerId && (
+             <div className="snap-center shrink-0 w-[92%] sm:w-[340px] flex flex-col justify-center h-full min-h-[200px] pb-6">
+               <button onClick={() => addExerciseItem(null)} className="w-full py-8 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-2xl text-sm font-bold flex flex-col items-center justify-center gap-3 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors border-2 border-dashed border-slate-300 dark:border-slate-700 shadow-sm">
+                 <div className="bg-white dark:bg-slate-800 p-3 rounded-full shadow-sm"><ListPlus size={24} className="text-orange-500" /></div>
+                 <span>ふたりで種目を追加</span>
+               </button>
+             </div>
+          )}
+        </div>
 
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm mt-6">
           <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2"><Activity size={16} /> 本日の体組成（任意）</h3>
@@ -1418,65 +1248,23 @@ ${importText}`;
           </div>
         </div>
 
-        <button onClick={handleSubmit} disabled={isSubmitting || (workoutItems.length === 0 && !bodyWeight && !bodyFat)} className={`w-full text-white font-bold py-4 rounded-xl shadow-md flex items-center justify-center gap-2 mt-6 mb-4 transition-all ${isSubmitting || (workoutItems.length === 0 && !bodyWeight && !bodyFat) ? 'bg-slate-300 dark:bg-slate-800 cursor-not-allowed text-slate-500 dark:text-slate-400' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30'}`}>
+        {!myInfo?.isTraining && !isManual && (
+          <button
+            onClick={handleStart}
+            className="w-full text-white font-bold py-4 rounded-xl shadow-md flex items-center justify-center gap-2 mt-6 mb-2 transition-all bg-indigo-500 hover:bg-indigo-600 shadow-indigo-500/30"
+          >
+            <Play size={20} fill="currentColor" /> このメニューでトレーニングを開始する
+          </button>
+        )}
+
+        <button onClick={handleSubmit} disabled={isSubmitting || (workoutItems.length === 0 && !bodyWeight && !bodyFat)} className={`w-full text-white font-bold py-4 rounded-xl shadow-md flex items-center justify-center gap-2 mt-4 mb-4 transition-all ${isSubmitting || (workoutItems.length === 0 && !bodyWeight && !bodyFat) ? 'bg-slate-300 dark:bg-slate-800 cursor-not-allowed text-slate-500 dark:text-slate-400' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30'}`}>
           {isSubmitting ? <Activity className="animate-spin" size={20} /> : (isManual ? <><CalendarIcon size={20} /> 過去の記録を保存</> : <><Flame size={20} /> トレーニングを完了して保存</>)}
         </button>
-
-        <button onClick={() => setShowImportTextModal(true)} className="w-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold py-3 rounded-xl shadow-sm flex items-center justify-center gap-2 mb-4 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all border border-slate-200 dark:border-slate-700">
-          <Sparkles size={18} className="text-indigo-500" /> テキストから一括インポート
-        </button>
         
-        <button onClick={handleCancel} className="w-full text-slate-500 dark:text-slate-400 font-bold py-3 rounded-xl flex items-center justify-center gap-2 mt-2 mb-8 transition-all bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:text-rose-500 hover:border-rose-200 dark:hover:border-rose-800">記録を破棄して終了</button>
+        <button onClick={handleCancel} className="w-full text-slate-500 dark:text-slate-400 font-bold py-3 rounded-xl flex items-center justify-center gap-2 mt-2 mb-8 transition-all bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:text-rose-500 hover:border-rose-200 dark:hover:border-rose-800">
+          {!myInfo?.isTraining && !isManual ? '事前メニューをクリア' : '記録を破棄して終了'}
+        </button>
       </div>
-
-      {showImportTextModal && (
-        <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950/40">
-              <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                <Sparkles size={18} className="text-indigo-500"/> テキストからインポート
-              </h3>
-              <button onClick={() => setShowImportTextModal(false)} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full transition-colors">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="p-5 overflow-y-auto">
-              {aiErrorMsg && (
-                <div className="mb-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400">
-                  AI解析に失敗しました。以下のエラーを確認してください：<br/>
-                  <span className="font-normal opacity-80 break-all">{aiErrorMsg}</span>
-                </div>
-              )}
-              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-3">
-                コピーしたトレーニング記録を貼り付けてください。AIが自動でアプリの形式に変換し、一覧に追加します。
-              </p>
-              <textarea
-                value={importText}
-                onChange={e => { setImportText(e.target.value); setAiErrorMsg(null); }}
-                placeholder="例:&#10;■ 1. ベンチプレス [胸]&#10;Set 1: 50kg x 10回&#10;Set 2: 50kg x 8回"
-                className="w-full h-64 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:border-indigo-500 resize-none"
-              />
-            </div>
-            <div className="p-4 border-t border-slate-200 dark:border-slate-800">
-              {isSubmitting ? (
-                <div className="w-full">
-                  <div className="flex justify-between text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2">
-                    <span>AIが解析しています...</span>
-                    <span>{importProgress}%</span>
-                  </div>
-                  <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden shadow-inner">
-                    <div className="bg-indigo-500 h-2.5 rounded-full transition-all duration-300" style={{ width: `${importProgress}%` }}></div>
-                  </div>
-                </div>
-              ) : (
-                <button onClick={handleTextImportSubmit} disabled={!importText.trim()} className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-bold py-3.5 rounded-xl shadow-md transition-colors flex items-center justify-center gap-2">
-                  <Sparkles size={18} /> 解析して入力
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {showReorderModal && (
         <ReorderItemsModal 
@@ -1493,18 +1281,6 @@ ${importText}`;
           }}
         />
       )}
-
-      <PastExercisePickerModal
-        isOpen={showPastExerciseModal}
-        onClose={() => setShowPastExerciseModal(false)}
-        pastPosts={myPastPosts}
-        onSelectExerciseItem={(item, post) => {
-          if (onImportItem) {
-            onImportItem(item, post);
-          }
-          setShowPastExerciseModal(false);
-        }}
-      />
     </div>
   );
 }
@@ -1513,6 +1289,5 @@ export {
   PROG_INFO,
   ProgramGeneratorModal,
   ActiveProgramDisplay,
-  PastExercisePickerModal,
   RecordView
 };

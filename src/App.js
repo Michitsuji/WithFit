@@ -229,7 +229,8 @@ export default function App() {
 
   const [currentTab, setCurrentTab] = useState('timeline');
   const [isRecordManual, setIsRecordManual] = useState(false);
-  const [importGymId, setImportGymId] = useState('');
+  const [recordViewMode, setRecordViewMode] = useState('start');
+  const [recordSelectedGymId, setRecordSelectedGymId] = useState('');
   const [isSessionChecked, setIsSessionChecked] = useState(false);
 
   useEffect(() => {
@@ -1550,7 +1551,7 @@ export default function App() {
     };
   };
 
-  const handleImportExerciseItem = async (item, post = null) => {
+  const handleImportExerciseItem = async (item) => {
     if (!item || !item.exerciseName) return;
     const newItem = formatItemForImport(item);
 
@@ -1576,56 +1577,41 @@ export default function App() {
       return nextItems;
     });
 
-    if (myInfo?.isTraining || isRecordManual) {
-      alert(`「${item.exerciseName}」を現在の記録に追加しました！`);
-    } else {
-      const matchedGym = post?.gymName ? allGyms.find(g => g.name === post.gymName) : null;
-      const fallbackGymId = matchedGym?.id || (myInfo.joinedGyms || []).find(id => id !== 'common') || '';
-      if (fallbackGymId && window.confirm(`「${item.exerciseName}」をメニューに追加しました。\nこのままトレーニングを開始して記録画面を開きますか？`)) {
-        await handleStartTraining(fallbackGymId);
-        setCurrentTab('record');
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('returnToRecordInput'));
-        }, 50);
-      } else {
-        alert(`「${item.exerciseName}」を記録メニューに追加しました！`);
-      }
-    }
+    alert(`「${item.exerciseName}」を現在のジムの記録画面に追加しました！`);
   };
 
-  const handleImportWorkout = async (post, isManual) => {
-    const gym = allGyms.find(g => g.name === post.gymName);
-    const gymId = gym ? gym.id : '';
-
-    if (!isManual && myInfo.isTraining && myInfo.currentGymId) {
-       const currentGymName = gyms.find(g => g.id === myInfo.currentGymId)?.name;
-       if (currentGymName !== post.gymName) {
-          alert(`現在 ${currentGymName} でトレーニング中のため、他のジムのメニューはコピーできません。`);
-          return;
-       }
-    }
+  const handleImportWorkout = async (post) => {
+    if (!post || !post.items || post.items.length === 0) return;
 
     const newItems = (post.items || []).map(item => formatItemForImport(item));
-    
     const importedCategories = Array.from(new Set(newItems.map(item => item.category).filter(Boolean)));
-    setSelectedCategories(importedCategories);
-    setDraftWorkoutItems(newItems);
-    
-    if (isManual) {
-      setIsRecordManual(true);
-      setImportGymId(gymId);
-    } else {
-      setIsRecordManual(false);
-      setImportGymId('');
-      if (!myInfo.isTraining) {
-        if (gymId) await handleStartTraining(gymId);
+    setSelectedCategories(prev => Array.from(new Set([...prev, ...importedCategories])));
+
+    setDraftWorkoutItems(prev => {
+      const hasOnlyBlank = prev.length === 1 && !prev[0].exerciseName && (!prev[0].sets || prev[0].sets.every(s => !s.weight && !s.reps && !s.distance && !s.time));
+      const nextItems = hasOnlyBlank ? newItems : [...prev, ...newItems];
+
+      if (myInfo?.jointPartnerId && db) {
+        const partnerCurrent = accountsInfo[myInfo.jointPartnerId]?.currentWorkoutItems || [];
+        const partnerNewItems = (post.items || []).map(it => formatItemForImport(it));
+        const partnerHasOnlyBlank = partnerCurrent.length === 1 && !partnerCurrent[0].exerciseName;
+        const nextPartnerItems = partnerHasOnlyBlank ? partnerNewItems : [...partnerCurrent, ...partnerNewItems];
+        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', myInfo.jointPartnerId), {
+          currentWorkoutItems: nextPartnerItems,
+          lastUpdater: currentUser
+        }, { merge: true }).catch(() => {});
       }
-      if (newItems.length > 0 && newItems[0].exerciseName) {
-        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { currentExerciseName: newItems[0].exerciseName }, { merge: true }).catch(()=>{});
-      }
+
+      return nextItems;
+    });
+
+    if (myInfo?.isTraining && newItems.length > 0 && newItems[0].exerciseName && db) {
+      setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { currentExerciseName: newItems[0].exerciseName }, { merge: true }).catch(() => {});
     }
-    
+
+    setRecordViewMode('record');
     setCurrentTab('record');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleActiveExerciseChange = (exerciseName) => {
@@ -2455,7 +2441,7 @@ export default function App() {
         )}
         {currentTab === 'timeline' && <TimelineView posts={visiblePosts} onToggleLike={toggleLike} onImport={handleImportWorkout} onImportItem={handleImportExerciseItem} currentUser={currentUser} onDelete={handleDeleteWorkout} onEdit={setEditingPost} accountsInfo={accountsInfo} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} scrollToPostId={scrollToPostId} setScrollToPostId={setScrollToPostId} />}
         {currentTab === 'exercises' && <ExercisesView gyms={allGyms} exercises={exercises} posts={visiblePosts} accountsInfo={accountsInfo} currentUser={currentUser} myInfo={myInfo} setCurrentTab={setCurrentTab} onSendRequest={handleSendFriendRequest} onUserClick={setSelectedUserProfile} />}
-        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} onRequestJointTraining={handleRequestJointTraining} onAcceptJointTraining={handleAcceptJointTraining} onRejectJointTraining={handleRejectJointTraining} onCancelJointTraining={handleCancelJointTraining} onImportItem={handleImportExerciseItem} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} />}
+        {currentTab === 'record' && <RecordView onStart={handleStartTraining} onPost={handlePostWorkout} onCancel={handleCancelTraining} onRequestJointTraining={handleRequestJointTraining} onAcceptJointTraining={handleAcceptJointTraining} onRejectJointTraining={handleRejectJointTraining} onCancelJointTraining={handleCancelJointTraining} onImportItem={handleImportExerciseItem} myInfo={myInfo} gyms={allGyms} exercises={exercises} workoutItems={draftWorkoutItems} setWorkoutItems={setDraftWorkoutItems} selectedCategories={selectedCategories} setSelectedCategories={setSelectedCategories} posts={visiblePosts} currentUser={currentUser} isManual={isRecordManual} setIsManual={setIsRecordManual} onActiveExerciseChange={handleActiveExerciseChange} accountsInfo={accountsInfo} viewMode={recordViewMode} setViewMode={setRecordViewMode} selectedGymId={recordSelectedGymId} setSelectedGymId={setRecordSelectedGymId} />}
         {currentTab === 'data' && <DataView posts={posts} currentUser={currentUser} accountsInfo={accountsInfo} onEdit={setEditingPost} onDelete={handleDeleteWorkout} onImport={handleImportWorkout} onImportItem={handleImportExerciseItem} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} onToggleCommentLike={handleToggleCommentLike} onUserClick={setSelectedUserProfile} onOpenCoach={() => setShowCoachChat(true)} />}
         {currentTab === 'friends' && <FriendsView currentUser={currentUser} myInfo={myInfo} accountsInfo={accountsInfo} onSendRequest={handleSendFriendRequest} onAccept={handleAcceptFriendRequest} onReject={handleRejectFriendRequest} onRemoveFriend={handleRemoveFriend} onSendPartnerRequest={handleSendPartnerRequest} onAcceptPartnerRequest={handleAcceptPartnerRequest} onRejectPartnerRequest={handleRejectPartnerRequest} onRemovePartner={handleRemovePartner} onFriendClick={(u) => setSelectedFriendUser(u)} onGenerateFriendCode={handleGenerateFriendCode} posts={posts} targetFriendTab={targetFriendTab} setTargetFriendTab={setTargetFriendTab} onImport={handleImportWorkout} onImportItem={handleImportExerciseItem} onSendTestPush={async (targetUser, message) => {
           if (!db || !targetUser || !message) return;
@@ -2498,8 +2484,8 @@ export default function App() {
         <div className="flex justify-around items-center p-2 max-w-md mx-auto">
           <NavButton icon={<Home size={22} />} label="ホーム" isActive={currentTab === 'timeline'} onClick={() => { if(currentTab === 'timeline') window.scrollTo({top:0, behavior:'smooth'}); else setCurrentTab('timeline'); }} />
           <NavButton icon={<Dumbbell size={22} />} label="種目" isActive={currentTab === 'exercises'} onClick={() => { if(currentTab === 'exercises') window.scrollTo({top:0, behavior:'smooth'}); else setCurrentTab('exercises'); }} />
-          <RecordWheelWrapper myInfo={myInfo} currentTab={currentTab} setCurrentTab={setCurrentTab}>
-            <NavButton icon={myInfo.isTraining ? <Clock className="animate-pulse" size={28}/> : <PlusCircle size={28} />} label={myInfo.isTraining ? "記録中" : "記録"} isActive={currentTab === 'record'} onClick={() => { if (!myInfo?.isTraining) { if(currentTab === 'record') { window.scrollTo({top:0, behavior:'smooth'}); window.dispatchEvent(new CustomEvent('showRecordDashboard')); } else { setCurrentTab('record'); window.dispatchEvent(new CustomEvent('showRecordDashboard')); } } }} isPrimary isTraining={myInfo.isTraining} />
+          <RecordWheelWrapper myInfo={myInfo} currentTab={currentTab} setCurrentTab={setCurrentTab} setRecordViewMode={setRecordViewMode} onResetManual={() => setIsRecordManual(false)}>
+            <NavButton icon={myInfo.isTraining ? <Clock className="animate-pulse" size={28}/> : <PlusCircle size={28} />} label={myInfo.isTraining ? "記録中" : "記録"} isActive={currentTab === 'record'} onClick={() => { setIsRecordManual(false); setRecordViewMode('start'); setCurrentTab('record'); window.scrollTo({top:0, behavior:'smooth'}); window.dispatchEvent(new CustomEvent('showRecordDashboard')); }} isPrimary isTraining={myInfo.isTraining} />
           </RecordWheelWrapper>
           <NavButton icon={<CalendarIcon size={22} />} label="データ" isActive={currentTab === 'data'} onClick={() => { if(currentTab === 'data') window.scrollTo({top:0, behavior:'smooth'}); else setCurrentTab('data'); }} />
           <NavButton icon={<Users size={22} />} label="フレンド" isActive={currentTab === 'friends'} onClick={() => { if(currentTab === 'friends') window.scrollTo({top:0, behavior:'smooth'}); else setCurrentTab('friends'); }} />

@@ -726,31 +726,155 @@ function WorkoutItemForm({ item, index, availableExercises, allGymExercises = []
         </div>
       );
     } else {
-      const weightInputType = wType === 'bodyWeight' ? "text" : "number";
-      const weightInputMode = wType === 'bodyWeight' ? "text" : "decimal";
+      const isBodyWeight = wType === 'bodyWeight';
+      const rawWeightStr = String(val('weight') ?? '');
+      const savedSign = val('weightSign');
+      const bwSign = savedSign === '-' || rawWeightStr.startsWith('-') ? '-' : '+';
+      const bwAbsWeight = rawWeightStr.replace(/^[+-]/, '');
+
+      const handleSetBwSign = (nextSign) => {
+        update('weightSign', nextSign);
+        const cleanNum = rawWeightStr.replace(/[^0-9.]/g, '');
+        if (cleanNum !== '') {
+          const signedVal = nextSign === '-' && Number(cleanNum) !== 0 ? `-${cleanNum}` : cleanNum;
+          update('weight', signedVal);
+        }
+      };
+
+      const handleBwWeightChange = (rawVal) => {
+        const cleanNum = String(rawVal).replace(/[^0-9.]/g, '');
+        const signedVal = cleanNum === '' ? '' : (bwSign === '-' && Number(cleanNum) !== 0 ? `-${cleanNum}` : cleanNum);
+        update('weight', signedVal);
+      };
+
+      const noSpinCls = "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
       inputContent = (
-        <div className="flex-1 flex gap-1.5 min-w-0">
+        <div className="flex-1 flex items-center gap-1 min-w-0">
           {isLR ? (
             <>
-              <input type={weightInputType} inputMode={weightInputMode} value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder={getWeightPlaceholder(wType)} className="w-[48px] sm:w-[60px] shrink-0 text-center text-sm font-bold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded focus:outline-none focus:border-emerald-500 py-1.5 px-0" style={{ fontSize: '16px' }}/>
-              <div className="flex flex-1 items-center gap-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-1 min-w-0">
-                <span className="text-[10px] text-slate-400 font-bold shrink-0">L:</span>
-                <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('lReps')} onChange={(e) => update('lReps', e.target.value)} placeholder={targetVal('lReps') || "0"} className="w-full text-center text-sm font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0 px-0" style={{ fontSize: '16px' }}/>
+              {isBodyWeight ? (
+                <div className="flex items-center border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded overflow-hidden shrink-0 w-[68px] sm:w-[78px]">
+                  <button
+                    type="button"
+                    onClick={() => handleSetBwSign(bwSign === '+' ? '-' : '+')}
+                    className={`px-1 py-1.5 text-[10px] font-black shrink-0 transition-colors ${bwSign === '-' ? 'bg-indigo-500 text-white' : 'bg-emerald-500 text-white'}`}
+                    title="＋荷重 / －アシスト切替"
+                  >
+                    {bwSign === '-' ? '－' : '＋'}
+                  </button>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={bwAbsWeight}
+                    onChange={(e) => handleBwWeightChange(e.target.value)}
+                    placeholder={bwSign === '-' ? '補助' : '荷重'}
+                    className={`w-full min-w-0 text-center font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none py-1.5 px-0.5 ${noSpinCls}`}
+                    style={{ fontSize: '16px' }}
+                  />
+                </div>
+              ) : (
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={val('weight')}
+                  onChange={(e) => update('weight', e.target.value)}
+                  placeholder={getWeightPlaceholder(wType)}
+                  className={`${item.isForcedReps ? 'w-[45px] sm:w-[54px]' : 'w-[52px] sm:w-[62px]'} shrink-0 text-center font-bold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded focus:outline-none focus:border-emerald-500 py-1.5 px-0.5 ${noSpinCls}`}
+                  style={{ fontSize: '16px' }}
+                />
+              )}
+              <div className="flex flex-1 items-center border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-1 py-1.5 min-w-[50px]">
+                <span className="text-[10px] text-slate-400 font-bold shrink-0 leading-none mr-0.5">L:</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={val('lReps')}
+                  onChange={(e) => update('lReps', e.target.value)}
+                  placeholder={targetVal('lReps') || "0"}
+                  className={`w-full min-w-0 text-center font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none p-0 ${noSpinCls}`}
+                  style={{ fontSize: '16px' }}
+                />
               </div>
-              <div className="flex flex-1 items-center gap-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-1 min-w-0">
-                <span className="text-[10px] text-slate-400 font-bold shrink-0">R:</span>
-                <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('rReps')} onChange={(e) => update('rReps', e.target.value)} placeholder={targetVal('rReps') || "0"} className="w-full text-center text-sm font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0 px-0" style={{ fontSize: '16px' }}/>
+              <div className="flex flex-1 items-center border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-1 py-1.5 min-w-[50px]">
+                <span className="text-[10px] text-slate-400 font-bold shrink-0 leading-none mr-0.5">R:</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={val('rReps')}
+                  onChange={(e) => update('rReps', e.target.value)}
+                  placeholder={targetVal('rReps') || "0"}
+                  className={`w-full min-w-0 text-center font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none p-0 ${noSpinCls}`}
+                  style={{ fontSize: '16px' }}
+                />
               </div>
             </>
           ) : (
             <>
-              <input type={weightInputType} inputMode={weightInputMode} value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder={getWeightPlaceholder(wType)} className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-1.5 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-sm" style={{ fontSize: '16px' }}/>
-              <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('reps')} onChange={(e) => update('reps', e.target.value)} placeholder={targetVal('reps') || "回数"} className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-1.5 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-sm" style={{ fontSize: '16px' }}/>
+              {isBodyWeight ? (
+                <div className="flex-[1.35] flex items-center border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded overflow-hidden min-w-0 focus-within:border-emerald-500">
+                  <div className="flex shrink-0 border-r border-slate-200 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => handleSetBwSign('+')}
+                      className={`px-1.5 py-1.5 text-[10px] font-bold transition-colors ${bwSign === '+' ? 'bg-emerald-500 text-white' : 'bg-slate-50 dark:bg-slate-900 text-slate-400'}`}
+                    >
+                      ＋荷重
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSetBwSign('-')}
+                      className={`px-1.5 py-1.5 text-[10px] font-bold transition-colors border-l border-slate-200 dark:border-slate-800 ${bwSign === '-' ? 'bg-indigo-500 text-white' : 'bg-slate-50 dark:bg-slate-900 text-slate-400'}`}
+                    >
+                      －ｱｼｽﾄ
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={bwAbsWeight}
+                    onChange={(e) => handleBwWeightChange(e.target.value)}
+                    placeholder={bwSign === '-' ? 'アシストkg' : '荷重kg(0=自重)'}
+                    className={`w-full min-w-0 bg-transparent py-1.5 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none text-sm ${noSpinCls}`}
+                    style={{ fontSize: '16px' }}
+                  />
+                </div>
+              ) : (
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={val('weight')}
+                  onChange={(e) => update('weight', e.target.value)}
+                  placeholder={getWeightPlaceholder(wType)}
+                  className={`flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-1.5 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-sm ${noSpinCls}`}
+                  style={{ fontSize: '16px' }}
+                />
+              )}
+              <input
+                type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={val('reps')}
+                onChange={(e) => update('reps', e.target.value)}
+                placeholder={targetVal('reps') || "回数"}
+                className={`flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-1.5 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-sm ${noSpinCls}`}
+                style={{ fontSize: '16px' }}
+              />
             </>
           )}
           {item.isForcedReps && (
-            <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('forcedReps')} onChange={(e) => update('forcedReps', e.target.value)} placeholder="+補" className="w-10 shrink-0 text-center text-sm font-bold text-rose-600 bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-800 rounded focus:outline-none focus:border-rose-500 py-1.5 px-0" style={{ fontSize: '16px' }}/>
+            <input
+              type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={val('forcedReps')}
+              onChange={(e) => update('forcedReps', e.target.value)}
+              placeholder="+補"
+              className={`${isLR ? 'w-[36px] sm:w-[40px]' : 'w-10'} shrink-0 text-center font-bold text-rose-600 bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-800 rounded focus:outline-none focus:border-rose-500 py-1.5 px-0.5 ${noSpinCls}`}
+              style={{ fontSize: '16px' }}
+            />
           )}
         </div>
       );
@@ -854,10 +978,43 @@ function WorkoutItemForm({ item, index, availableExercises, allGymExercises = []
       )}
 
       {item.weightType !== 'cardio' && (
-        <div className="flex gap-2 mb-5 overflow-x-auto scrollbar-hide py-1 pl-8">
-          <button onClick={() => updateItem(item.id, { isSuperSet: !item.isSuperSet })} className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${item.isSuperSet ? 'bg-indigo-50 dark:bg-indigo-950 border-indigo-300 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>スーパー</button>
-          <button onClick={() => updateItem(item.id, { isDropSet: !item.isDropSet })} className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${item.isDropSet ? 'bg-orange-50 dark:bg-orange-950 border-orange-300 dark:border-orange-800 text-orange-700 dark:text-orange-300' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>ドロップ</button>
-          <button onClick={() => updateItem(item.id, { isForcedReps: !item.isForcedReps })} className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${item.isForcedReps ? 'bg-rose-50 dark:bg-rose-950 border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>補助</button>
+        <div className="flex flex-wrap items-center gap-1.5 mb-4 py-1 pl-2">
+          <button type="button" onClick={() => updateItem(item.id, { isSuperSet: !item.isSuperSet })} className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${item.isSuperSet ? 'bg-indigo-50 dark:bg-indigo-950 border-indigo-300 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>スーパー</button>
+          <button type="button" onClick={() => updateItem(item.id, { isDropSet: !item.isDropSet })} className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${item.isDropSet ? 'bg-orange-50 dark:bg-orange-950 border-orange-300 dark:border-orange-800 text-orange-700 dark:text-orange-300' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>ドロップ</button>
+          <button type="button" onClick={() => updateItem(item.id, { isForcedReps: !item.isForcedReps })} className={`whitespace-nowrap px-3 py-1.5 text-xs font-bold rounded-full border transition-colors ${item.isForcedReps ? 'bg-rose-50 dark:bg-rose-950 border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>補助</button>
+          {item.weightType === 'bodyWeight' && (() => {
+            const firstSet = item.sets && item.sets[0];
+            const currentSign = (firstSet?.weightSign === '-' || String(firstSet?.weight ?? '').startsWith('-')) ? '-' : '+';
+            const applySignToAllSets = (nextSign) => {
+              const updatedSets = (item.sets || []).map(s => {
+                const cleanNum = String(s.weight ?? '').replace(/[^0-9.]/g, '');
+                return {
+                  ...s,
+                  weightSign: nextSign,
+                  weight: cleanNum === '' ? '' : (nextSign === '-' && Number(cleanNum) !== 0 ? `-${cleanNum}` : cleanNum)
+                };
+              });
+              updateItem(item.id, { sets: updatedSets });
+            };
+            return (
+              <div className="inline-flex items-center rounded-full border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-50 dark:bg-slate-800 ml-auto">
+                <button
+                  type="button"
+                  onClick={() => applySignToAllSets('+')}
+                  className={`px-2.5 py-1 text-[11px] font-bold transition-colors ${currentSign === '+' ? 'bg-emerald-500 text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                >
+                  ＋荷重
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applySignToAllSets('-')}
+                  className={`px-2.5 py-1 text-[11px] font-bold transition-colors border-l border-slate-200 dark:border-slate-700 ${currentSign === '-' ? 'bg-indigo-500 text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                >
+                  －アシスト
+                </button>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -926,9 +1083,9 @@ function WorkoutItemForm({ item, index, availableExercises, allGymExercises = []
             className={`bg-slate-50/50 dark:bg-slate-950/50 p-2 rounded-xl border transition-all relative ${draggedSetIndex === sIndex ? (dragOverSetIndex === sIndex ? 'opacity-70 border-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'opacity-40 border-dashed border-slate-300 dark:border-slate-600') : 'border-slate-100 dark:border-slate-800'} ${draggedSetIndex !== null ? 'space-y-0' : 'space-y-2'}`}
           >
             {dragOverSetIndex === sIndex && draggedSetIndex !== sIndex && <div className={`absolute left-0 w-full h-1 bg-emerald-500 rounded-full z-10 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse ${draggedSetIndex < dragOverSetIndex ? '-bottom-1.5' : '-top-1.5'}`} />}
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1">
               <div 
-                 className={`cursor-grab active:cursor-grabbing text-slate-300 hover:text-emerald-500 p-1 -ml-1 shrink-0 touch-none ${isJointPartner ? 'hidden' : ''}`}
+                 className={`cursor-grab active:cursor-grabbing text-slate-300 hover:text-emerald-500 p-0.5 -ml-1 shrink-0 touch-none ${isJointPartner ? 'hidden' : ''}`}
                  onMouseEnter={() => setDraggableSetId(set.id)}
                  onMouseLeave={() => setDraggableSetId(null)}
                  onTouchStart={(e) => handleTouchStart(e, sIndex)}
@@ -936,16 +1093,16 @@ function WorkoutItemForm({ item, index, availableExercises, allGymExercises = []
                  onTouchEnd={handleTouchEnd}
                  onTouchCancel={handleTouchEnd}
               >
-                <GripVertical size={16} />
+                <GripVertical size={15} />
               </div>
-              <div className="w-5 text-center text-slate-400 dark:text-slate-500 font-bold text-xs shrink-0">{sIndex + 1}</div>
+              <div className="w-4 text-center text-slate-400 dark:text-slate-500 font-bold text-xs shrink-0">{sIndex + 1}</div>
               
               {draggedSetIndex !== null ? (
                 <div className="flex-1 text-sm font-bold text-slate-500 dark:text-slate-400 py-1">SET {sIndex + 1}</div>
               ) : (
                 <>
                   {renderInputRow(set, item.weightType, 'main', false)}
-                  {!isJointPartner && <button onClick={() => removeSet(item.id, set.id)} disabled={item.sets.length === 1} className="w-6 flex-shrink-0 text-slate-400 hover:text-rose-500 disabled:opacity-30 flex justify-center"><X size={18} /></button>}
+                  {!isJointPartner && <button onClick={() => removeSet(item.id, set.id)} disabled={item.sets.length === 1} className="w-5 flex-shrink-0 text-slate-400 hover:text-rose-500 disabled:opacity-30 flex justify-center"><X size={17} /></button>}
                 </>
               )}
             </div>

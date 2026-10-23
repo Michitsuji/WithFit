@@ -522,27 +522,27 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
 
           {/* 3段目：自分の実績サマリー（ベスト重量・1RM・実施回数・最終日） */}
           {stats && stats.count > 0 && (
-            <div className="flex items-center flex-wrap gap-2 mt-2 pt-1.5 border-t border-slate-100 dark:border-slate-800/70 text-[11px] font-bold">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2 mt-2 pt-1.5 border-t border-slate-100 dark:border-slate-800/70 text-[11px] font-bold">
               {stats.bestSetStr && (
-                <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                <span className="text-amber-600 dark:text-amber-400 flex items-center flex-wrap gap-1">
                   <Award size={12} className="shrink-0" />
-                  ベスト: {stats.bestSetStr}
+                  <span className="whitespace-nowrap">ベスト: {stats.bestSetStr}</span>
                   {stats.max1RM > 0 && !stats.isCardio && (
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal">
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal whitespace-nowrap">
                       (1RM {stats.max1RM}kg)
                     </span>
                   )}
                 </span>
               )}
-              <span className="text-slate-400 dark:text-slate-500 text-[10px]">
+              <span className="text-slate-400 dark:text-slate-500 text-[10px] whitespace-nowrap">
                 計{stats.count}回{stats.lastDate ? ` ・ 最終 ${stats.lastDate}` : ''}
               </span>
             </div>
           )}
         </div>
 
-        {/* 右側アクションボタン群 */}
-        <div className="flex items-center gap-1 shrink-0">
+        {/* 右側アクションボタン群（2x2グリッドで右詰め配置） */}
+        <div className="grid grid-cols-2 gap-1.5 shrink-0 ml-auto self-center justify-items-end">
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setSelectedExerciseForChart(ex); }}

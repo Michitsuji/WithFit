@@ -2,7 +2,7 @@
 // WorkoutCard.js — ワークアウトカード＆タイムライン画面コンポーネント
 // ==========================================
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Clock, MapPin, Edit2, Trash2, MoreVertical, FileText, Scale, ListPlus, Copy, Play, X, Dumbbell, Flame, Activity, Zap, AlignLeft, Heart, MessageCircle, ArrowDown, ArrowUp, Send, Plus, Calendar as CalendarIcon } from 'lucide-react';
+import { Clock, MapPin, Edit2, Trash2, MoreVertical, FileText, Scale, ListPlus, Copy, X, Dumbbell, Flame, Activity, Zap, AlignLeft, Heart, MessageCircle, ArrowDown, ArrowUp, Send, Plus } from 'lucide-react';
 import { generateColor, calculateWorkoutTotals, formatShortDateTime, formatDuration, getVolumeMetaphor, getCategoryColor, getRelativeTime } from './utils';
 import { UserAvatar, renderUsernameWithBadge, AdBanner } from './CommonUI';
 
@@ -135,7 +135,6 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
       return <span key={i}>{part}</span>;
     });
   };
-  const [showImportOptions, setShowImportOptions] = useState(false);
   const [showLikesModal, setShowLikesModal] = useState(false);
   const [showPostMenu, setShowPostMenu] = useState(false);
   const isMyPost = post.author === currentUser;
@@ -462,18 +461,10 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                 </>
               )}
             </div>
-            <div className="flex flex-col gap-1.5 mt-1">
+            <div className="flex flex-col gap-1 mt-1">
               <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 dark:text-slate-400 font-bold">
                 <span>{formatShortDateTime(post.timestamp)}</span>
                 {post.duration && <span className="flex items-center gap-0.5"><Clock size={12}/> {formatDuration(post.duration)}</span>}
-              </div>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {post.gymName && <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-100 dark:border-emerald-900"><MapPin size={10}/> {post.gymName}</span>}
-                {categories.map(cat => (
-                  <span key={cat} className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${getCategoryColor(cat)}`}>
-                    {cat}
-                  </span>
-                ))}
               </div>
             </div>
           </div>
@@ -496,48 +487,41 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
         )}
       </div>
 
-      {/* 種目の上のサマリーダッシュボード（体組成グラフのサマリーカードと同じ見やすくスタイリッシュなUI） */}
-      {(hasWorkoutStats || hasBodyMetrics) && (
+      {/* 種目の上のサマリーダッシュボード（ジム・部位・統計・体組成を統合） */}
+      {(hasWorkoutStats || hasBodyMetrics || post.gymName || categories.length > 0) && (
         <div className="ml-3 mb-4 bg-slate-50/95 dark:bg-slate-950/75 border border-slate-200/80 dark:border-slate-800/90 rounded-2xl p-3.5 space-y-3 shadow-sm">
+          {/* 上部バー：ジム・部位バッジ ＆ 構成コピーボタン */}
+          {(post.gymName || categories.length > 0 || (onImport && post.items && post.items.length > 0)) && (
+            <div className={`flex items-center justify-between gap-2 ${(hasWorkoutStats || hasBodyMetrics) ? 'pb-2.5 border-b border-slate-200/60 dark:border-slate-800/80' : ''}`}>
+              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                {post.gymName && (
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded-md border border-emerald-200/80 dark:border-emerald-900">
+                    <MapPin size={10} className="shrink-0" /> {post.gymName}
+                  </span>
+                )}
+                {categories.map(cat => (
+                  <span key={cat} className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${getCategoryColor(cat)}`}>
+                    {cat}
+                  </span>
+                ))}
+              </div>
+              {onImport && post.items && post.items.length > 0 && (
+                <div className="relative shrink-0 ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => onImport(post, false)}
+                    className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/70 transition-colors border border-emerald-200/80 dark:border-emerald-800/80 shadow-sm"
+                  >
+                    <Copy size={12} /> 構成コピー
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ワークアウト統計セクション（総負荷量・セット数・消費カロリー） */}
           {hasWorkoutStats && (
             <div>
-              {/* 上部バー：負荷量メタファー＆構成コピーボタン */}
-              {(displayVolumeCalc > 0 || (onImport && post.items && post.items.length > 0)) && (
-                <div className="flex items-center justify-between gap-2 mb-2.5 pb-2 border-b border-slate-200/60 dark:border-slate-800/80">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 shadow-[0_0_6px_rgba(16,185,129,0.7)]"></span>
-                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 truncate">
-                      {displayVolumeCalc > 0 ? getVolumeMetaphor(displayVolumeCalc) : 'ワークアウトサマリー'}
-                    </span>
-                  </div>
-                  {onImport && post.items && post.items.length > 0 && (
-                    <div className="relative shrink-0 ml-auto">
-                      {!showImportOptions ? (
-                        <button
-                          onClick={() => setShowImportOptions(true)}
-                          className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/70 transition-colors border border-emerald-200/80 dark:border-emerald-800/80 shadow-sm"
-                        >
-                          <Copy size={12} /> 構成コピー
-                        </button>
-                      ) : (
-                        <div className="flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-150">
-                          <button onClick={() => { setShowImportOptions(false); onImport(post, false); }} className="flex items-center gap-1 text-[10px] font-bold text-white bg-emerald-500 px-2 py-1 rounded-md hover:bg-emerald-600 transition-colors shadow-sm">
-                            <Play size={9} fill="currentColor" /> 今から
-                          </button>
-                          <button onClick={() => { setShowImportOptions(false); onImport(post, true); }} className="flex items-center gap-1 text-[10px] font-bold text-slate-600 bg-white dark:bg-slate-800 dark:text-slate-300 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 transition-colors shadow-sm">
-                            <CalendarIcon size={9} /> 過去
-                          </button>
-                          <button onClick={() => setShowImportOptions(false)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-white dark:bg-slate-800 rounded-full">
-                            <X size={12} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
               {/* 3カラムメトリクスグリッド */}
               <div className="grid grid-cols-3 divide-x divide-slate-200/70 dark:divide-slate-800 text-center">
                 <div className="px-1 flex flex-col items-center justify-center">
@@ -551,6 +535,11 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                     </span>
                     <span className="text-[10px] font-bold text-slate-400">kg</span>
                   </div>
+                  {displayVolumeCalc > 0 && (
+                    <div className="text-[9px] sm:text-[10px] font-bold text-slate-500 dark:text-slate-400 mt-0.5 leading-tight text-center">
+                      {getVolumeMetaphor(displayVolumeCalc)}
+                    </div>
+                  )}
                 </div>
 
                 <div className="px-1 flex flex-col items-center justify-center">
