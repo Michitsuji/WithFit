@@ -2,7 +2,7 @@
 // CommonUI.js — 共通UIコンポーネント・カスタムフック・アイコン
 // ==========================================
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Activity, AlignLeft, Edit2, TrendingUp, TrendingDown } from 'lucide-react';
+import { AlignLeft, Edit2 } from 'lucide-react';
 import { MASTER_USER, generateColor, MUSCLE_CATEGORIES, getCategoryTabColor } from './utils';
 
 // --- カスタムアイコン ---
@@ -90,8 +90,8 @@ function TimerDisplay({ startTime, isStopped = false }) {
   return <span className="font-mono font-bold tracking-wider">{hours > 0 ? `${hours}:` : ''}{minutes.toString().padStart(2, '0')}:{seconds.toString().padStart(2, '0')}</span>;
 }
 
-// --- グラフコンポーネント（1か月・3か月・1年・全期間切替＋タッチ数値確認対応） ---
-function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
+// --- グラフコンポーネント（1か月・3か月・1年・全期間切替＋タッチ時のみ数値表示＆グラフ外タッチで非表示） ---
+function SimpleChart({ data, color = "#10b981", title, unit = "", invertDiffColor = false }) {
   const [rangeType, setRangeType] = useState('3M'); // '1M' | '3M' | '1Y' | 'ALL'
   const [selectedIndex, setSelectedIndex] = useState(null);
   const svgRef = useRef(null);
@@ -135,14 +135,26 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
     return allSortedData.filter(d => d.time >= cutoff);
   }, [allSortedData, rangeType]);
 
-  // 期間変更時やデータ更新時は最新ポイントを選択状態にする
+  // 初期状態および期間変更時は未選択（非表示）にしてグラフ全体を見やすく保つ
   useEffect(() => {
-    if (filteredData.length > 0) {
-      setSelectedIndex(filteredData.length - 1);
-    } else {
-      setSelectedIndex(null);
-    }
-  }, [filteredData.length, rangeType]);
+    setSelectedIndex(null);
+  }, [rangeType, filteredData.length]);
+
+  // グラフ（SVG）以外の場所をタッチ・クリックしたときは再び非表示にする
+  useEffect(() => {
+    if (selectedIndex === null) return;
+    const handleOutsidePointer = (e) => {
+      if (svgRef.current && !svgRef.current.contains(e.target)) {
+        setSelectedIndex(null);
+      }
+    };
+    document.addEventListener('touchstart', handleOutsidePointer, { passive: true });
+    document.addEventListener('mousedown', handleOutsidePointer);
+    return () => {
+      document.removeEventListener('touchstart', handleOutsidePointer);
+      document.removeEventListener('mousedown', handleOutsidePointer);
+    };
+  }, [selectedIndex]);
 
   const rangeOptions = [
     { key: '1M', label: '1か月' },
@@ -184,10 +196,10 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
 
   // SVG座標設計 (レスポンシブViewBox・上部ツールチップ領域を確保)
   const svgW = 360;
-  const svgH = 205;
+  const svgH = 210;
   const padL = 38;
   const padR = 16;
-  const padT = 34;
+  const padT = 36;
   const padB = 30;
   const plotW = svgW - padL - padR;
   const plotH = svgH - padT - padB;
@@ -201,7 +213,6 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
     if (filteredData.length === 1 || timeSpan === 0) {
       x = padL + plotW / 2;
     } else {
-      // 時間比率とインデックス比率をハイブリッドして点の重なりを防止しつつ時間間隔も表現
       const timeRatio = (d.time - minTime) / timeSpan;
       const idxRatio = idx / (filteredData.length - 1);
       const ratio = filteredData.length > 20 ? idxRatio : (timeRatio * 0.7 + idxRatio * 0.3);
@@ -212,7 +223,7 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
     const shortDate = `${dt.getMonth() + 1}/${dt.getDate()}`;
     const fullDate = `${dt.getFullYear()}/${String(dt.getMonth() + 1).padStart(2, '0')}/${String(dt.getDate()).padStart(2, '0')}`;
     const prevDiff = idx > 0 ? Math.round((d.value - filteredData[idx - 1].value) * 10) / 10 : null;
-    return { x, y, val: d.value, shortDate, fullDate, prevDiff, idx };
+    return { x, y, val: d.value, shortDate, fullDate, prevDiff, idx, extra: d.extra };
   });
 
   // ベジェ曲線パスまたは滑らかな折れ線パス生成
@@ -273,16 +284,35 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
     setSelectedIndex(closestIdx);
   };
 
+  // タッチされるまでは null（非表示）
   const activePoint = (selectedIndex !== null && points[selectedIndex])
     ? points[selectedIndex]
-    : (points[points.length - 1] || null);
+    : null;
 
-  const showStaticLabels = points.length <= 6;
+  const getDiffColorClass = (diff) => {
+    if (diff > 0) return invertDiffColor ? 'text-emerald-500' : 'text-rose-500';
+    if (diff < 0) return invertDiffColor ? 'text-rose-500' : 'text-emerald-500';
+    return 'text-slate-600 dark:text-slate-300';
+  };
+
+  const getDiffBadgeClass = (diff) => {
+    if (diff > 0) {
+      return invertDiffColor
+        ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/50'
+        : 'bg-rose-50 text-rose-500 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/50';
+    }
+    if (diff < 0) {
+      return invertDiffColor
+        ? 'bg-rose-50 text-rose-500 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/50'
+        : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/50';
+    }
+    return 'bg-slate-200/60 text-slate-500 dark:bg-slate-800 dark:text-slate-400';
+  };
 
   return (
     <div className="w-full bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col transition-all">
-      {/* ヘッダー＆期間セレクター（スマホでも綺麗に揃う2段構成） */}
-      <div className="flex flex-col gap-3 mb-4">
+      {/* ヘッダー＆期間セレクター */}
+      <div className="flex flex-col gap-3 mb-3">
         <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 min-w-0">
           <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}80` }}></span>
           <span className="truncate">{title}</span>
@@ -322,52 +352,12 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
         </div>
       ) : (
         <>
-          {/* 選択中のポイント詳細 ＆ サマリーカード（上下2段で文字潰れ・重なりを完全防止） */}
-          <div className="bg-slate-50/90 dark:bg-slate-950/70 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-3.5 mb-4 flex flex-col gap-3">
-            {/* 上段：選択日の数値 ＆ 前回比バッジ */}
-            <div className="flex items-end justify-between gap-2">
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-xs font-bold text-slate-400 dark:text-slate-500 font-mono whitespace-nowrap">
-                    {activePoint ? activePoint.fullDate : '-'}
-                  </span>
-                  {activePoint && activePoint.idx === points.length - 1 && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300 whitespace-nowrap shrink-0 leading-none">
-                      最新
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-baseline gap-1 whitespace-nowrap">
-                  <span className="text-3xl font-black tracking-tight text-slate-900 dark:text-white font-mono leading-none">
-                    {activePoint ? activePoint.val.toFixed(1) : '-'}
-                  </span>
-                  <span className="text-xs font-bold text-slate-400">{inferredUnit}</span>
-                </div>
-              </div>
-
-              {activePoint && activePoint.prevDiff !== null && (
-                <div className="flex flex-col items-end shrink-0">
-                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-1 whitespace-nowrap">前回比</span>
-                  <span className={`text-xs font-bold font-mono px-2.5 py-1 rounded-lg whitespace-nowrap inline-flex items-center ${
-                    activePoint.prevDiff > 0
-                      ? 'bg-rose-50 text-rose-500 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/50'
-                      : activePoint.prevDiff < 0
-                      ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-900/50'
-                      : 'bg-slate-200/60 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-                  }`}>
-                    {activePoint.prevDiff > 0 ? `+${activePoint.prevDiff.toFixed(1)}` : activePoint.prevDiff.toFixed(1)}{inferredUnit}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* 下段：期間変化・平均・最小/最大の3カラム均等配置 */}
-            <div className="grid grid-cols-3 divide-x divide-slate-200/70 dark:divide-slate-800 border-t border-slate-200/70 dark:border-slate-800 pt-2.5 text-center">
+          {/* 期間サマリーバー（常に一定高さでレイアウトシフトを防止） */}
+          <div className="bg-slate-50/90 dark:bg-slate-950/70 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-3 mb-3">
+            <div className="grid grid-cols-3 divide-x divide-slate-200/70 dark:divide-slate-800 text-center">
               <div className="px-1 flex flex-col items-center justify-center">
                 <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-0.5 whitespace-nowrap">期間変化</div>
-                <div className={`text-xs font-bold font-mono whitespace-nowrap ${
-                  periodDiff > 0 ? 'text-rose-500' : periodDiff < 0 ? 'text-emerald-500' : 'text-slate-600 dark:text-slate-300'
-                }`}>
+                <div className={`text-xs font-bold font-mono whitespace-nowrap ${getDiffColorClass(periodDiff)}`}>
                   {periodDiff > 0 ? `+${periodDiff.toFixed(1)}` : periodDiff.toFixed(1)}{inferredUnit}
                 </div>
               </div>
@@ -386,7 +376,7 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
             </div>
           </div>
 
-          {/* インタラクティブSVGチャート */}
+          {/* インタラクティブSVGチャート（最初タッチするまでは数値・ガイドを非表示にしてグラフをクリアに表示） */}
           <div className="relative w-full select-none">
             <svg
               ref={svgRef}
@@ -395,6 +385,7 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
               onClick={handlePointerInteract}
               onTouchStart={handlePointerInteract}
               onTouchMove={handlePointerInteract}
+              onMouseDown={handlePointerInteract}
               onMouseMove={(e) => { if (e.buttons === 1) handlePointerInteract(e); }}
             >
               <defs>
@@ -450,7 +441,7 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
                 />
               )}
 
-              {/* 選択中の垂直ガイドライン */}
+              {/* 選択中の垂直ガイドライン（タッチ選択時のみ表示） */}
               {activePoint && (
                 <line
                   x1={activePoint.x}
@@ -460,15 +451,15 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
                   stroke={color}
                   strokeWidth="1.5"
                   strokeDasharray="3 3"
-                  opacity="0.65"
+                  opacity="0.7"
                 />
               )}
 
-              {/* データポイント描画（データ数が多い場合は文字を重ねずドットをスマート化） */}
+              {/* データポイント描画（常時ラベルを廃止し、タッチ前はグラフの線がはっきり見えるようにする） */}
               {points.map((p, i) => {
                 const isSelected = activePoint && activePoint.idx === i;
                 const isDense = points.length > 20;
-                const dotRadius = isSelected ? 5.5 : (isDense ? 2.2 : 3.5);
+                const dotRadius = isSelected ? 5.5 : (isDense ? 2.2 : 3.2);
 
                 return (
                   <g key={`pt-${i}`}>
@@ -478,7 +469,7 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
                         cy={p.y}
                         r="10"
                         fill={color}
-                        opacity="0.2"
+                        opacity="0.22"
                       />
                     )}
                     <circle
@@ -490,29 +481,21 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
                       stroke={color}
                       strokeWidth={isSelected ? "2.5" : (isDense ? "1.5" : "2")}
                     />
-                    {showStaticLabels && !isSelected && (
-                      <text
-                        x={p.x}
-                        y={p.y - 9}
-                        fontSize="9.5"
-                        fill={color}
-                        textAnchor="middle"
-                        className="font-bold font-mono"
-                        opacity="0.8"
-                      >
-                        {p.val}
-                      </text>
-                    )}
                   </g>
                 );
               })}
 
-              {/* 選択ポイントのフローティングツールチップ（常にポイント上部に配置し線との重なりを防止） */}
+              {/* 選択ポイントのフローティングツールチップ（タッチ選択時のみ表示） */}
               {activePoint && (() => {
-                const boxW = 84;
-                const boxH = 22;
+                const diffStr = activePoint.prevDiff !== null
+                  ? ` (${activePoint.prevDiff > 0 ? '+' : ''}${activePoint.prevDiff.toFixed(1)})`
+                  : '';
+                const labelText = `${activePoint.shortDate}  ${activePoint.val.toFixed(1)}${inferredUnit}${diffStr}`;
+                const boxW = Math.max(92, labelText.length * 6.2 + 16);
+                const boxH = 24;
                 const clampedX = Math.min(Math.max(activePoint.x, padL + boxW / 2), svgW - padR - boxW / 2);
-                const boxY = Math.max(2, activePoint.y - boxH - 8);
+                const placeBelow = activePoint.y - boxH - 10 < 2;
+                const boxY = placeBelow ? Math.min(padT + plotH - boxH, activePoint.y + 12) : activePoint.y - boxH - 10;
 
                 return (
                   <g className="pointer-events-none">
@@ -521,19 +504,19 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
                       y={boxY}
                       width={boxW}
                       height={boxH}
-                      rx="6"
+                      rx="7"
                       fill={color}
-                      opacity="0.95"
+                      opacity="0.96"
                     />
                     <text
                       x={clampedX}
-                      y={boxY + 14.5}
+                      y={boxY + 15.5}
                       fontSize="10"
                       fill="#ffffff"
                       textAnchor="middle"
                       className="font-bold font-mono"
                     >
-                      {activePoint.shortDate} {activePoint.val.toFixed(1)}{inferredUnit}
+                      {labelText}
                     </text>
                   </g>
                 );
@@ -554,9 +537,35 @@ function SimpleChart({ data, color = "#10b981", title, unit = "" }) {
                 </text>
               ))}
             </svg>
-            <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 text-right mt-1">
-              ※グラフをタッチ・なぞると各日の数値を表示します（全{points.length}件）
-            </div>
+
+            {/* タッチ選択中のみ下部に詳細カードを表示（SVGのY座標がズレないようグラフ下部に配置） */}
+            {activePoint ? (
+              <div className="mt-2 bg-slate-50 dark:bg-slate-950/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl px-3.5 py-2.5 flex items-center justify-between gap-2 animate-in fade-in duration-150">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400 font-mono whitespace-nowrap">
+                    {activePoint.fullDate}
+                  </span>
+                  <div className="flex items-baseline gap-1 whitespace-nowrap">
+                    <span className="text-xl font-black tracking-tight text-slate-900 dark:text-white font-mono">
+                      {activePoint.val.toFixed(1)}
+                    </span>
+                    <span className="text-xs font-bold text-slate-400">{inferredUnit}</span>
+                  </div>
+                </div>
+                {activePoint.prevDiff !== null && (
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">前回比</span>
+                    <span className={`text-xs font-bold font-mono px-2 py-0.5 rounded-lg whitespace-nowrap ${getDiffBadgeClass(activePoint.prevDiff)}`}>
+                      {activePoint.prevDiff > 0 ? `+${activePoint.prevDiff.toFixed(1)}` : activePoint.prevDiff.toFixed(1)}{inferredUnit}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 text-right mt-1">
+                ※グラフをタッチするとその日の数値を表示（グラフ外タッチで非表示）
+              </div>
+            )}
           </div>
         </>
       )}
@@ -611,7 +620,9 @@ function CategoryFilterGrid({ selectedCategories, toggleCategory }) {
   );
 }
 
-// --- 記録ボタン長押しホイール（ドラッグ選択＆長押し後タップ選択の両対応で安定化） ---
+// --- 記録ボタン長押しホイール（短時間長押し＆ドラッグ選択の両対応） ---
+const LONG_PRESS_DURATION_MS = 105; // 従来の220msから大幅に短縮し、素早い長押しで即座に起動
+
 function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
   const [isOpen, setIsOpen] = useState(false);
   const [hovered, setHovered] = useState(null);
@@ -670,8 +681,8 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
     const dy = centerY - clientY; // 上方向が正
     const dist = Math.hypot(dx, dy);
 
-    // ボタン中心から少し（14px以上）動かしただけで左右どちらかを確実に判定
-    if (dist >= 14 && dy > -45) {
+    // ボタン中心から少し（10px以上）動かしただけで左右どちらかを確実に判定
+    if (dist >= 10 && dy > -45) {
       return dx < 0 ? 'left' : 'right';
     }
     return null;
@@ -703,9 +714,9 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
       setIsOpen(true);
       updateHover(lastPosRef.current.x, lastPosRef.current.y);
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        try { navigator.vibrate(40); } catch (e) {}
+        try { navigator.vibrate(35); } catch (e) {}
       }
-    }, 220);
+    }, LONG_PRESS_DURATION_MS);
   };
 
   useEffect(() => {
@@ -728,8 +739,8 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
           touch.clientX - startPosRef.current.x,
           touch.clientY - startPosRef.current.y
         );
-        // 長押し待機中に上方向・左右へドラッグを開始した場合は即座にメニューを開く
-        if (moveDist > 18) {
+        // 長押し待機中に少しでもスライドを開始した場合は即座にメニューを開く
+        if (moveDist > 8) {
           clearPressTimer();
           isOpenRef.current = true;
           setIsOpen(true);
@@ -743,6 +754,17 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
       lastPosRef.current = { x: e.clientX, y: e.clientY };
       if (isOpenRef.current) {
         updateHover(e.clientX, e.clientY);
+      } else {
+        const moveDist = Math.hypot(
+          e.clientX - startPosRef.current.x,
+          e.clientY - startPosRef.current.y
+        );
+        if (moveDist > 8) {
+          clearPressTimer();
+          isOpenRef.current = true;
+          setIsOpen(true);
+          updateHover(e.clientX, e.clientY);
+        }
       }
     };
 
@@ -823,7 +845,7 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
       >
         {myInfo?.isTraining && (
           <div 
-            className={`absolute bottom-full mb-2 left-1/2 -translate-x-1/2 flex transition-all duration-200 ${
+            className={`absolute bottom-full mb-2 left-1/2 -translate-x-1/2 flex transition-all duration-150 ${
               isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-50 pointer-events-none'
             } ${tapSelectMode ? 'pointer-events-auto' : 'pointer-events-none'}`}
             style={{ transformOrigin: 'bottom center' }}
@@ -858,7 +880,7 @@ function RecordWheelWrapper({ myInfo, currentTab, setCurrentTab, children }) {
         )}
 
         <div
-          className={`transition-transform duration-200 ${isOpen && myInfo?.isTraining ? 'scale-90 opacity-80' : 'scale-100'}`}
+          className={`transition-transform duration-150 ${isOpen && myInfo?.isTraining ? 'scale-90 opacity-80' : 'scale-100'}`}
           onClick={() => {
             if (myInfo?.isTraining && tapSelectMode) {
               closeMenu();

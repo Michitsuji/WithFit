@@ -1,9 +1,9 @@
 // ==========================================
 // DataView.js — データ画面（カレンダー・グラフ・月間レポート・体組成・種目成長率チャート）
 // ==========================================
-import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, TrendingDown, X } from 'lucide-react';
-import { formatDateFromTimestamp, MUSCLE_CATEGORIES, getCategoryColor, getAge, getBMR, getFFMI, getFFMIEval } from './utils';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Sparkles, TrendingUp, X, Award, Users, User } from 'lucide-react';
+import { formatDateFromTimestamp, MUSCLE_CATEGORIES, getCategoryColor, getAge, getBMR, getFFMI, getFFMIEval, calcSetVolume } from './utils';
 import { UserAvatar, renderUsernameWithBadge, SimpleChart } from './CommonUI';
 import { WorkoutCard } from './WorkoutCard';
 
@@ -21,14 +21,12 @@ function MonthlyReport({ monthDate, posts, userName, accountsInfo }) {
   const trainingDays = new Set(monthPosts.map(p => formatDateFromTimestamp(p.timestamp))).size;
   
   let totalSets = 0;
-  let totalWorkoutsCount = 0;
   const categoryCount = {};
   MUSCLE_CATEGORIES.forEach(c => categoryCount[c] = 0);
 
   monthPosts.forEach(post => {
     if (post.items) {
       post.items.forEach(item => {
-        totalWorkoutsCount++;
         const sets = item.sets ? item.sets.length : 0;
         totalSets += sets;
         const cat = item.category || 'その他';
@@ -170,11 +168,7 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
 
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
   const todayStr = formatDateFromTimestamp(Date.now());
-
-
   
   const myPosts = posts.filter(p => p.author === displayUser);
 
@@ -433,141 +427,760 @@ function DataView({ posts, currentUser, accountsInfo, onEdit, onDelete, onImport
   );
 }
 
-// --- 種目成長率チャートモーダル ---
+// --- 種目成長率チャートモーダル（体組成グラフと同じ見やすいUI・期間切替・指標切替・タッチ数値表示＆外タッチ非表示対応） ---
 function ExerciseChartModal({ exercise, posts, accountsInfo, onClose, currentUser }) {
-  if (!exercise) return null;
-  
+  const isCardio = exercise?.weightType === 'cardio' || exercise?.category === '有酸素';
+  const [rangeType, setRangeType] = useState('3M'); // '1M' | '3M' | '1Y' | 'ALL'
+  const [metricType, setMetricType] = useState(isCardio ? 'distance' : '1rm'); // '1rm' | 'maxWeight' | 'volume' | 'distance' | 'time'
+  const [viewMode, setViewMode] = useState('me'); // 'me' | 'compare'
+  const [selectedIndex, setSelectedIndex] = useState(null);
+  const svgRef = useRef(null);
+  const gradientId = useRef(`ex-chart-grad-${Math.random().toString(36).substring(2, 9)}`).current;
+
+  useEffect(() => {
+    setMetricType(isCardio ? 'distance' : '1rm');
+    setSelectedIndex(null);
+  }, [exercise?.id, isCardio]);
+
+  // 期間やモード変更時は選択解除（グラフを見やすく保つ）
+  useEffect(() => {
+    setSelectedIndex(null);
+  }, [rangeType, metricType, viewMode]);
+
+  // グラフ（SVG）以外の場所をタッチ・クリックしたときは再び非表示にする
+  useEffect(() => {
+    if (selectedIndex === null) return;
+    const handleOutsidePointer = (e) => {
+      if (svgRef.current && !svgRef.current.contains(e.target)) {
+        setSelectedIndex(null);
+      }
+    };
+    document.addEventListener('touchstart', handleOutsidePointer, { passive: true });
+    document.addEventListener('mousedown', handleOutsidePointer);
+    return () => {
+      document.removeEventListener('touchstart', handleOutsidePointer);
+      document.removeEventListener('mousedown', handleOutsidePointer);
+    };
+  }, [selectedIndex]);
+
   const calc1RM = (weight, reps) => {
     if (!weight || isNaN(weight) || weight <= 0) return 0;
     if (!reps || isNaN(reps) || reps <= 0) return weight;
     return weight * (1 + reps / 40);
   };
 
-  const chartDataMap = {};
-  
-  posts.forEach(p => {
-    const dStr = p.date.substring(0, 10);
-    if (!chartDataMap[dStr]) chartDataMap[dStr] = {};
-    
-    let maxRM = 0;
-    p.items?.forEach(item => {
-       if (item.exerciseName === exercise.name) {
-          item.sets?.forEach(set => {
-             const w = Number(set.weight) || 0;
-             const r = Number(set.reps) || Math.max(Number(set.lReps)||0, Number(set.rReps)||0);
-             const rm = calc1RM(w, r);
-             if (rm > maxRM) maxRM = rm;
+  // 投稿データから日付・ユーザー別の種目パフォーマンスを集計
+  const { allRecordsByDay, allAuthors } = useMemo(() => {
+    if (!exercise || !posts) return { allRecordsByDay: {}, allAuthors: [] };
+    const dayMap = {};
+    const authorsSet = new Set();
+
+    posts.forEach(p => {
+      if (!p.date && !p.timestamp) return;
+      const time = new Date(p.date || p.timestamp).getTime();
+      if (isNaN(time)) return;
+      const dt = new Date(time);
+      const dStr = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+
+      let maxRM = 0;
+      let maxWeight = 0;
+      let totalVol = 0;
+      let totalDist = 0;
+      let totalTime = 0;
+      let bestSetText = '';
+      let matched = false;
+      const baseWeight = Number(p.bodyWeight) || Number(accountsInfo?.[p.author]?.weight) || 60;
+
+      const checkSet = (wRaw, rRaw, wType, rawSet) => {
+        if (wType === 'cardio' || isCardio) {
+          const dist = Number(rawSet.distance) || 0;
+          const tm = Number(rawSet.time) || 0;
+          if (dist > 0 || tm > 0) {
+            matched = true;
+            totalDist += dist;
+            totalTime += tm;
+            if (!bestSetText || dist > maxWeight) {
+              maxWeight = dist;
+              bestSetText = `${dist}km / ${tm}分`;
+            }
+          }
+          return;
+        }
+        const w = Number(wRaw) || 0;
+        const r = Number(rRaw) || 0;
+        if (w <= 0 && wType !== 'bodyWeight') return;
+        matched = true;
+        const rm = calc1RM(w, r);
+        if (rm > maxRM) {
+          maxRM = rm;
+          const unitLabel = wType === 'plate' ? '枚' : 'kg';
+          bestSetText = `${w}${unitLabel} × ${r}回`;
+        }
+        if (w > maxWeight) maxWeight = w;
+        totalVol += calcSetVolume({ weight: w, reps: r }, wType, baseWeight);
+      };
+
+      (p.items || []).forEach(item => {
+        if (item.exerciseName === exercise.name) {
+          (item.sets || []).forEach(s => {
+            const r = Number(s.reps) || Math.max(Number(s.lReps) || 0, Number(s.rReps) || 0);
+            checkSet(s.weight, r, item.weightType || exercise.weightType, s);
+            (s.dropSets || []).forEach(ds => {
+              const dr = Number(ds.reps) || Math.max(Number(ds.lReps) || 0, Number(ds.rReps) || 0);
+              checkSet(ds.weight, dr, item.weightType || exercise.weightType, ds);
+            });
           });
-       }
+        }
+        if (item.isSuperSet && item.superExerciseName === exercise.name) {
+          (item.sets || []).forEach(s => {
+            const r = Number(s.superReps) || Math.max(Number(s.superLReps) || 0, Number(s.superRReps) || 0);
+            checkSet(s.superWeight, r, item.superWeightType || exercise.weightType, s);
+          });
+        }
+        if (item.isSuperSet && item.superExerciseName3 === exercise.name) {
+          (item.sets || []).forEach(s => {
+            const r = Number(s.superReps3) || Math.max(Number(s.superLReps3) || 0, Number(s.superRReps3) || 0);
+            checkSet(s.superWeight3, r, item.superWeightType3 || exercise.weightType, s);
+          });
+        }
+      });
+
+      if (!matched) return;
+      authorsSet.add(p.author);
+      if (!dayMap[dStr]) dayMap[dStr] = { time, dStr, users: {} };
+
+      const prevUserRec = dayMap[dStr].users[p.author];
+      const nextRec = {
+        oneRM: Math.round(maxRM * 10) / 10,
+        maxWeight: Math.round(maxWeight * 10) / 10,
+        volume: Math.round(totalVol),
+        distance: Math.round(totalDist * 10) / 10,
+        time: Math.round(totalTime),
+        bestSetText
+      };
+
+      if (!prevUserRec || nextRec.oneRM >= prevUserRec.oneRM) {
+        dayMap[dStr].users[p.author] = nextRec;
+      }
     });
-    
-    if (maxRM > 0) {
-       if (!chartDataMap[dStr][p.author] || maxRM > chartDataMap[dStr][p.author]) {
-          chartDataMap[dStr][p.author] = Math.round(maxRM * 10) / 10;
-       }
+
+    const authorsList = Array.from(authorsSet);
+    // 自分を先頭に並べる
+    authorsList.sort((a, b) => (a === currentUser ? -1 : b === currentUser ? 1 : 0));
+    return { allRecordsByDay: dayMap, allAuthors: authorsList };
+  }, [exercise, posts, accountsInfo, currentUser, isCardio]);
+
+  if (!exercise) return null;
+
+  const hasFriendData = allAuthors.some(a => a !== currentUser);
+  const hasMyData = allAuthors.includes(currentUser);
+  const effectiveViewMode = !hasMyData && hasFriendData ? 'compare' : viewMode;
+
+  const activeAuthors = effectiveViewMode === 'me'
+    ? (hasMyData ? [currentUser] : allAuthors.slice(0, 1))
+    : allAuthors;
+
+  const getMetricValue = (rec) => {
+    if (!rec) return null;
+    if (metricType === 'maxWeight') return rec.maxWeight;
+    if (metricType === 'volume') return rec.volume;
+    if (metricType === 'distance') return rec.distance;
+    if (metricType === 'time') return rec.time;
+    return rec.oneRM;
+  };
+
+  const unitLabel = (() => {
+    if (metricType === 'distance') return 'km';
+    if (metricType === 'time') return '分';
+    if (exercise.weightType === 'plate' && metricType !== 'volume') return '枚';
+    return 'kg';
+  })();
+
+  const metricLabel = (() => {
+    if (metricType === 'maxWeight') return '最大重量';
+    if (metricType === 'volume') return '総負荷量';
+    if (metricType === 'distance') return '走行距離';
+    if (metricType === 'time') return '運動時間';
+    return '推定1RM';
+  })();
+
+  // 対象ユーザーのデータがある日付のみ抽出しソート
+  const allSortedDays = Object.values(allRecordsByDay)
+    .filter(dayObj => activeAuthors.some(a => {
+      const v = getMetricValue(dayObj.users[a]);
+      return v !== null && v > 0;
+    }))
+    .sort((a, b) => a.time - b.time);
+
+  // 期間フィルタリング
+  const filteredDays = (() => {
+    if (allSortedDays.length === 0) return [];
+    if (rangeType === 'ALL') return allSortedDays;
+    const latestTime = Math.max(Date.now(), allSortedDays[allSortedDays.length - 1].time);
+    const daysMap = { '1M': 31, '3M': 92, '1Y': 366 };
+    const cutoff = latestTime - (daysMap[rangeType] || 92) * 24 * 60 * 60 * 1000;
+    return allSortedDays.filter(d => d.time >= cutoff);
+  })();
+
+  const rangeOptions = [
+    { key: '1M', label: '1か月' },
+    { key: '3M', label: '3か月' },
+    { key: '1Y', label: '1年' },
+    { key: 'ALL', label: '全期間' }
+  ];
+
+  const metricOptions = isCardio
+    ? [
+        { key: 'distance', label: '距離 (km)' },
+        { key: 'time', label: '時間 (分)' }
+      ]
+    : [
+        { key: '1rm', label: '推定1RM' },
+        { key: 'maxWeight', label: '最大重量' },
+        { key: 'volume', label: '総負荷量' }
+      ];
+
+  const palette = ['#10b981', '#6366f1', '#f43f5e', '#f59e0b', '#06b6d4'];
+  const getAuthorColor = (author, idx) => {
+    if (author === currentUser) return '#10b981';
+    return palette[(idx + 1) % palette.length];
+  };
+
+  // メインユーザー（自分または先頭ユーザー）のサマリー統計
+  const primaryAuthor = activeAuthors[0] || currentUser;
+  const primaryValues = filteredDays
+    .map(d => getMetricValue(d.users[primaryAuthor]))
+    .filter(v => v !== null && v > 0);
+
+  const hasRangeData = filteredDays.length > 0;
+  const minVal = primaryValues.length > 0 ? Math.min(...primaryValues) : 0;
+  const maxVal = primaryValues.length > 0 ? Math.max(...primaryValues) : 0;
+  const firstVal = primaryValues.length > 0 ? primaryValues[0] : 0;
+  const latestVal = primaryValues.length > 0 ? primaryValues[primaryValues.length - 1] : 0;
+  const periodDiff = Math.round((latestVal - firstVal) * 10) / 10;
+
+  // 全ユーザーを含めたY軸スケール計算
+  let globalMin = Infinity;
+  let globalMax = -Infinity;
+  filteredDays.forEach(d => {
+    activeAuthors.forEach(a => {
+      const v = getMetricValue(d.users[a]);
+      if (v !== null && v > 0) {
+        if (v < globalMin) globalMin = v;
+        if (v > globalMax) globalMax = v;
+      }
+    });
+  });
+  if (globalMin === Infinity) { globalMin = 0; globalMax = 10; }
+
+  const pad = (globalMax - globalMin) === 0 ? Math.max(1, globalMin * 0.08) : (globalMax - globalMin) * 0.22;
+  const yMin = Math.max(0, Math.floor((globalMin - pad) * 10) / 10);
+  const yMax = Math.ceil((globalMax + pad) * 10) / 10;
+  const yRange = yMax - yMin === 0 ? 1 : yMax - yMin;
+
+  // SVG座標設定（SimpleChartと完全統一）
+  const svgW = 360;
+  const svgH = 210;
+  const padL = 40;
+  const padR = 16;
+  const padT = 36;
+  const padB = 30;
+  const plotW = svgW - padL - padR;
+  const plotH = svgH - padT - padB;
+
+  const minTime = hasRangeData ? filteredDays[0].time : 0;
+  const maxTime = hasRangeData ? filteredDays[filteredDays.length - 1].time : 0;
+  const timeSpan = maxTime - minTime;
+
+  const dayPositions = filteredDays.map((d, idx) => {
+    let x;
+    if (filteredDays.length === 1 || timeSpan === 0) {
+      x = padL + plotW / 2;
+    } else {
+      const timeRatio = (d.time - minTime) / timeSpan;
+      const idxRatio = idx / (filteredDays.length - 1);
+      const ratio = filteredDays.length > 20 ? idxRatio : (timeRatio * 0.7 + idxRatio * 0.3);
+      x = padL + ratio * plotW;
     }
+    const dt = new Date(d.time);
+    const shortDate = `${dt.getMonth() + 1}/${dt.getDate()}`;
+    const fullDate = `${dt.getFullYear()}/${String(dt.getMonth() + 1).padStart(2, '0')}/${String(dt.getDate()).padStart(2, '0')}`;
+    return { ...d, x, shortDate, fullDate, idx };
   });
 
-  const dates = Object.keys(chartDataMap).sort();
-  const authorsSet = new Set();
-  dates.forEach(d => Object.keys(chartDataMap[d]).forEach(a => authorsSet.add(a)));
-  const authors = Array.from(authorsSet);
-
-  const renderMultiChart = () => {
-     if (dates.length === 0) return <div className="p-4 text-center text-slate-500 font-bold">データがありません</div>;
-     
-     const width = 300, height = 150;
-     let min = Infinity, max = -Infinity;
-     dates.forEach(d => {
-       authors.forEach(a => {
-         const v = chartDataMap[d][a];
-         if (v) {
-           if (v < min) min = v;
-           if (v > max) max = v;
-         }
-       });
-     });
-     
-     if (min === Infinity) return <div className="p-4 text-center text-slate-500 font-bold">データがありません</div>;
-     const padding = (max - min) === 0 ? (min === 0 ? 1 : min * 0.1) : (max - min) * 0.2;
-     min = Math.max(0, min - padding);
-     max = max + padding;
-     const range = max - min === 0 ? 1 : max - min;
-     const colors = ['#10b981', '#6366f1', '#f43f5e', '#f59e0b', '#06b6d4'];
-
-     return (
-       <div className="relative w-full overflow-x-auto pb-6">
-         <svg viewBox={`0 -10 ${width} ${height + 40}`} className="w-full min-w-[300px] h-48 overflow-visible pl-6">
-           {[0, 0.5, 1].map(tick => {
-             const y = height - tick * height;
-             const val = Math.round(min + range * tick);
-             return (
-               <g key={tick}>
-                 <line x1="0" y1={y} x2={width} y2={y} stroke="currentColor" className="text-slate-200 dark:text-slate-800" strokeWidth="1" strokeDasharray="4 4" />
-                 <text x="-8" y={y + 4} fontSize="10" fill="currentColor" textAnchor="end" className="text-slate-400">{val}</text>
-               </g>
-             );
-           })}
-           {authors.map((author, aIdx) => {
-              const color = author === currentUser ? '#10b981' : colors[(aIdx + 1) % colors.length];
-              const pointsData = dates.map((d, i) => {
-                 const val = chartDataMap[d][author];
-                 if (!val) return null;
-                 const x = (i / (dates.length - 1 || 1)) * width;
-                 const y = height - ((val - min) / range) * height;
-                 return { x, y, val, d, author };
-              }).filter(Boolean);
-
-              if (pointsData.length === 0) return null;
-              const pointsStr = pointsData.map(p => `${p.x},${p.y}`).join(' ');
-
-              return (
-                 <g key={author}>
-                   <polyline points={pointsStr} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                   {pointsData.map((p, i) => (
-                     <g key={i}>
-                       <circle cx={p.x} cy={p.y} r="4" fill="white" stroke={color} strokeWidth="2" />
-                       <text x={p.x} y={p.y - 10} fontSize="10" fill={color} textAnchor="middle" className="font-bold">{p.val}</text>
-                     </g>
-                   ))}
-                 </g>
-              );
-           })}
-           {dates.map((d, i) => {
-              const x = (i / (dates.length - 1 || 1)) * width;
-              const dateStr = d.substring(5).replace('-', '/');
-              return (
-                 <text key={d} x={x} y={height + 20} fontSize="9" fill="#94a3b8" textAnchor="middle" className="font-bold">{dateStr}</text>
-              );
-           })}
-         </svg>
-         <div className="flex flex-wrap gap-3 mt-4 justify-center">
-            {authors.map((author, aIdx) => {
-               const color = author === currentUser ? '#10b981' : colors[(aIdx + 1) % colors.length];
-               const displayName = accountsInfo[author]?.displayName || author;
-               return (
-                  <div key={author} className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">
-                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}></div>
-                     {displayName}
-                  </div>
-               );
-            })}
-         </div>
-       </div>
-     );
+  const buildSmoothPath = (pts) => {
+    if (pts.length === 0) return '';
+    if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`;
+    if (pts.length === 2) return `M ${pts[0].x} ${pts[0].y} L ${pts[1].x} ${pts[1].y}`;
+    let d = `M ${pts[0].x} ${pts[0].y}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i];
+      const p1 = pts[i + 1];
+      const cpx1 = p0.x + (p1.x - p0.x) * 0.35;
+      const cpy1 = p0.y;
+      const cpx2 = p1.x - (p1.x - p0.x) * 0.35;
+      const cpy2 = p1.y;
+      d += ` C ${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${p1.x} ${p1.y}`;
+    }
+    return d;
   };
+
+  // 著者ごとのポイント＆パス生成
+  const authorSeries = activeAuthors.map((author, aIdx) => {
+    const color = getAuthorColor(author, aIdx);
+    const pts = [];
+    dayPositions.forEach((dayPos) => {
+      const rec = dayPos.users[author];
+      const val = getMetricValue(rec);
+      if (val !== null && val > 0) {
+        const y = padT + plotH - ((val - yMin) / yRange) * plotH;
+        const prevPt = pts.length > 0 ? pts[pts.length - 1] : null;
+        const prevDiff = prevPt ? Math.round((val - prevPt.val) * 10) / 10 : null;
+        pts.push({
+          x: dayPos.x,
+          y,
+          val,
+          shortDate: dayPos.shortDate,
+          fullDate: dayPos.fullDate,
+          dayIdx: dayPos.idx,
+          bestSetText: rec?.bestSetText || '',
+          prevDiff,
+          author,
+          color
+        });
+      }
+    });
+    const linePath = buildSmoothPath(pts);
+    const areaPath = pts.length > 1
+      ? `${linePath} L ${pts[pts.length - 1].x} ${padT + plotH} L ${pts[0].x} ${padT + plotH} Z`
+      : '';
+    return { author, color, pts, linePath, areaPath };
+  });
+
+  // X軸メモリ（最大5個）
+  const xTicks = (() => {
+    if (dayPositions.length === 0) return [];
+    if (dayPositions.length <= 5) return dayPositions;
+    const tickCount = 5;
+    const result = [];
+    for (let i = 0; i < tickCount; i++) {
+      const targetIdx = Math.round((i / (tickCount - 1)) * (dayPositions.length - 1));
+      result.push(dayPositions[targetIdx]);
+    }
+    return result;
+  })();
+
+  const handlePointerInteract = (e) => {
+    if (!svgRef.current || dayPositions.length === 0) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const clientX = e.touches && e.touches.length > 0
+      ? e.touches[0].clientX
+      : e.clientX;
+    if (clientX === undefined) return;
+
+    const relX = ((clientX - rect.left) / rect.width) * svgW;
+    let closestIdx = 0;
+    let minDist = Infinity;
+    dayPositions.forEach((p, idx) => {
+      const dist = Math.abs(p.x - relX);
+      if (dist < minDist) {
+        minDist = dist;
+        closestIdx = idx;
+      }
+    });
+    setSelectedIndex(closestIdx);
+  };
+
+  const activeDay = (selectedIndex !== null && dayPositions[selectedIndex])
+    ? dayPositions[selectedIndex]
+    : null;
+
+  // 選択された日の各ユーザーのポイント
+  const activeDayPoints = activeDay
+    ? authorSeries
+        .map(s => s.pts.find(pt => pt.dayIdx === activeDay.idx))
+        .filter(Boolean)
+    : [];
+
+  const primaryActivePt = activeDayPoints[0] || null;
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-[70] flex items-center justify-center p-4 animate-in fade-in" onClick={onClose}>
-      <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
-          <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2"><TrendingDown className="transform rotate-180 text-emerald-500" size={18}/> 成長率 (推定1RM)</h3>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20}/></button>
+      <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+        {/* モーダルヘッダー */}
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/70 dark:bg-slate-950/50">
+          <div className="min-w-0 pr-2">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="text-emerald-500 shrink-0" size={18} />
+              <h3 className="font-bold text-slate-800 dark:text-slate-100 text-base truncate">{exercise.name}</h3>
+            </div>
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+              {exercise.category && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${getCategoryColor(exercise.category)}`}>
+                  {exercise.category}
+                </span>
+              )}
+              {exercise.maker && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                  {exercise.maker}
+                </span>
+              )}
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 rounded-full transition-colors shrink-0">
+            <X size={20} />
+          </button>
         </div>
-        <div className="p-4">
-           <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-4 text-center">{exercise.name}</h4>
-           {renderMultiChart()}
-           <p className="text-[10px] text-slate-400 font-bold mt-4 text-center">※推定1RM = 重量 × (1 + 回数 ÷ 40) で計算しています。</p>
+
+        <div className="p-4 sm:p-5 overflow-y-auto space-y-4">
+          {allSortedDays.length === 0 ? (
+            <div className="p-8 text-center text-slate-400 dark:text-slate-500 font-bold text-sm bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800">
+              まだこの種目の記録データがありません
+            </div>
+          ) : (
+            <>
+              {/* 指標切替 ＆ フレンド比較切替 */}
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200/70 dark:border-slate-700/70 flex-1 min-w-[200px]">
+                  {metricOptions.map(opt => {
+                    const active = metricType === opt.key;
+                    return (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => setMetricType(opt.key)}
+                        className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap ${
+                          active
+                            ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {hasFriendData && hasMyData && (
+                  <button
+                    type="button"
+                    onClick={() => setViewMode(prev => prev === 'me' ? 'compare' : 'me')}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition-all shrink-0 ${
+                      effectiveViewMode === 'compare'
+                        ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400'
+                        : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                    }`}
+                  >
+                    {effectiveViewMode === 'compare' ? <Users size={14} /> : <User size={14} />}
+                    {effectiveViewMode === 'compare' ? 'フレンド比較中' : '自分のみ'}
+                  </button>
+                )}
+              </div>
+
+              {/* 期間セレクター（体組成グラフと統一） */}
+              <div className="grid grid-cols-4 gap-1 w-full bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200/70 dark:border-slate-700/70">
+                {rangeOptions.map(opt => {
+                  const active = rangeType === opt.key;
+                  return (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setRangeType(opt.key)}
+                      className={`py-1.5 text-xs font-bold rounded-lg text-center whitespace-nowrap transition-all ${
+                        active
+                          ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {!hasRangeData ? (
+                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-2xl p-8 text-center">
+                  <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mb-2">選択した期間のデータがありません</p>
+                  <button
+                    type="button"
+                    onClick={() => setRangeType('ALL')}
+                    className="text-xs font-bold px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                  >
+                    全期間を表示する
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* サマリー統計バー（期間変化・最新・自己ベスト） */}
+                  <div className="bg-slate-50/90 dark:bg-slate-950/70 border border-slate-100 dark:border-slate-800/80 rounded-2xl p-3">
+                    <div className="grid grid-cols-3 divide-x divide-slate-200/70 dark:divide-slate-800 text-center">
+                      <div className="px-1 flex flex-col items-center justify-center">
+                        <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-0.5 whitespace-nowrap">期間成長</div>
+                        <div className={`text-xs font-bold font-mono whitespace-nowrap ${
+                          periodDiff > 0 ? 'text-emerald-500' : periodDiff < 0 ? 'text-rose-500' : 'text-slate-600 dark:text-slate-300'
+                        }`}>
+                          {periodDiff > 0 ? `+${periodDiff}` : periodDiff}{unitLabel}
+                        </div>
+                      </div>
+                      <div className="px-1 flex flex-col items-center justify-center">
+                        <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mb-0.5 whitespace-nowrap">最新 ({metricLabel})</div>
+                        <div className="text-xs font-bold font-mono text-slate-700 dark:text-slate-200 whitespace-nowrap">
+                          {latestVal}{unitLabel}
+                        </div>
+                      </div>
+                      <div className="px-1 flex flex-col items-center justify-center">
+                        <div className="text-[10px] font-bold text-amber-500 mb-0.5 whitespace-nowrap flex items-center gap-0.5">
+                          <Award size={11} /> 期間ベスト
+                        </div>
+                        <div className="text-xs font-bold font-mono text-slate-800 dark:text-slate-100 whitespace-nowrap">
+                          {maxVal}{unitLabel}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* インタラクティブSVGチャート（最初タッチするまでは数値・ツールチップを非表示にしてグラフを見やすく表示） */}
+                  <div className="relative w-full select-none">
+                    <svg
+                      ref={svgRef}
+                      viewBox={`0 0 ${svgW} ${svgH}`}
+                      className="w-full h-auto overflow-visible touch-pan-y cursor-crosshair"
+                      onClick={handlePointerInteract}
+                      onTouchStart={handlePointerInteract}
+                      onTouchMove={handlePointerInteract}
+                      onMouseDown={handlePointerInteract}
+                      onMouseMove={(e) => { if (e.buttons === 1) handlePointerInteract(e); }}
+                    >
+                      <defs>
+                        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#10b981" stopOpacity="0.36" />
+                          <stop offset="75%" stopColor="#10b981" stopOpacity="0.06" />
+                          <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
+
+                      {/* 水平グリッド線 ＆ Y軸ラベル */}
+                      {[0, 0.333, 0.666, 1].map((t, idx) => {
+                        const y = padT + plotH - t * plotH;
+                        const rawVal = yMin + yRange * t;
+                        const val = metricType === 'volume' ? Math.round(rawVal) : rawVal.toFixed(1);
+                        return (
+                          <g key={`grid-${idx}`}>
+                            <line
+                              x1={padL}
+                              y1={y}
+                              x2={svgW - padR}
+                              y2={y}
+                              stroke="currentColor"
+                              className="text-slate-100 dark:text-slate-800/90"
+                              strokeWidth="1"
+                              strokeDasharray={idx === 0 ? undefined : "3 3"}
+                            />
+                            <text
+                              x={padL - 6}
+                              y={y + 3.5}
+                              fontSize="9.5"
+                              fill="currentColor"
+                              textAnchor="end"
+                              className="text-slate-400 dark:text-slate-500 font-bold font-mono"
+                            >
+                              {val}
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                      {/* 単一ユーザー表示時は美しいグラデーションエリアを描画 */}
+                      {authorSeries.length === 1 && authorSeries[0].areaPath && (
+                        <path d={authorSeries[0].areaPath} fill={`url(#${gradientId})`} />
+                      )}
+
+                      {/* 折れ線・ベジェ曲線 */}
+                      {authorSeries.map(series => (
+                        series.linePath ? (
+                          <path
+                            key={`line-${series.author}`}
+                            d={series.linePath}
+                            fill="none"
+                            stroke={series.color}
+                            strokeWidth="2.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        ) : null
+                      ))}
+
+                      {/* 選択中の垂直ガイドライン（タッチ時のみ表示） */}
+                      {activeDay && (
+                        <line
+                          x1={activeDay.x}
+                          y1={padT - 4}
+                          x2={activeDay.x}
+                          y2={padT + plotH}
+                          stroke="#10b981"
+                          strokeWidth="1.5"
+                          strokeDasharray="3 3"
+                          opacity="0.7"
+                        />
+                      )}
+
+                      {/* データポイント描画（常時テキスト表示をなくし、線の推移を見やすくする） */}
+                      {authorSeries.map(series => (
+                        <g key={`pts-${series.author}`}>
+                          {series.pts.map((p, i) => {
+                            const isSelected = activeDay && p.dayIdx === activeDay.idx;
+                            const isDense = series.pts.length > 20;
+                            const dotRadius = isSelected ? 5.5 : (isDense ? 2.2 : 3.2);
+                            return (
+                              <g key={`pt-${series.author}-${i}`}>
+                                {isSelected && (
+                                  <circle
+                                    cx={p.x}
+                                    cy={p.y}
+                                    r="10"
+                                    fill={series.color}
+                                    opacity="0.22"
+                                  />
+                                )}
+                                <circle
+                                  cx={p.x}
+                                  cy={p.y}
+                                  r={dotRadius}
+                                  fill={isSelected ? series.color : "currentColor"}
+                                  className={isSelected ? "" : "text-white dark:text-slate-900"}
+                                  stroke={series.color}
+                                  strokeWidth={isSelected ? "2.5" : (isDense ? "1.5" : "2")}
+                                />
+                              </g>
+                            );
+                          })}
+                        </g>
+                      ))}
+
+                      {/* フローティングツールチップ（タッチ選択時のみ表示） */}
+                      {primaryActivePt && (() => {
+                        const labelText = `${primaryActivePt.shortDate}  ${primaryActivePt.val}${unitLabel}`;
+                        const boxW = Math.max(88, labelText.length * 6.5 + 16);
+                        const boxH = 24;
+                        const clampedX = Math.min(Math.max(primaryActivePt.x, padL + boxW / 2), svgW - padR - boxW / 2);
+                        const placeBelow = primaryActivePt.y - boxH - 10 < 2;
+                        const boxY = placeBelow ? Math.min(padT + plotH - boxH, primaryActivePt.y + 12) : primaryActivePt.y - boxH - 10;
+
+                        return (
+                          <g className="pointer-events-none">
+                            <rect
+                              x={clampedX - boxW / 2}
+                              y={boxY}
+                              width={boxW}
+                              height={boxH}
+                              rx="7"
+                              fill={primaryActivePt.color}
+                              opacity="0.96"
+                            />
+                            <text
+                              x={clampedX}
+                              y={boxY + 15.5}
+                              fontSize="10"
+                              fill="#ffffff"
+                              textAnchor="middle"
+                              className="font-bold font-mono"
+                            >
+                              {labelText}
+                            </text>
+                          </g>
+                        );
+                      })()}
+
+                      {/* X軸の日付ラベル */}
+                      {xTicks.map((t, idx) => (
+                        <text
+                          key={`xtick-${idx}`}
+                          x={t.x}
+                          y={svgH - 7}
+                          fontSize="9.5"
+                          fill="currentColor"
+                          textAnchor="middle"
+                          className="text-slate-400 dark:text-slate-500 font-bold font-mono"
+                        >
+                          {t.shortDate}
+                        </text>
+                      ))}
+                    </svg>
+
+                    {/* タッチ選択中のみその日の詳細（数値・ベストセット・前回比）を下部に表示 */}
+                    {activeDay && activeDayPoints.length > 0 ? (
+                      <div className="mt-2 bg-slate-50 dark:bg-slate-950/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-3 space-y-2 animate-in fade-in duration-150">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-500 dark:text-slate-400 font-mono">
+                            {activeDay.fullDate}
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-400">{metricLabel}</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          {activeDayPoints.map(pt => {
+                            const dispName = accountsInfo?.[pt.author]?.displayName || pt.author;
+                            return (
+                              <div key={pt.author} className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: pt.color }}></span>
+                                  <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{dispName}</span>
+                                  {pt.bestSetText && (
+                                    <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded border border-slate-200/70 dark:border-slate-800 whitespace-nowrap">
+                                      ベスト: {pt.bestSetText}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <span className="text-base font-black text-slate-900 dark:text-white font-mono">
+                                    {pt.val}<span className="text-[10px] font-bold text-slate-400 ml-0.5">{unitLabel}</span>
+                                  </span>
+                                  {pt.prevDiff !== null && (
+                                    <span className={`text-[10px] font-bold font-mono px-1.5 py-0.5 rounded ${
+                                      pt.prevDiff > 0
+                                        ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400'
+                                        : pt.prevDiff < 0
+                                        ? 'bg-rose-50 text-rose-500 dark:bg-rose-950/60 dark:text-rose-400'
+                                        : 'bg-slate-200/60 text-slate-500 dark:bg-slate-800'
+                                    }`}>
+                                      {pt.prevDiff > 0 ? `+${pt.prevDiff}` : pt.prevDiff}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 text-right mt-1">
+                        ※グラフをタッチするとその日の数値を表示（グラフ外タッチで非表示）
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 複数ユーザー比較時の凡例 */}
+                  {authorSeries.length > 1 && (
+                    <div className="flex flex-wrap gap-3 pt-1 justify-center">
+                      {authorSeries.map((s) => {
+                        const displayName = accountsInfo?.[s.author]?.displayName || s.author;
+                        return (
+                          <div key={s.author} className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">
+                            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: s.color }}></div>
+                            {displayName}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+              {!isCardio && metricType === '1rm' && (
+                <p className="text-[10px] text-slate-400 font-bold text-center">
+                  ※推定1RM = 重量 × (1 + 回数 ÷ 40) で計算しています。
+                </p>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -454,6 +454,34 @@ function RecordView({ onStart, onPost, onCancel, onRequestJointTraining, onAccep
 
   const activeProgramsList = myInfo.activePrograms || (myInfo.activeProgram ? [myInfo.activeProgram] : []);
 
+  const myPastPosts = posts.filter(p => p.author === currentUser);
+  const mutedExercises = myInfo.mutedExercises || [];
+
+  // 選択中のジム＋共通で利用可能な全種目（部位選択前でも検索・サジェスト可能）
+  const allGymExercises = useMemo(() => {
+    return exercises.filter(ex => {
+      if (ex.gymId !== selectedGymId && ex.gymId !== 'common') return false;
+      if (mutedExercises.includes(ex.name)) return false;
+      if (ex.gymId === 'common') {
+        if (ex.author && ex.author !== currentUser && ex.author !== MASTER_USER) return false;
+      } else {
+        const gym = gyms.find(g => g.id === ex.gymId);
+        if (gym && ex.author && ex.author !== gym.owner && ex.author !== currentUser && ex.author !== MASTER_USER) return false;
+      }
+      return true;
+    });
+  }, [exercises, selectedGymId, mutedExercises, currentUser, gyms]);
+
+  const availableExercises = useMemo(() => {
+    if (selectedCategories.length === 0) return allGymExercises;
+    return allGymExercises.filter(ex => selectedCategories.includes(ex.category || 'その他'));
+  }, [allGymExercises, selectedCategories]);
+
+  const ensureCategory = (cat) => {
+    if (!cat) return;
+    setSelectedCategories(prev => prev.includes(cat) ? prev : [...prev, cat]);
+  };
+
   const handleTextImportSubmit = async () => {
     if (!importText.trim()) {
       alert("テキストを入力してください。");
@@ -520,7 +548,7 @@ ${importText}`;
       const parsedItems = JSON.parse(textResponse);
 
       const newItems = parsedItems.map(item => {
-        const matchedEx = availableExercises.find(ex => ex.name.includes(item.exerciseName) || (item.exerciseName && item.exerciseName.includes(ex.name)));
+        const matchedEx = allGymExercises.find(ex => ex.name.includes(item.exerciseName) || (item.exerciseName && item.exerciseName.includes(ex.name)));
         if (matchedEx && !selectedCategories.includes(matchedEx.category)) {
            toggleCategory(matchedEx.category);
         }
@@ -675,7 +703,7 @@ ${importText}`;
   };
 
   const handleApplyProgramToMenu = (program, dayData) => {
-    const targetEx = availableExercises.find(ex => ex.name === program.exerciseName) || { category: 'その他', weightType: 'total' };
+    const targetEx = allGymExercises.find(ex => ex.name === program.exerciseName) || { category: 'その他', weightType: 'total' };
     
     if (!selectedCategories.includes(targetEx.category)) {
       setSelectedCategories(prev => [...prev, targetEx.category]);
@@ -731,24 +759,6 @@ ${importText}`;
     } catch (e) {}
   };
 
-  const isTraining = myInfo.isTraining;
-  const myPastPosts = posts.filter(p => p.author === currentUser);
-
-  const mutedExercises = myInfo.mutedExercises || [];
-  const availableExercises = exercises.filter(ex => {
-    if (ex.gymId !== selectedGymId && ex.gymId !== 'common') return false; 
-    if (mutedExercises.includes(ex.name)) return false;
-    if (selectedCategories.length === 0) return false;
-    if (ex.gymId === 'common') {
-       if (ex.author && ex.author !== currentUser && ex.author !== MASTER_USER) return false;
-    } else {
-       const gym = gyms.find(g => g.id === ex.gymId);
-       if (gym && ex.author && ex.author !== gym.owner && ex.author !== currentUser && ex.author !== MASTER_USER) return false;
-    }
-    return selectedCategories.includes(ex.category || 'その他');
-  });
-
-
   const handleStart = () => {
     if (!selectedGymId) { alert("ジムを選択してください"); return; }
     onStart(selectedGymId);
@@ -787,7 +797,7 @@ ${importText}`;
   };
   
   const addExerciseItem = (insertAfterIndex = null, defaultName = '') => {
-    const defaultEx = availableExercises.find(ex => ex.name === defaultName);
+    const defaultEx = allGymExercises.find(ex => ex.name === defaultName);
     const isCardio = defaultEx ? defaultEx.weightType === 'cardio' : false;
     const newItem = { 
       id: generateId(), 
@@ -836,19 +846,6 @@ ${importText}`;
        newPItems.splice(index, 1);
        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newPItems }, { merge: true });
     }
-  };
-  
-  const moveItemUp = (index) => {
-    if (index === 0) return;
-    const newItems = [...workoutItems];
-    [newItems[index - 1], newItems[index]] = [newItems[index], newItems[index - 1]];
-    setWorkoutItems(newItems);
-  };
-  const moveItemDown = (index) => {
-    if (index === workoutItems.length - 1) return;
-    const newItems = [...workoutItems];
-    [newItems[index], newItems[index + 1]] = [newItems[index + 1], newItems[index]];
-    setWorkoutItems(newItems);
   };
 
   const addSet = (itemId) => {
@@ -1023,8 +1020,6 @@ ${importText}`;
     setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', jointPartnerId), { currentWorkoutItems: newItems }, { merge: true });
   };
 
-
-
   const addDropSet = (itemId, parentSetId, targetArray = 'dropSets') => {
     setWorkoutItems(prev => prev.map(item => {
       if (item.id !== itemId) return item;
@@ -1051,7 +1046,7 @@ ${importText}`;
         return { ...set, [targetArray]: (set[targetArray] || []).map(ds => ds.id === dropId ? { ...ds, [field]: value } : ds) };
       })};
     }));
-  }
+  };
 
   const handleSubmit = async () => {
     if (workoutItems.length > 0) {
@@ -1066,7 +1061,6 @@ ${importText}`;
       alert("種目を追加するか、体重・体脂肪率を入力してください。"); return;
     }
 
-    // 押し間違い防止の確認ステップ（ログアウト時と同様のwindow.confirm）
     if (!window.confirm(isManual ? "過去の記録を保存しますか？" : "トレーニングを完了して保存しますか？")) return;
 
     setIsSubmitting(true);
@@ -1314,7 +1308,7 @@ ${importText}`;
       {selectedCategories.length > 0 && availableExercises.length === 0 && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-center shadow-sm mb-4">
           <p className="text-slate-500 dark:text-slate-400 mb-2 text-sm font-bold">この部位に該当する種目がありません。</p>
-          <p className="text-slate-400 dark:text-slate-500 text-xs font-bold">「種目」タブから追加してください。</p>
+          <p className="text-slate-400 dark:text-slate-500 text-xs font-bold">「種目」タブから追加するか、種目検索から他部位の種目を検索できます。</p>
         </div>
       )}
 
@@ -1344,7 +1338,9 @@ ${importText}`;
                      <WorkoutItemForm 
                        item={myItem} 
                        index={index}
-                       availableExercises={availableExercises} 
+                       availableExercises={availableExercises}
+                       allGymExercises={allGymExercises}
+                       onEnsureCategory={ensureCategory}
                        updateItem={updateItem} 
                        removeItem={removeExerciseItem}
                        addSet={addSet} 
@@ -1375,7 +1371,9 @@ ${importText}`;
                      <WorkoutItemForm 
                        item={pItem} 
                        index={index}
-                       availableExercises={availableExercises} 
+                       availableExercises={availableExercises}
+                       allGymExercises={allGymExercises}
+                       onEnsureCategory={ensureCategory}
                        updateItem={updatePartnerItem} 
                        removeItem={() => {}}
                        addSet={addPartnerSet} 
