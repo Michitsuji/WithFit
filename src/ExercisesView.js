@@ -1,5 +1,5 @@
 // ==========================================
-// ExercisesView.js — 種目・ジム管理画面コンポーネント（見やすいカテゴリ別・統計付き種目リストUI）
+// ExercisesView.js — 種目・ジム管理画面コンポーネント（よく使う順・一覧型フィルタ対応UI）
 // ==========================================
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Users, UserPlus, Search, X, Edit2, Trash2, MapPin, EyeOff, Eye, TrendingUp, ChevronDown, ChevronUp, Award, Dumbbell, Filter } from 'lucide-react';
@@ -61,7 +61,6 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
   const [filterGymId, setFilterGymId] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterEquipType, setFilterEquipType] = useState('all'); // 'all' | 'machine' | 'barbell' | 'dumbbell' | 'smith'
-  const [sortBy, setSortBy] = useState('category'); // 'category' | 'frequent' | 'name'
   const [showMuted, setShowMuted] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
 
@@ -94,13 +93,17 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
     }
   }, [myInfo?.isTraining, myInfo?.currentGymId]);
 
-  // 自分の過去投稿から各種目の「実施回数」「自己ベスト」「最終実施日」を集計
-  const myExerciseStatsMap = useMemo(() => {
+  // 自分の過去投稿から各種目の「実施回数」「自己ベスト」「最終実施日」および「ジム利用回数」を集計
+  const { myExerciseStatsMap, myGymUsageMap } = useMemo(() => {
     const stats = {};
-    if (!posts) return stats;
+    const gymCounts = {};
+    if (!posts) return { myExerciseStatsMap: stats, myGymUsageMap: gymCounts };
     const myPosts = posts.filter(p => p.author === currentUser);
 
     myPosts.forEach(p => {
+      if (p.gymName) {
+        gymCounts[p.gymName] = (gymCounts[p.gymName] || 0) + 1;
+      }
       const time = new Date(p.date || p.timestamp).getTime();
       const dt = !isNaN(time) ? new Date(time) : null;
       const dateLabel = dt ? `${dt.getMonth() + 1}/${dt.getDate()}` : '';
@@ -157,8 +160,21 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
       });
     });
 
-    return stats;
+    return { myExerciseStatsMap: stats, myGymUsageMap: gymCounts };
   }, [posts, currentUser]);
+
+  // 参加中ジムを「よく使う順」にソート（ジムでの記録回数 ＋ そのジム所属種目の合計実施回数）
+  const sortedJoinedGyms = useMemo(() => {
+    const list = gyms.filter(g => joinedGyms.includes(g.id));
+    const getGymScore = (g) => {
+      const postHits = myGymUsageMap[g.name] || 0;
+      const exHits = exercises
+        .filter(ex => ex.gymId === g.id)
+        .reduce((sum, ex) => sum + (myExerciseStatsMap[ex.name]?.count || 0), 0);
+      return postHits * 1000 + exHits;
+    };
+    return [...list].sort((a, b) => getGymScore(b) - getGymScore(a));
+  }, [gyms, joinedGyms, myGymUsageMap, exercises, myExerciseStatsMap]);
 
   const handleAddGym = async (e) => {
     e.preventDefault();
@@ -357,7 +373,9 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
     return true;
   });
 
-  const joinedGymsList = filteredGyms.filter(gym => joinedGyms.includes(gym.id));
+  const joinedGymsList = filteredGyms
+    .filter(gym => joinedGyms.includes(gym.id))
+    .sort((a, b) => (myGymUsageMap[b.name] || 0) - (myGymUsageMap[a.name] || 0));
   
   const friendGymsList = filteredGyms.filter(gym => {
     if (joinedGyms.includes(gym.id)) return false;
@@ -473,7 +491,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
             <span className="font-bold text-slate-800 dark:text-slate-100 text-sm sm:text-base leading-snug">
               {ex.name}
             </span>
-            {sortBy !== 'category' && ex.category && (
+            {ex.category && (
               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${getCategoryColor(ex.category)}`}>
                 {ex.category}
               </span>
@@ -722,7 +740,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
 
       {activeTab === 'exercises' && (
         <div className="space-y-4 animate-in fade-in">
-          {gyms.filter(g => joinedGyms.includes(g.id)).length === 0 ? (
+          {sortedJoinedGyms.length === 0 ? (
             <div className="text-center py-8"><p className="text-slate-500 dark:text-slate-400 text-sm mb-4 font-bold">先に「ジムグループ」タブから所属するジムを決定してください。</p></div>
           ) : ( 
             <>
@@ -736,7 +754,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                       <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">対象のジムグループ <span className="text-rose-500">*</span></label>
                       <div className="relative">
                         <select value={editingExGymId} onChange={e => setEditingExGymId(e.target.value)} className="w-full bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
-                          {gyms.filter(g => joinedGyms.includes(g.id)).map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
+                          {sortedJoinedGyms.map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
                         </select>
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
                       </div>
@@ -813,7 +831,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                         </label>
                         <div className="relative">
                           <select value={selectedGymId} onChange={e => setSelectedGymId(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
-                            {gyms.filter(g => joinedGyms.includes(g.id)).map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
+                            {sortedJoinedGyms.map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
                           </select>
                           <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
                         </div>
@@ -859,8 +877,8 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                 </div>
               )}
 
-              {/* 検索＆フィルタリングコントロールパネル */}
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 shadow-sm space-y-3">
+              {/* 検索＆フィルタリングコントロールパネル（横スライドではなく一覧で並べて表示） */}
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 shadow-sm space-y-3.5">
                 {/* 検索ボックス */}
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -881,78 +899,84 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                   )}
                 </div>
 
-                {/* ジム・グループ切替ピル */}
-                <div className="flex gap-1.5 overflow-x-auto pb-0.5 hide-scrollbar">
-                  <button
-                    type="button"
-                    onClick={() => setFilterGymId('all')}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 border transition-all ${
-                      filterGymId === 'all'
-                        ? 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-slate-900 dark:border-white shadow-sm'
-                        : 'bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800'
-                    }`}
-                  >
-                    すべてのジム・器具
-                  </button>
-                  {gyms.filter(g => joinedGyms.includes(g.id)).map(g => {
-                    const active = filterGymId === g.id;
-                    return (
-                      <button
-                        key={g.id}
-                        type="button"
-                        onClick={() => setFilterGymId(active ? 'all' : g.id)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 border transition-all flex items-center gap-1 ${
-                          active
-                            ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
-                            : 'bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-emerald-400'
-                        }`}
-                      >
-                        {g.id === 'common' ? <Dumbbell size={12} /> : <MapPin size={12} />}
-                        <span>{g.name}</span>
-                      </button>
-                    );
-                  })}
+                {/* ジム・グループ選択ボタン（よく使う順・折り返し一覧表示） */}
+                <div>
+                  <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-1.5">ジム・器具グループ（よく使う順）</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setFilterGymId('all')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                        filterGymId === 'all'
+                          ? 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-slate-900 dark:border-white shadow-sm'
+                          : 'bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800'
+                      }`}
+                    >
+                      すべて
+                    </button>
+                    {sortedJoinedGyms.map(g => {
+                      const active = filterGymId === g.id;
+                      return (
+                        <button
+                          key={g.id}
+                          type="button"
+                          onClick={() => setFilterGymId(active ? 'all' : g.id)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1 ${
+                            active
+                              ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
+                              : 'bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-emerald-400'
+                          }`}
+                        >
+                          {g.id === 'common' ? <Dumbbell size={12} /> : <MapPin size={12} />}
+                          <span>{g.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* 部位カテゴリチップ（件数バッジ付き） */}
-                <div className="flex gap-1.5 overflow-x-auto pb-0.5 hide-scrollbar">
-                  <button
-                    type="button"
-                    onClick={() => setFilterCategory('all')}
-                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold shrink-0 border transition-all flex items-center gap-1 ${
-                      filterCategory === 'all'
-                        ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
-                        : 'bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800'
-                    }`}
-                  >
-                    <span>全部位</span>
-                    <span className={`text-[10px] px-1 rounded-full ${filterCategory === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200/70 dark:bg-slate-800 text-slate-500'}`}>
-                      {categoryCounts.all}
-                    </span>
-                  </button>
-                  {MUSCLE_CATEGORIES.map(cat => {
-                    const isSelected = filterCategory === cat;
-                    const count = categoryCounts[cat] || 0;
-                    return (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setFilterCategory(isSelected ? 'all' : cat)}
-                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold shrink-0 border transition-all flex items-center gap-1 ${getCategoryTabColor(cat, isSelected)}`}
-                      >
-                        {!isSelected && <span className={`w-1.5 h-1.5 rounded-full ${getCategoryDotColor(cat)}`}></span>}
-                        <span>{cat}</span>
-                        <span className={`text-[10px] px-1 rounded-full ${isSelected ? 'bg-white/25 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
-                          {count}
-                        </span>
-                      </button>
-                    );
-                  })}
+                {/* 部位カテゴリ選択ボタン（横スライドではなくグリッド一覧で全表示） */}
+                <div>
+                  <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-1.5">部位カテゴリ</div>
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setFilterCategory('all')}
+                      className={`px-2 py-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1 ${
+                        filterCategory === 'all'
+                          ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
+                          : 'bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800'
+                      }`}
+                    >
+                      <span>全部位</span>
+                      <span className={`text-[10px] px-1 rounded-full ${filterCategory === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200/70 dark:bg-slate-800 text-slate-500'}`}>
+                        {categoryCounts.all}
+                      </span>
+                    </button>
+                    {MUSCLE_CATEGORIES.map(cat => {
+                      const isSelected = filterCategory === cat;
+                      const count = categoryCounts[cat] || 0;
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setFilterCategory(isSelected ? 'all' : cat)}
+                          className={`px-2 py-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1 ${getCategoryTabColor(cat, isSelected)}`}
+                        >
+                          {!isSelected && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${getCategoryDotColor(cat)}`}></span>}
+                          <span className="truncate">{cat}</span>
+                          <span className={`text-[10px] px-1 rounded-full shrink-0 ${isSelected ? 'bg-white/25 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* 器具タイプ ＆ 並び順・非表示切替バー */}
+                {/* 器具タイプ ＆ 非表示種目切替バー（並び替えセレクターは廃止し常時よく使う順） */}
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar">
+                  <div className="flex flex-wrap items-center gap-1">
                     {[
                       { key: 'all', label: '全器具' },
                       { key: 'machine', label: 'マシン' },
@@ -964,7 +988,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                         key={eq.key}
                         type="button"
                         onClick={() => setFilterEquipType(prev => prev === eq.key ? 'all' : eq.key)}
-                        className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-colors shrink-0 ${
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors ${
                           filterEquipType === eq.key
                             ? 'bg-indigo-500 text-white'
                             : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200'
@@ -975,41 +999,27 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                     ))}
                   </div>
 
-                  <div className="flex items-center gap-1.5 ml-auto">
-                    {mutedCount > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setShowMuted(prev => !prev)}
-                        className={`px-2 py-1 rounded-lg text-[10px] font-bold border flex items-center gap-1 transition-colors ${
-                          showMuted
-                            ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400'
-                            : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400'
-                        }`}
-                      >
-                        <EyeOff size={11} /> 非表示({mutedCount})
-                      </button>
-                    )}
-                    <div className="relative">
-                      <select
-                        value={sortBy}
-                        onChange={e => setSortBy(e.target.value)}
-                        className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold text-[11px] pl-2.5 pr-6 py-1 rounded-lg appearance-none focus:outline-none border border-slate-200/70 dark:border-slate-700"
-                      >
-                        <option value="category">部位別</option>
-                        <option value="frequent">よく使う順</option>
-                        <option value="name">名前順</option>
-                      </select>
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[9px]">▼</div>
-                    </div>
-                  </div>
+                  {mutedCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowMuted(prev => !prev)}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border flex items-center gap-1 transition-colors ml-auto ${
+                        showMuted
+                          ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400'
+                          : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400'
+                      }`}
+                    >
+                      <EyeOff size={11} /> 非表示({mutedCount})
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {/* 種目一覧（ジムごと × 部位セクション別カード表示） */}
+              {/* 種目一覧（よく使うジム順 × よく使う種目順） */}
               <div className="space-y-5">
                 {(() => {
                   const normQ = normalizeText(exerciseSearchQuery);
-                  const targetGyms = gyms.filter(gym => joinedGyms.includes(gym.id) && (filterGymId === 'all' || gym.id === filterGymId));
+                  const targetGyms = sortedJoinedGyms.filter(gym => filterGymId === 'all' || gym.id === filterGymId);
                   let totalRendered = 0;
 
                   const gymBlocks = targetGyms.map(gym => {
@@ -1028,22 +1038,16 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                     if (gymExercises.length === 0) return null;
                     totalRendered += gymExercises.length;
 
-                    // 並び替え
+                    // 常時「よく使う順」でソート（同数の場合は部位順 → 名前順）
                     const sortedList = [...gymExercises].sort((a, b) => {
-                      if (sortBy === 'frequent') {
-                        const cA = myExerciseStatsMap[a.name]?.count || 0;
-                        const cB = myExerciseStatsMap[b.name]?.count || 0;
-                        if (cA !== cB) return cB - cA;
-                      } else if (sortBy === 'name') {
-                        return (a.name || '').localeCompare(b.name || '', 'ja');
-                      }
+                      const cA = myExerciseStatsMap[a.name]?.count || 0;
+                      const cB = myExerciseStatsMap[b.name]?.count || 0;
+                      if (cA !== cB) return cB - cA;
                       const idxA = MUSCLE_CATEGORIES.indexOf(a.category);
                       const idxB = MUSCLE_CATEGORIES.indexOf(b.category);
                       const catDiff = (idxA !== -1 ? idxA : 99) - (idxB !== -1 ? idxB : 99);
                       if (catDiff !== 0) return catDiff;
-                      const cA = myExerciseStatsMap[a.name]?.count || 0;
-                      const cB = myExerciseStatsMap[b.name]?.count || 0;
-                      return cB - cA;
+                      return (a.name || '').localeCompare(b.name || '', 'ja');
                     });
 
                     return (
@@ -1059,34 +1063,9 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
                           </span>
                         </div>
 
-                        {/* 部位別グループ表示（sortBy === 'category' かつ 全部位表示時） */}
-                        {sortBy === 'category' && filterCategory === 'all' ? (
-                          <div className="divide-y divide-slate-200/70 dark:divide-slate-800">
-                            {MUSCLE_CATEGORIES.map(cat => {
-                              const catItems = sortedList.filter(ex => (ex.category || 'その他') === cat);
-                              if (catItems.length === 0) return null;
-                              return (
-                                <div key={`${gym.id}-${cat}`}>
-                                  <div className="px-3.5 py-1.5 bg-slate-50/90 dark:bg-slate-950/60 flex items-center justify-between">
-                                    <div className="flex items-center gap-1.5">
-                                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${getCategoryColor(cat)}`}>
-                                        {cat}
-                                      </span>
-                                    </div>
-                                    <span className="text-[10px] font-bold text-slate-400">{catItems.length}件</span>
-                                  </div>
-                                  <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                                    {catItems.map(ex => renderExerciseCard(ex, gym))}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
-                            {sortedList.map(ex => renderExerciseCard(ex, gym))}
-                          </div>
-                        )}
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                          {sortedList.map(ex => renderExerciseCard(ex, gym))}
+                        </div>
                       </div>
                     );
                   });

@@ -2,7 +2,7 @@
 // WorkoutForm.js — ワークアウト入力フォーム・種目検索サジェスト・種目並び替え・編集モーダル
 // ==========================================
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { CheckCircle, Trash2, Clock, GripVertical, X, TrendingDown, Plus, Zap, Edit2, ArrowUp, ArrowDown, Settings, ListPlus, Copy, Search, Flame, ChevronDown } from 'lucide-react';
+import { CheckCircle, Trash2, Clock, GripVertical, X, TrendingDown, Plus, Zap, Edit2, ArrowUp, ArrowDown, Settings, ListPlus, Copy, Search, ChevronDown } from 'lucide-react';
 import { generateId, formatDateWithDay, formatDateFromTimestamp, formatTimeFromTimestamp, MASTER_USER, MUSCLE_CATEGORIES, getCategoryColor } from './utils';
 import { FormInput, CategoryFilterGrid } from './CommonUI';
 
@@ -35,7 +35,7 @@ const getWeightTypeShortLabel = (wType) => {
   }
 };
 
-// --- 検索＆サジェスト付き種目セレクター ---
+// --- 検索＆サジェスト付き種目セレクター（横幅最大化・スクロール時閉じ防止・キーボード配慮） ---
 function ExerciseSearchSelect({
   value,
   onChange,
@@ -44,7 +44,7 @@ function ExerciseSearchSelect({
   exerciseUsageCount = {},
   lastExerciseSummaryMap = {},
   disabled = false,
-  placeholder = "種目を検索・選択...",
+  placeholder = "種目名を検索・選択...",
   isSuperSetSelect = false,
   excludeCardio = false,
   allowEmptyOption = false,
@@ -55,28 +55,102 @@ function ExerciseSearchSelect({
   const [subCategoryFilter, setSubCategoryFilter] = useState('all');
   const containerRef = useRef(null);
   const inputRef = useRef(null);
+  const pointerDownPosRef = useRef(null);
+  const didScrollRef = useRef(false);
 
-  // 外側タップでサジェストを閉じる
+  // スクロール操作では絶対に閉じず、純粋な「外側タップ（移動なし）」のときだけ閉じる
   useEffect(() => {
     if (!isOpen) return;
-    const handleOutside = (e) => {
+
+    const handleTouchStart = (e) => {
+      if (e.touches && e.touches.length > 0) {
+        pointerDownPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        didScrollRef.current = false;
+      }
+    };
+
+    const handleTouchMove = (e) => {
+      if (!pointerDownPosRef.current || !e.touches || e.touches.length === 0) return;
+      const dx = Math.abs(e.touches[0].clientX - pointerDownPosRef.current.x);
+      const dy = Math.abs(e.touches[0].clientY - pointerDownPosRef.current.y);
+      if (dx > 6 || dy > 6) {
+        didScrollRef.current = true;
+      }
+    };
+
+    const handleScroll = () => {
+      didScrollRef.current = true;
+    };
+
+    const handleTouchEnd = (e) => {
+      if (didScrollRef.current) {
+        pointerDownPosRef.current = null;
+        return;
+      }
       if (containerRef.current && !containerRef.current.contains(e.target)) {
         setIsOpen(false);
       }
+      pointerDownPosRef.current = null;
     };
-    document.addEventListener('mousedown', handleOutside);
-    document.addEventListener('touchstart', handleOutside, { passive: true });
+
+    const handleMouseDown = (e) => {
+      pointerDownPosRef.current = { x: e.clientX, y: e.clientY };
+      didScrollRef.current = false;
+    };
+
+    const handleMouseUp = (e) => {
+      if (pointerDownPosRef.current) {
+        const dx = Math.abs(e.clientX - pointerDownPosRef.current.x);
+        const dy = Math.abs(e.clientY - pointerDownPosRef.current.y);
+        if (dx > 6 || dy > 6) {
+          pointerDownPosRef.current = null;
+          return;
+        }
+      }
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+      pointerDownPosRef.current = null;
+    };
+
+    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    document.addEventListener('touchmove', handleTouchMove, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd, { passive: true });
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
+
     return () => {
-      document.removeEventListener('mousedown', handleOutside);
-      document.removeEventListener('touchstart', handleOutside);
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('scroll', handleScroll, { capture: true });
     };
   }, [isOpen]);
+
+  // 検索欄を開いたとき、スマホのキーボードで隠れないよう検索欄を画面上部へスムーズにスクロール
+  const scrollInputToUpperViewport = () => {
+    setTimeout(() => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const targetTop = 135; // ヘッダー・タイマー直下の見やすい位置
+      if (rect.top > targetTop || rect.top < 70) {
+        const modalScroll = containerRef.current.closest('#edit-modal-scroll-container');
+        if (modalScroll) {
+          modalScroll.scrollBy({ top: rect.top - targetTop, behavior: 'smooth' });
+        } else {
+          window.scrollBy({ top: rect.top - targetTop, behavior: 'smooth' });
+        }
+      }
+    }, 120);
+  };
 
   // 検索時は選択部位外の種目もヒットできるようにベースプールを決定
   const basePool = useMemo(() => {
     const primary = excludeCardio ? filteredExercises.filter(ex => ex.weightType !== 'cardio') : filteredExercises;
     const fallbackAll = excludeCardio ? allGymExercises.filter(ex => ex.weightType !== 'cardio') : allGymExercises;
-    // 検索語入力中、または部位未選択時は全種目からもサジェスト可能にする
     if (query.trim().length > 0 || primary.length === 0 || subCategoryFilter !== 'all') {
       const mergedMap = new Map();
       primary.forEach(ex => mergedMap.set(ex.id || ex.name, { ...ex, _inSelectedCat: true }));
@@ -90,6 +164,7 @@ function ExerciseSearchSelect({
     return primary.map(ex => ({ ...ex, _inSelectedCat: true }));
   }, [filteredExercises, allGymExercises, query, excludeCardio, subCategoryFilter]);
 
+  // よく使う順（＋検索時は前方一致優先）でソート
   const suggestions = useMemo(() => {
     const normQ = normalizeSearchText(query);
     const list = basePool.filter(ex => {
@@ -115,12 +190,6 @@ function ExerciseSearchSelect({
     });
   }, [basePool, query, subCategoryFilter, exerciseUsageCount]);
 
-  // よく使う種目（クエリ未入力時のクイックサジェスト）
-  const frequentSuggestions = useMemo(() => {
-    if (query.trim()) return [];
-    return suggestions.filter(ex => (exerciseUsageCount[ex.name] || 0) > 0).slice(0, 5);
-  }, [suggestions, query, exerciseUsageCount]);
-
   const selectedExObj = useMemo(() => {
     if (!value) return null;
     return allGymExercises.find(ex => ex.name === value) || filteredExercises.find(ex => ex.name === value) || { name: value };
@@ -130,6 +199,7 @@ function ExerciseSearchSelect({
     onChange(exName);
     setQuery('');
     setIsOpen(false);
+    inputRef.current?.blur();
   };
 
   const openSearch = () => {
@@ -137,6 +207,7 @@ function ExerciseSearchSelect({
     setIsOpen(true);
     setTimeout(() => {
       inputRef.current?.focus();
+      scrollInputToUpperViewport();
     }, 20);
   };
 
@@ -191,16 +262,19 @@ function ExerciseSearchSelect({
             type="text"
             disabled={disabled}
             value={query}
-            onFocus={() => setIsOpen(true)}
+            onFocus={() => {
+              setIsOpen(true);
+              scrollInputToUpperViewport();
+            }}
             onChange={(e) => {
               setQuery(e.target.value);
               if (!isOpen) setIsOpen(true);
             }}
-            placeholder={value ? `${value}（検索して変更...）` : placeholder}
-            className={`w-full ${baseBorderClass} border rounded-xl pl-9 pr-16 py-2.5 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-base`}
+            placeholder={value ? `${value}（検索して変更）` : placeholder}
+            className={`w-full ${baseBorderClass} border rounded-xl pl-9 pr-14 py-2.5 text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-base`}
             style={{ fontSize: '16px' }}
           />
-          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
             {query && (
               <button
                 type="button"
@@ -212,7 +286,14 @@ function ExerciseSearchSelect({
             )}
             <button
               type="button"
-              onClick={() => setIsOpen(!isOpen)}
+              onClick={() => {
+                if (isOpen) {
+                  setIsOpen(false);
+                  inputRef.current?.blur();
+                } else {
+                  openSearch();
+                }
+              }}
               className="p-1 text-slate-400 hover:text-emerald-500 rounded-full"
             >
               <ChevronDown size={16} className={`transition-transform ${isOpen ? 'rotate-180 text-emerald-500' : ''}`} />
@@ -221,15 +302,15 @@ function ExerciseSearchSelect({
         </div>
       )}
 
-      {/* サジェストパネル */}
+      {/* サジェストウィンドウ（カード横幅100%・キーボード上でも見やすいコンパクト設計・スクロールしても閉じない） */}
       {isOpen && !disabled && (
-        <div className="mt-1.5 w-full bg-white dark:bg-slate-900 border-2 border-emerald-500/70 dark:border-emerald-600/70 rounded-2xl shadow-xl overflow-hidden z-40 animate-in fade-in zoom-in-95 duration-150">
-          {/* サジェスト内・部位クイック絞り込みバー */}
-          <div className="p-2 bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800 flex items-center gap-1 overflow-x-auto hide-scrollbar">
+        <div className="mt-1.5 w-full bg-white dark:bg-slate-900 border-2 border-emerald-500/80 dark:border-emerald-600/80 rounded-2xl shadow-2xl overflow-hidden z-40 animate-in fade-in zoom-in-95 duration-150">
+          {/* 部位クイック絞り込み（横スクロールではなく折り返し一覧で全表示） */}
+          <div className="p-2 bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800 flex flex-wrap gap-1">
             <button
               type="button"
               onClick={() => setSubCategoryFilter('all')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition-colors ${
+              className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-colors ${
                 subCategoryFilter === 'all'
                   ? 'bg-emerald-500 text-white shadow-sm'
                   : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800'
@@ -242,7 +323,7 @@ function ExerciseSearchSelect({
                 key={cat}
                 type="button"
                 onClick={() => setSubCategoryFilter(prev => prev === cat ? 'all' : cat)}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition-colors ${
+                className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-colors ${
                   subCategoryFilter === cat
                     ? 'bg-emerald-500 text-white shadow-sm'
                     : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-800'
@@ -253,7 +334,11 @@ function ExerciseSearchSelect({
             ))}
           </div>
 
-          <div className="max-h-64 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/80">
+          {/* 種目サジェストリスト（よく使う順） */}
+          <div
+            className="max-h-60 overflow-y-auto overscroll-contain divide-y divide-slate-100 dark:divide-slate-800/80"
+            style={{ WebkitOverflowScrolling: 'touch' }}
+          >
             {allowEmptyOption && (
               <button
                 type="button"
@@ -264,41 +349,9 @@ function ExerciseSearchSelect({
               </button>
             )}
 
-            {/* よく使う種目セクション（検索文字未入力時） */}
-            {!query.trim() && frequentSuggestions.length > 0 && (
-              <div className="p-2.5 bg-amber-50/40 dark:bg-amber-950/20">
-                <div className="text-[10px] font-bold text-amber-600 dark:text-amber-400 mb-1.5 flex items-center gap-1 px-1">
-                  <Flame size={12} fill="currentColor" /> よく使う種目（タップで即選択）
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {frequentSuggestions.map(ex => {
-                    const isCurrent = ex.name === value;
-                    return (
-                      <button
-                        key={`freq-${ex.id || ex.name}`}
-                        type="button"
-                        onClick={() => handleSelect(ex.name)}
-                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 max-w-full ${
-                          isCurrent
-                            ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm'
-                            : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-amber-200/80 dark:border-amber-800/60 hover:border-emerald-400'
-                        }`}
-                      >
-                        <span className="truncate">{ex.name}</span>
-                        <span className={`text-[10px] px-1 rounded ${isCurrent ? 'bg-white/20 text-white' : 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300'}`}>
-                          {exerciseUsageCount[ex.name]}回
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* 種目サジェストリスト */}
             {suggestions.length === 0 ? (
-              <div className="p-6 text-center text-xs font-bold text-slate-400 dark:text-slate-500">
-                「{query}」に一致する種目が見つかりません
+              <div className="p-5 text-center text-xs font-bold text-slate-400 dark:text-slate-500">
+                {query ? `「${query}」に一致する種目がありません` : '該当する種目がありません'}
               </div>
             ) : (
               suggestions.map(ex => {
@@ -313,10 +366,10 @@ function ExerciseSearchSelect({
                     key={ex.id || ex.name}
                     type="button"
                     onClick={() => handleSelect(ex.name)}
-                    className={`w-full px-3.5 py-2.5 text-left transition-colors flex items-center justify-between gap-2 ${
+                    className={`w-full px-3 py-2.5 text-left transition-colors flex items-center justify-between gap-2 ${
                       isSelected
                         ? 'bg-emerald-50 dark:bg-emerald-950/50'
-                        : 'hover:bg-slate-50 dark:hover:bg-slate-800/70'
+                        : 'hover:bg-slate-50 dark:hover:bg-slate-800/70 active:bg-slate-100 dark:active:bg-slate-800'
                     }`}
                   >
                     <div className="min-w-0 flex-1">
@@ -326,7 +379,7 @@ function ExerciseSearchSelect({
                             {ex.category}
                           </span>
                         )}
-                        <span className={`text-sm font-bold truncate ${isSelected ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-100'}`}>
+                        <span className={`text-sm font-bold break-words ${isSelected ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-800 dark:text-slate-100'}`}>
                           {ex.name}
                         </span>
                       </div>
@@ -335,7 +388,7 @@ function ExerciseSearchSelect({
                           {equipLabel}
                         </span>
                         {ex.maker && (
-                          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded truncate max-w-[120px]">
+                          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded truncate max-w-[130px]">
                             {ex.maker}
                           </span>
                         )}
@@ -343,7 +396,7 @@ function ExerciseSearchSelect({
                           {weightLabel}
                         </span>
                         {lastSummary && (
-                          <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 truncate">
+                          <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500">
                             前回: {lastSummary}
                           </span>
                         )}
@@ -365,12 +418,15 @@ function ExerciseSearchSelect({
             )}
           </div>
 
-          <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-[10px] font-bold text-slate-400">
-            <span>候補 {suggestions.length}件</span>
+          <div className="px-3 py-2 bg-slate-50 dark:bg-slate-950 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-[11px] font-bold text-slate-400">
+            <span>候補 {suggestions.length}件（よく使う順）</span>
             <button
               type="button"
-              onClick={() => setIsOpen(false)}
-              className="text-slate-500 dark:text-slate-300 hover:text-emerald-500 px-2 py-0.5 rounded"
+              onClick={() => {
+                setIsOpen(false);
+                inputRef.current?.blur();
+              }}
+              className="text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-1 rounded-lg hover:text-emerald-500"
             >
               閉じる
             </button>
@@ -460,7 +516,7 @@ function WorkoutItemForm({ item, index, availableExercises, allGymExercises = []
     return history;
   }, [myPastPosts]);
 
-  // 各目の前回代表セット文字列マップ（サジェスト表示用）
+  // 各種目の前回代表セット文字列マップ（サジェスト表示用）
   const lastExerciseSummaryMap = useMemo(() => {
     const summary = {};
     if (!myPastPosts) return summary;
@@ -742,38 +798,48 @@ function WorkoutItemForm({ item, index, availableExercises, allGymExercises = []
           <CheckCircle size={12} /> 保存済み
         </div>
       )}
-      <div className="flex justify-between items-start mb-4">
-        <div className="flex items-start gap-1.5 flex-1 min-w-0">
-          <div className={`flex flex-col flex-1 min-w-0 gap-2 ${isConfirmed ? 'pointer-events-none opacity-60' : ''}`}>
-            {!isJointPartner && !isAnyDragging && (
-              <div className="flex flex-wrap bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg gap-1">
-                <button type="button" onClick={() => toggleFilter('gym')} disabled={isConfirmed} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilters.includes('gym') ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>マシン等</button>
-                <button type="button" onClick={() => toggleFilter('barbell')} disabled={isConfirmed} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilters.includes('barbell') ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>バーベル</button>
-                <button type="button" onClick={() => toggleFilter('dumbbell')} disabled={isConfirmed} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilters.includes('dumbbell') ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>ダンベル</button>
-                <button type="button" onClick={() => toggleFilter('smith')} disabled={isConfirmed} className={`flex-1 min-w-[45px] py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilters.includes('smith') ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>スミス</button>
-              </div>
-            )}
-            {!isJointPartner ? (
-              <ExerciseSearchSelect
-                value={item.exerciseName || ''}
-                onChange={(newName) => updateExerciseName(newName, 0)}
-                filteredExercises={filteredExercises}
-                allGymExercises={filteredAllGymExercises}
-                exerciseUsageCount={exerciseUsageCount}
-                lastExerciseSummaryMap={lastExerciseSummaryMap}
-                disabled={isConfirmed}
-                placeholder="種目名を検索・サジェストから選択..."
-              />
-            ) : (
-              <div className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold text-base">
-                {item.exerciseName || "種目未選択"}
-              </div>
-            )}
-          </div>
-        </div>
+
+      {/* 上段：器具フィルタ＆削除ボタンを横並びに配置し、下の検索欄＆サジェストウィンドウがカード横幅100%を使えるようにする */}
+      <div className="flex flex-col gap-2.5 mb-4 w-full">
         {!isJointPartner && (
-          <button onClick={() => removeItem(item.id)} disabled={isConfirmed} className={`ml-2 text-slate-400 hover:text-rose-500 p-2 flex-shrink-0 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors mt-2 ${isConfirmed ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''}`}><Trash2 size={18} /></button>
+          <div className="flex items-center gap-2 w-full">
+            {!isAnyDragging && (
+              <div className={`flex flex-1 bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg gap-1 ${isConfirmed ? 'pointer-events-none opacity-60' : ''}`}>
+                <button type="button" onClick={() => toggleFilter('gym')} disabled={isConfirmed} className={`flex-1 py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilters.includes('gym') ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>マシン等</button>
+                <button type="button" onClick={() => toggleFilter('barbell')} disabled={isConfirmed} className={`flex-1 py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilters.includes('barbell') ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>バーベル</button>
+                <button type="button" onClick={() => toggleFilter('dumbbell')} disabled={isConfirmed} className={`flex-1 py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilters.includes('dumbbell') ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>ダンベル</button>
+                <button type="button" onClick={() => toggleFilter('smith')} disabled={isConfirmed} className={`flex-1 py-1 text-[10px] font-bold text-center rounded transition-colors ${localFilters.includes('smith') ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>スミス</button>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => removeItem(item.id)}
+              disabled={isConfirmed}
+              className={`text-slate-400 hover:text-rose-500 p-2 flex-shrink-0 bg-slate-50 dark:bg-slate-800 rounded-lg transition-colors ml-auto ${isConfirmed ? 'opacity-30 cursor-not-allowed pointer-events-none' : ''}`}
+            >
+              <Trash2 size={18} />
+            </button>
+          </div>
         )}
+
+        <div className={`w-full ${isConfirmed ? 'pointer-events-none opacity-60' : ''}`}>
+          {!isJointPartner ? (
+            <ExerciseSearchSelect
+              value={item.exerciseName || ''}
+              onChange={(newName) => updateExerciseName(newName, 0)}
+              filteredExercises={filteredExercises}
+              allGymExercises={filteredAllGymExercises}
+              exerciseUsageCount={exerciseUsageCount}
+              lastExerciseSummaryMap={lastExerciseSummaryMap}
+              disabled={isConfirmed}
+              placeholder="種目名を検索・選択..."
+            />
+          ) : (
+            <div className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2.5 text-slate-800 dark:text-slate-100 font-bold text-base">
+              {item.exerciseName || "種目未選択"}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className={`transition-all overflow-visible ${isAnyDragging ? 'h-0 opacity-0 overflow-hidden' : 'h-auto opacity-100'}`}>
@@ -812,7 +878,7 @@ function WorkoutItemForm({ item, index, availableExercises, allGymExercises = []
       )}
 
       {item.isSuperSet && item.weightType !== 'cardio' && (
-        <div className="mb-5 pl-6 border-l-2 border-indigo-300 dark:border-indigo-600 space-y-3">
+        <div className="mb-5 pl-3 border-l-2 border-indigo-300 dark:border-indigo-600 space-y-3">
           {!isJointPartner ? (
             <ExerciseSearchSelect
               value={item.superExerciseName || ''}
