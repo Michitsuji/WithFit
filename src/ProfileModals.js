@@ -605,12 +605,12 @@ function LoginScreen({ onLogin, onGoogleLogin, onSecretLogin, isOnline }) {
 ・友達同士でマナーを守り、楽しくアプリを活用しましょう！`;
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-slate-50 flex flex-col items-center justify-center p-6 relative overscroll-none touch-none">
+    <div className="min-h-screen w-full overflow-y-auto bg-slate-50 flex flex-col items-center justify-center p-6 relative">
       <div onClick={handleOnlineTap} className="absolute top-6 left-6 z-10 flex items-center gap-1.5 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full border border-slate-200 shadow-sm cursor-pointer select-none">
         <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-[#10b981] shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`}></div>
         <span className="text-[10px] font-bold text-slate-500">{isOnline ? 'オンライン' : 'オフライン'}</span>
       </div>
-      <div className="w-full max-w-sm flex flex-col items-center">
+      <div className="w-full max-w-sm flex flex-col items-center my-auto py-6">
         <div className="mb-6 flex flex-col items-center">
           <WithFitLogo className="text-indigo-500 w-16 h-16 mb-2" />
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">WithFit</h1>
@@ -637,31 +637,40 @@ function LoginScreen({ onLogin, onGoogleLogin, onSecretLogin, isOnline }) {
                  </div>
                </div>
                <button 
+                 type="button"
                  disabled={!agreed}
-                 onClick={() => { 
+                 onClick={async () => { 
                    const isWebView = typeof window !== 'undefined' && window.ReactNativeWebView;
                    if (isWebView) {
                      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'REQUEST_GOOGLE_LOGIN' }));
                    } else {
                      const provider = new GoogleAuthProvider(); 
                      provider.setCustomParameters({ prompt: 'select_account' }); 
-                     if (navigator.userAgent.includes('Edg')) {
-                       signInWithRedirect(getAuth(), provider);
-                     } else {
-                       signInWithPopup(getAuth(), provider).then((result) => { 
-                         onGoogleLogin(result.user); 
-                       }).catch((err) => {
-                         console.error(err);
-                         if (err.code !== 'auth/popup-closed-by-user') {
-                           signInWithRedirect(getAuth(), provider);
-                         }
-                       }); 
+                     try {
+                       const result = await signInWithPopup(getAuth(), provider);
+                       if (result && result.user) {
+                         await onGoogleLogin(result.user);
+                       }
+                     } catch (err) {
+                       console.error(err);
+                       if (err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
+                         signInWithRedirect(getAuth(), provider);
+                       } else if (err.code !== 'auth/popup-closed-by-user') {
+                         alert('Googleログインに失敗しました。ポップアップブロックを解除するか、下の「フレンドコードでログイン」をお試しください。');
+                       }
                      }
                    }
                  }} 
                  className={`w-full font-bold py-3 rounded-xl shadow-sm flex items-center justify-center gap-2 transition-colors border ${agreed ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50' : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'}`}
                > 
                  Googleでログイン / 登録
+               </button>
+               <button
+                 type="button"
+                 onClick={() => setShowSecretLogin(true)}
+                 className="w-full mt-3 text-xs font-bold text-slate-500 hover:text-indigo-600 py-2 transition-colors"
+               >
+                 フレンドコードでログイン（PC・別端末用）
                </button>
              </>
            ) : (

@@ -766,11 +766,25 @@ ${importText}`;
     } catch (e) {}
   };
 
-  const handleStart = () => {
-    if (!selectedGymId) { alert("ジムを選択してください"); return; }
-    onStart(selectedGymId);
+  const handleGymChange = async (newGymId) => {
+    setSelectedGymId(newGymId);
+    if (myInfo?.isTraining && currentUser && db) {
+      try {
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), {
+          currentGymId: newGymId,
+          lastActive: Date.now()
+        }, { merge: true });
+      } catch (e) {}
+    }
+  };
+
+  const handleStart = async () => {
+    const targetGymId = selectedGymId || sortedGyms[0]?.id || 'common';
+    if (!targetGymId) { alert("ジムを選択してください"); return; }
+    if (targetGymId !== selectedGymId) setSelectedGymId(targetGymId);
+    await onStart(targetGymId);
     if (workoutItems.length === 0) {
-       addExerciseItem('');
+       addExerciseItem(null);
     }
     setShowDashboard(false);
   };
@@ -1159,7 +1173,7 @@ ${importText}`;
             {myInfo?.isTraining ? 'トレーニング中のジム' : '本日のトレーニング場所を選択してください'}
           </label>
           <div className="w-full relative mb-6">
-            <select value={selectedGymId} onChange={(e) => setSelectedGymId(e.target.value)} disabled={myInfo?.isTraining} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base disabled:opacity-70" style={{ fontSize: '16px' }}>
+            <select value={selectedGymId} onChange={(e) => handleGymChange(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}>
               <option value="" disabled>ジムを選択</option>
               {sortedGyms.map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
             </select>
@@ -1230,6 +1244,38 @@ ${importText}`;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
+      {!isManual && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <label className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-1.5 shrink-0">
+              <MapPin size={16} className="text-emerald-500 shrink-0" />
+              <span>{myInfo?.isTraining ? 'トレーニング中のジム' : '本日のジム'}</span>
+            </label>
+            <div className="relative flex-1 max-w-[220px]">
+              <select
+                value={selectedGymId}
+                onChange={(e) => handleGymChange(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-3 pr-8 py-2 text-sm text-slate-800 dark:text-slate-100 font-bold appearance-none focus:outline-none focus:border-emerald-500 truncate"
+                style={{ fontSize: '16px' }}
+              >
+                <option value="" disabled>ジムを選択</option>
+                {sortedGyms.map(gym => <option key={gym.id} value={gym.id}>{gym.name}</option>)}
+              </select>
+              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs">▼</div>
+            </div>
+          </div>
+          {!myInfo?.isTraining && (
+            <button
+              type="button"
+              onClick={handleStart}
+              className="w-full py-3.5 rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-all shadow-md bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/30"
+            >
+              <Play fill="currentColor" size={20} /> トレーニング開始
+            </button>
+          )}
+        </div>
+      )}
+
       {isManual && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-4">
            <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2"><CalendarIcon size={18} className="text-emerald-500"/> 過去の記録</h3>
@@ -1307,7 +1353,7 @@ ${importText}`;
       </div>
 
       <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
-        <h2 className="text-lg font-bold text-slate-900 dark:text-white">{isManual ? '記録内容' : 'ワークアウト中'}</h2>
+        <h2 className="text-lg font-bold text-slate-900 dark:text-white">{isManual ? '記録内容' : (myInfo?.isTraining ? 'ワークアウト中' : 'トレーニング準備中（開始前）')}</h2>
         <div className="flex items-center gap-2">
           {workoutItems.length > 1 && (
             <button onClick={() => setShowReorderModal(true)} className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 flex items-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-colors shadow-sm">

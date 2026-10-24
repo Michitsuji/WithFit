@@ -899,17 +899,29 @@ export default function App() {
 
   useEffect(() => {
     if (!auth) return;
-    
+    let isMounted = true;
+
     getRedirectResult(auth).then((result) => {
-      if (result && result.user) {
+      if (isMounted && result && result.user) {
         setRedirectUser(result.user);
+        setFirebaseUser(result.user);
       }
     }).catch(console.error);
 
-    const initAuth = async () => { try { await signInAnonymously(auth); } catch (e) {} };
-    initAuth();
-    const unsubscribe = onAuthStateChanged(auth, (user) => setFirebaseUser(user));
-    return () => unsubscribe();
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!isMounted) return;
+      if (user) {
+        setFirebaseUser(user);
+      } else {
+        try {
+          await signInAnonymously(auth);
+        } catch (e) {}
+      }
+    });
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   const exercisesByChunkRef = useRef({});
@@ -1175,9 +1187,10 @@ export default function App() {
   };
 
   const handleSecretLogin = async (friendCode, birthDate) => {
-    if (!db || !friendCode || !birthDate) return false;
+    const cleanCode = String(friendCode || '').trim();
+    if (!db || !cleanCode || !birthDate) return false;
     try {
-      const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'accounts'), where('friendCode', '==', friendCode), limit(1));
+      const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'accounts'), where('friendCode', '==', cleanCode), limit(1));
       const snap = await getDocs(q);
       if (!snap.empty) {
         const userData = snap.docs[0].data();
@@ -1208,7 +1221,32 @@ export default function App() {
 
   const handleStartTraining = async (gymId) => {
     if (!currentUser || !db) return;
-    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { isTraining: true, trainingStartTime: Date.now(), currentGymId: gymId, currentExerciseName: '', lastActive: Date.now(), hasSentStartNotification: deleteField(), hasSentForgotNotification: deleteField() }, { merge: true }); } catch (e) {}
+    const now = Date.now();
+    const firstExName = (draftWorkoutItems && draftWorkoutItems.length > 0 && draftWorkoutItems[0].exerciseName) ? draftWorkoutItems[0].exerciseName : '';
+    setAccountsInfo(prev => ({
+      ...prev,
+      [currentUser]: {
+        ...(prev[currentUser] || {}),
+        isTraining: true,
+        trainingStartTime: now,
+        currentGymId: gymId,
+        currentExerciseName: firstExName,
+        lastActive: now,
+        hasSentStartNotification: false,
+        hasSentForgotNotification: false
+      }
+    }));
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), {
+        isTraining: true,
+        trainingStartTime: now,
+        currentGymId: gymId,
+        currentExerciseName: firstExName,
+        lastActive: now,
+        hasSentStartNotification: false,
+        hasSentForgotNotification: false
+      }, { merge: true });
+    } catch (e) {}
   };
 
   const handlePostWorkout = async (gymName, workoutItems, bodyWeight, bodyFat, manualStart, manualEnd, jointPartnerId = null, partnerItems = null) => {
@@ -1392,28 +1430,64 @@ export default function App() {
   const myInfo = accountsInfo[currentUser] || {};
   const allGyms = useMemo(() => [{ id: 'common', name: 'フリーウェイト', createdAt: 0 }, ...gyms], [gyms]);
 
+  const startNotifContextRef = useRef({ myInfo: {}, allGyms: [], sendNotification: null });
   useEffect(() => {
-    if (!currentUser || !db || !myInfo?.isTraining || !myInfo?.trainingStartTime) return;
+    startNotifContextRef.current = { myInfo, allGyms, sendNotification };
+  }, [myInfo, allGyms, sendNotification]);
+
+  const sendingStartNotifForTimeRef = useRef(null);
+
+  useEffect(() => {
+    if (!currentUser || !db || !myInfo?.isTraining || !myInfo?.trainingStartTime) {
+      sendingStartNotifForTimeRef.current = null;
+      return;
+    }
     if (myInfo.hasSentStartNotification) return;
 
-    const elapsed = Date.now() - myInfo.trainingStartTime;
-    const timeUntilNotify = (3 * 60 * 1000) - elapsed;
+    const startTime = Number(myInfo.trainingStartTime);
+    if (!startTime || isNaN(startTime)) return;
 
-    const sendStartNotification = async () => {
+    const checkAndSendStartNotification = async () => {
+      const { myInfo: latestMyInfo, allGyms: latestGyms, sendNotification: latestSendNotif } = startNotifContextRef.current;
+      if (!latestMyInfo?.isTraining || latestMyInfo.hasSentStartNotification) return;
+      if (sendingStartNotifForTimeRef.current === startTime) return;
+      if (Date.now() - startTime < 3 * 60 * 1000) return;
+
+      sendingStartNotifForTimeRef.current = startTime;
       try {
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { hasSentStartNotification: true }, { merge: true });
-        const myFriends = myInfo.friends || [];
-        const authorName = myInfo.displayName || currentUser;
-        const gymName = allGyms.find(g => g.id === myInfo.currentGymId)?.name || 'ジム';
-        myFriends.forEach(friendId => {
-          sendNotification(friendId, '🔥 トレーニング開始！', `${authorName}さんが${gymName}でトレーニングを開始しました！`, 'post');
-        });
-      } catch (e) { console.error(e); }
+        const myFriends = latestMyInfo.friends || [];
+        const authorName = latestMyInfo.displayName || currentUser;
+        const gymName = latestGyms.find(g => g.id === latestMyInfo.currentGymId)?.name || 'ジム';
+        if (latestSendNotif) {
+          await Promise.all(
+            myFriends.map(friendId =>
+              latestSendNotif(friendId, '🔥 トレーニング開始！', `${authorName}さんが${gymName}でトレーニングを開始しました！`, 'post')
+            )
+          );
+        }
+      } catch (e) {
+        sendingStartNotifForTimeRef.current = null;
+        console.error(e);
+      }
     };
 
-    if (timeUntilNotify <= 0) { sendStartNotification(); } 
-    else { const timer = setTimeout(sendStartNotification, timeUntilNotify); return () => clearTimeout(timer); }
-  }, [currentUser, db, myInfo?.isTraining, myInfo?.trainingStartTime, myInfo?.hasSentStartNotification, myInfo?.friends, myInfo?.displayName, myInfo?.currentGymId, allGyms, sendNotification]);
+    const elapsed = Date.now() - startTime;
+    const timeUntilNotify = Math.max(0, (3 * 60 * 1000) - elapsed);
+
+    const timer = setTimeout(checkAndSendStartNotification, timeUntilNotify);
+    const interval = setInterval(checkAndSendStartNotification, 5000);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') checkAndSendStartNotification();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [currentUser, db, myInfo?.isTraining, myInfo?.trainingStartTime, myInfo?.hasSentStartNotification]);
 
   useEffect(() => {
     if (!currentUser || !db || !myInfo?.isTraining || !myInfo?.trainingStartTime) return;
@@ -1624,13 +1698,7 @@ export default function App() {
       setIsRecordManual(true);
     } else {
       setIsRecordManual(false);
-      if (!myInfo.isTraining) {
-        const joinedGymIds = (myInfo.joinedGyms || []).filter(id => id !== 'common');
-        const matchedPostGym = allGyms.find(g => g.name === post.gymName && joinedGymIds.includes(g.id));
-        const targetGymId = myInfo.currentGymId || importGymId || matchedPostGym?.id || joinedGymIds[0] || 'common';
-        if (targetGymId) await handleStartTraining(targetGymId);
-      }
-      if (newItems.length > 0 && newItems[0].exerciseName) {
+      if (myInfo.isTraining && newItems.length > 0 && newItems[0].exerciseName) {
         setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { currentExerciseName: newItems[0].exerciseName }, { merge: true }).catch(() => {});
       }
     }
