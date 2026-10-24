@@ -1299,7 +1299,9 @@ export default function App() {
 
   const handleUpdateWorkout = async (postId, updatedData) => {
     if (!currentUser || !db) return;
-    const { processedItems, totalVolume, totalCalories } = calculateWorkoutTotals(updatedData.items, updatedData.duration, updatedData.bodyWeight);
+    const { processedItems, totalVolume, totalCalories } = (!updatedData.items || updatedData.items.length === 0)
+      ? { processedItems: [], totalVolume: 0, totalCalories: 0 }
+      : calculateWorkoutTotals(updatedData.items, updatedData.duration, updatedData.bodyWeight);
     const totalSets = processedItems.reduce((acc, it) => acc + (it.sets?.length || 0), 0);
     const cleanItems = JSON.parse(JSON.stringify(processedItems));
     try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'workouts', postId), { ...updatedData, items: cleanItems, volume: totalVolume, calories: totalCalories, totalSets: totalSets }, { merge: true }); setEditingPost(null); } catch (e) { console.error("Update error:", e); }
@@ -1593,39 +1595,52 @@ export default function App() {
     }
   };
 
-  const handleImportWorkout = async (post, isManual) => {
-    const gym = allGyms.find(g => g.name === post.gymName);
-    const gymId = gym ? gym.id : '';
-
-    if (!isManual && myInfo.isTraining && myInfo.currentGymId) {
-       const currentGymName = gyms.find(g => g.id === myInfo.currentGymId)?.name;
-       if (currentGymName !== post.gymName) {
-          alert(`現在 ${currentGymName} でトレーニング中のため、他のジムのメニューはコピーできません。`);
-          return;
-       }
-    }
-
+  const handleImportWorkout = async (post, isManual = false) => {
     const newItems = (post.items || []).map(item => formatItemForImport(item));
-    
+    if (newItems.length === 0) return;
+
     const importedCategories = Array.from(new Set(newItems.map(item => item.category).filter(Boolean)));
-    setSelectedCategories(importedCategories);
-    setDraftWorkoutItems(newItems);
-    
-    if (isManual) {
+    setSelectedCategories(prev => Array.from(new Set([...prev, ...importedCategories])));
+
+    setDraftWorkoutItems(prev => {
+      const hasOnlyBlank = prev.length === 1 && !prev[0].exerciseName && (!prev[0].sets || prev[0].sets.every(s => !s.weight && !s.reps && !s.lReps && !s.rReps && !s.distance && !s.time && !s.calories));
+      const nextItems = hasOnlyBlank ? newItems : [...prev, ...newItems];
+
+      if (myInfo?.jointPartnerId && db) {
+        const partnerCurrent = accountsInfo[myInfo.jointPartnerId]?.currentWorkoutItems || [];
+        const partnerNewItems = (post.items || []).map(item => formatItemForImport(item));
+        const partnerHasOnlyBlank = partnerCurrent.length === 1 && !partnerCurrent[0].exerciseName;
+        const nextPartnerItems = partnerHasOnlyBlank ? partnerNewItems : [...partnerCurrent, ...partnerNewItems];
+        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', myInfo.jointPartnerId), {
+          currentWorkoutItems: nextPartnerItems,
+          lastUpdater: currentUser
+        }, { merge: true }).catch(() => {});
+      }
+
+      return nextItems;
+    });
+
+    if (isManual || isRecordManual) {
       setIsRecordManual(true);
-      setImportGymId(gymId);
     } else {
       setIsRecordManual(false);
-      setImportGymId('');
       if (!myInfo.isTraining) {
-        if (gymId) await handleStartTraining(gymId);
+        const joinedGymIds = (myInfo.joinedGyms || []).filter(id => id !== 'common');
+        const matchedPostGym = allGyms.find(g => g.name === post.gymName && joinedGymIds.includes(g.id));
+        const targetGymId = myInfo.currentGymId || importGymId || matchedPostGym?.id || joinedGymIds[0] || 'common';
+        if (targetGymId) await handleStartTraining(targetGymId);
       }
       if (newItems.length > 0 && newItems[0].exerciseName) {
-        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { currentExerciseName: newItems[0].exerciseName }, { merge: true }).catch(()=>{});
+        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'accounts', currentUser), { currentExerciseName: newItems[0].exerciseName }, { merge: true }).catch(() => {});
       }
     }
-    
+
+    setFocusedPost(null);
+    setSelectedFriendUser(null);
     setCurrentTab('record');
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('returnToRecordInput'));
+    }, 50);
   };
 
   const handleActiveExerciseChange = (exerciseName) => {

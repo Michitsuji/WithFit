@@ -592,8 +592,9 @@ function WorkoutItemForm({ item, index, availableExercises, allGymExercises = []
 
   const getWeightPlaceholder = (type) => {
     if (type === 'oneSide') return '片側kg';
+    if (type === 'lr') return '重量kg';
     if (type === 'plate') return '枚数';
-    if (type === 'bodyWeight') return '+加重/-アシストkg';
+    if (type === 'bodyWeight') return '荷重/アシストkg';
     return '重量kg';
   };
 
@@ -720,37 +721,170 @@ function WorkoutItemForm({ item, index, availableExercises, allGymExercises = []
     if (isCardio) {
       inputContent = (
         <div className="flex-1 flex gap-2 min-w-0">
-           <input type="number" inputMode="decimal" value={val('distance')} onChange={(e) => update('distance', e.target.value)} placeholder="距離(km)" className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-2 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
-           <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('time')} onChange={(e) => update('time', e.target.value)} placeholder="時間(分)" className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-2 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
-           <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('calories')} onChange={(e) => update('calories', e.target.value)} placeholder="kcal" className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-2 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
+           <input type="text" inputMode="decimal" value={val('distance')} onChange={(e) => update('distance', e.target.value.replace(/[^0-9.]/g, ''))} placeholder="距離(km)" className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-2 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
+           <input type="text" inputMode="decimal" value={val('time')} onChange={(e) => update('time', e.target.value.replace(/[^0-9.]/g, ''))} placeholder="時間(分)" className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-2 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
+           <input type="text" inputMode="numeric" pattern="[0-9]*" value={val('calories')} onChange={(e) => update('calories', e.target.value.replace(/[^0-9]/g, ''))} placeholder="kcal" className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-2 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-base" style={{ fontSize: '16px' }}/>
         </div>
       );
     } else {
-      const weightInputType = wType === 'bodyWeight' ? "text" : "number";
-      const weightInputMode = wType === 'bodyWeight' ? "text" : "decimal";
+      const isBodyWeight = wType === 'bodyWeight';
+      const rawWeightStr = String(val('weight') ?? '');
+      const isAssist = isBodyWeight && rawWeightStr.startsWith('-');
+      const displayWeightVal = isBodyWeight ? rawWeightStr.replace(/^[+-]/, '') : rawWeightStr;
+
+      const handleWeightInputChange = (e) => {
+        const cleaned = e.target.value.replace(/[^0-9.]/g, '');
+        if (!isBodyWeight) {
+          update('weight', cleaned);
+          return;
+        }
+        if (cleaned === '') {
+          update('weight', isAssist ? '-' : '');
+        } else {
+          update('weight', isAssist ? `-${cleaned}` : cleaned);
+        }
+      };
+
+      const handleSelectBodyWeightSign = (sign) => {
+        if (!isBodyWeight) return;
+        if (sign === '-') {
+          update('weight', displayWeightVal ? `-${displayWeightVal}` : '-');
+        } else {
+          update('weight', displayWeightVal);
+        }
+      };
 
       inputContent = (
-        <div className="flex-1 flex gap-1.5 min-w-0">
-          {isLR ? (
-            <>
-              <input type={weightInputType} inputMode={weightInputMode} value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder={getWeightPlaceholder(wType)} className="w-[48px] sm:w-[60px] shrink-0 text-center text-sm font-bold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded focus:outline-none focus:border-emerald-500 py-1.5 px-0" style={{ fontSize: '16px' }}/>
-              <div className="flex flex-1 items-center gap-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-1 min-w-0">
-                <span className="text-[10px] text-slate-400 font-bold shrink-0">L:</span>
-                <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('lReps')} onChange={(e) => update('lReps', e.target.value)} placeholder={targetVal('lReps') || "0"} className="w-full text-center text-sm font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0 px-0" style={{ fontSize: '16px' }}/>
-              </div>
-              <div className="flex flex-1 items-center gap-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-1 min-w-0">
-                <span className="text-[10px] text-slate-400 font-bold shrink-0">R:</span>
-                <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('rReps')} onChange={(e) => update('rReps', e.target.value)} placeholder={targetVal('rReps') || "0"} className="w-full text-center text-sm font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0 px-0" style={{ fontSize: '16px' }}/>
-              </div>
-            </>
-          ) : (
-            <>
-              <input type={weightInputType} inputMode={weightInputMode} value={val('weight')} onChange={(e) => update('weight', e.target.value)} placeholder={getWeightPlaceholder(wType)} className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-1.5 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-sm" style={{ fontSize: '16px' }}/>
-              <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('reps')} onChange={(e) => update('reps', e.target.value)} placeholder={targetVal('reps') || "回数"} className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-1.5 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-sm" style={{ fontSize: '16px' }}/>
-            </>
+        <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+          {isBodyWeight && (
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => handleSelectBodyWeightSign('+')}
+                className={`flex-1 py-1 px-2 rounded-lg text-[11px] font-bold border transition-colors flex items-center justify-center gap-1 ${
+                  !isAssist
+                    ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
+                    : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                ＋（荷重）
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectBodyWeightSign('-')}
+                className={`flex-1 py-1 px-2 rounded-lg text-[11px] font-bold border transition-colors flex items-center justify-center gap-1 ${
+                  isAssist
+                    ? 'bg-sky-500 text-white border-sky-500 shadow-sm'
+                    : 'bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                －（アシスト）
+              </button>
+            </div>
           )}
-          {item.isForcedReps && (
-            <input type="number" inputMode="numeric" pattern="[0-9]*" value={val('forcedReps')} onChange={(e) => update('forcedReps', e.target.value)} placeholder="+補" className="w-10 shrink-0 text-center text-sm font-bold text-rose-600 bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-800 rounded focus:outline-none focus:border-rose-500 py-1.5 px-0" style={{ fontSize: '16px' }}/>
+          <div className="flex-1 flex gap-1.5 min-w-0">
+            {isLR ? (
+              <>
+                <div className="w-[62px] shrink-0 flex items-center bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded focus-within:border-emerald-500 overflow-hidden">
+                  {isBodyWeight && displayWeightVal !== '' && (
+                    <span className={`text-[11px] font-extrabold pl-1 shrink-0 ${isAssist ? 'text-sky-500' : 'text-emerald-500'}`}>
+                      {isAssist ? '-' : '+'}
+                    </span>
+                  )}
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={displayWeightVal}
+                    onChange={handleWeightInputChange}
+                    placeholder={isBodyWeight ? (isAssist ? 'ｱｼｽﾄkg' : '荷重kg') : '重量kg'}
+                    className="w-full min-w-0 text-center text-sm font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none py-1.5 px-0.5"
+                    style={{ fontSize: '16px' }}
+                  />
+                </div>
+                <div className="flex flex-1 items-center gap-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-1.5 min-w-0 focus-within:border-emerald-500">
+                  <span className="text-[10px] text-slate-400 font-bold shrink-0">L:</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={val('lReps')}
+                    onChange={(e) => update('lReps', e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder={targetVal('lReps') || "0"}
+                    className="w-full text-center text-sm font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0 py-1.5 px-0"
+                    style={{ fontSize: '16px' }}
+                  />
+                </div>
+                <div className="flex flex-1 items-center gap-0.5 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 rounded px-1.5 min-w-0 focus-within:border-emerald-500">
+                  <span className="text-[10px] text-slate-400 font-bold shrink-0">R:</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={val('rReps')}
+                    onChange={(e) => update('rReps', e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder={targetVal('rReps') || "0"}
+                    className="w-full text-center text-sm font-bold text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none min-w-0 py-1.5 px-0"
+                    style={{ fontSize: '16px' }}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex-1 min-w-0 flex items-center bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded focus-within:border-emerald-500 overflow-hidden">
+                  {isBodyWeight && displayWeightVal !== '' && (
+                    <span className={`text-xs font-extrabold pl-1.5 shrink-0 ${isAssist ? 'text-sky-500' : 'text-emerald-500'}`}>
+                      {isAssist ? '－' : '＋'}
+                    </span>
+                  )}
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={displayWeightVal}
+                    onChange={handleWeightInputChange}
+                    placeholder={isBodyWeight ? (isAssist ? 'アシストkg' : '荷重kg(0=自重)') : getWeightPlaceholder(wType)}
+                    className="w-full min-w-0 bg-transparent py-1.5 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none text-sm"
+                    style={{ fontSize: '16px' }}
+                  />
+                </div>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={val('reps')}
+                  onChange={(e) => update('reps', e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder={targetVal('reps') || "回数"}
+                  className="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded py-1.5 px-1 text-center text-slate-800 dark:text-slate-100 font-bold focus:outline-none focus:border-emerald-500 text-sm"
+                  style={{ fontSize: '16px' }}
+                />
+              </>
+            )}
+            {!isLR && item.isForcedReps && (
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={val('forcedReps')}
+                onChange={(e) => update('forcedReps', e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="+補"
+                className="w-11 shrink-0 text-center text-sm font-bold text-rose-600 bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-800 rounded focus:outline-none focus:border-rose-500 py-1.5 px-0"
+                style={{ fontSize: '16px' }}
+              />
+            )}
+          </div>
+          {isLR && item.isForcedReps && (
+            <div className="flex items-center justify-end gap-1.5">
+              <span className="text-[10px] font-bold text-rose-500 dark:text-rose-400 shrink-0">補助回数:</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={val('forcedReps')}
+                onChange={(e) => update('forcedReps', e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="+補助"
+                className="w-24 shrink-0 text-center text-sm font-bold text-rose-600 bg-rose-50 dark:bg-rose-950 border border-rose-200 dark:border-rose-800 rounded focus:outline-none focus:border-rose-500 py-1 px-2"
+                style={{ fontSize: '16px' }}
+              />
+            </div>
           )}
         </div>
       );
@@ -1278,20 +1412,38 @@ function EditWorkoutModal({ post, gyms, exercises, onClose, onSave, myPastPosts 
 
 
   const handleSave = () => {
-    const isValid = workoutItems.every(item => {
-      if (!item.exerciseName || !item.sets || item.sets.length === 0) return false;
-      if (item.weightType === 'cardio') return item.sets.every(set => set.distance !== '' || set.time !== '' || set.calories !== '');
-      if (item.weightType === 'lr') return item.sets.every(set => (set.weight !== '' || item.weightType === 'bodyWeight') && (set.lReps !== '' || set.rReps !== ''));
-      return item.sets.every(set => (set.weight !== '' || item.weightType === 'bodyWeight') && (set.reps !== '' || set.forcedReps));
+    const activeItems = workoutItems.filter(item => {
+      const hasName = Boolean(item.exerciseName);
+      const hasSetData = (item.sets || []).some(s =>
+        (s.weight !== '' && s.weight !== '-' && s.weight !== undefined) ||
+        (s.reps !== '' && s.reps !== undefined) ||
+        (s.lReps !== '' && s.lReps !== undefined) ||
+        (s.rReps !== '' && s.rReps !== undefined) ||
+        (s.distance !== '' && s.distance !== undefined) ||
+        (s.time !== '' && s.time !== undefined) ||
+        (s.calories !== '' && s.calories !== undefined)
+      );
+      return hasName || hasSetData;
     });
-    if (!isValid || workoutItems.length === 0) { alert("種目を選択し、すべての重量と回数を入力してください。"); return; }
+
+    if (activeItems.length > 0) {
+      const isValid = activeItems.every(item => {
+        if (!item.exerciseName || !item.sets || item.sets.length === 0) return false;
+        if (item.weightType === 'cardio') return item.sets.every(set => set.distance !== '' || set.time !== '' || set.calories !== '');
+        if (item.weightType === 'lr') return item.sets.every(set => (set.weight !== '' || item.weightType === 'bodyWeight') && (set.lReps !== '' || set.rReps !== ''));
+        return item.sets.every(set => (set.weight !== '' || item.weightType === 'bodyWeight') && (set.reps !== '' || set.forcedReps));
+      });
+      if (!isValid) { alert("種目を選択し、すべての重量と回数を入力してください。"); return; }
+    } else if (!editBodyWeight && !editBodyFat) {
+      alert("種目を追加するか、体重・体脂肪率を入力してください。"); return;
+    }
 
     const newStartTimestamp = new Date(`${editDate}T${editStartTime}`).getTime();
     const newEndTimestamp = new Date(`${editDate}T${editEndTime}`).getTime();
     const duration = newEndTimestamp - newStartTimestamp;
 
     onSave(post.id, {
-      items: workoutItems,
+      items: activeItems,
       bodyWeight: editBodyWeight ? Number(editBodyWeight) : null,
       bodyFat: editBodyFat ? Number(editBodyFat) : null,
       startTime: isNaN(newStartTimestamp) ? post.startTime : newStartTimestamp,

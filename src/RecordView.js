@@ -418,8 +418,18 @@ function RecordView({ onStart, onPost, onCancel, onRequestJointTraining, onAccep
   const [showDashboard, setShowDashboard] = useState(!myInfo?.isTraining && !isManual);
 
   useEffect(() => {
+    if (myInfo?.currentGymId) {
+      setSelectedGymId(myInfo.currentGymId);
+    } else if (!selectedGymId && sortedGyms.length > 0) {
+      setSelectedGymId(sortedGyms[0].id);
+    }
+  }, [myInfo?.currentGymId, sortedGyms, selectedGymId]);
+
+  useEffect(() => {
     if (!myInfo?.isTraining && !isManual) {
       setShowDashboard(true);
+    } else if (isManual) {
+      setShowDashboard(false);
     }
   }, [myInfo?.isTraining, isManual]);
 
@@ -1046,8 +1056,22 @@ ${importText}`;
   };
 
   const handleSubmit = async () => {
-    if (workoutItems.length > 0) {
-      const isValid = workoutItems.every(item => {
+    const activeItems = workoutItems.filter(item => {
+      const hasName = Boolean(item.exerciseName);
+      const hasSetData = (item.sets || []).some(s =>
+        (s.weight !== '' && s.weight !== '-' && s.weight !== undefined) ||
+        (s.reps !== '' && s.reps !== undefined) ||
+        (s.lReps !== '' && s.lReps !== undefined) ||
+        (s.rReps !== '' && s.rReps !== undefined) ||
+        (s.distance !== '' && s.distance !== undefined) ||
+        (s.time !== '' && s.time !== undefined) ||
+        (s.calories !== '' && s.calories !== undefined)
+      );
+      return hasName || hasSetData;
+    });
+
+    if (activeItems.length > 0) {
+      const isValid = activeItems.every(item => {
         if (!item.exerciseName || !item.sets || item.sets.length === 0) return false;
         if (item.weightType === 'cardio') return item.sets.every(set => set.distance !== '' || set.time !== '' || set.calories !== '');
         if (item.weightType === 'lr') return item.sets.every(set => (set.weight !== '' || item.weightType === 'bodyWeight') && (set.lReps !== '' || set.rReps !== ''));
@@ -1061,16 +1085,16 @@ ${importText}`;
     if (!window.confirm(isManual ? "過去の記録を保存しますか？" : "トレーニングを完了して保存しますか？")) return;
 
     setIsSubmitting(true);
-    const gym = gyms.find(g => g.id === selectedGymId);
+    const gym = gyms.find(g => g.id === (selectedGymId || myInfo?.currentGymId));
     
     try {
       if (isManual) {
          const startTs = new Date(`${manualDate}T${manualStartTime}`).getTime();
          const endTs = new Date(`${manualDate}T${manualEndTime}`).getTime();
-         await onPost(gym ? gym.name : '不明なジム', workoutItems, Number(bodyWeight), Number(bodyFat), startTs, endTs);
+         await onPost(gym ? gym.name : '不明なジム', activeItems, Number(bodyWeight), Number(bodyFat), startTs, endTs);
          setIsManual(false);
       } else {
-         await onPost(gym ? gym.name : '不明なジム', workoutItems, Number(bodyWeight), Number(bodyFat), null, null, jointPartnerId, partnerItems);
+         await onPost(gym ? gym.name : '不明なジム', activeItems, Number(bodyWeight), Number(bodyFat), null, null, jointPartnerId, partnerItems);
       }
       globalRecordHorizontalScroll = 0;
     } finally {
@@ -1153,7 +1177,7 @@ ${importText}`;
               </button>
               
               <div className="grid grid-cols-2 gap-3 w-full">
-                <button onClick={() => {setIsManual(true); if(workoutItems.length === 0) addExerciseItem('');}} className="w-full py-3 rounded-xl font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex flex-col items-center justify-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-all">
+                <button onClick={() => { setIsManual(true); setShowDashboard(false); if (workoutItems.length === 0) addExerciseItem(null); }} className="w-full py-3 rounded-xl font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 flex flex-col items-center justify-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-all">
                   <CalendarIcon size={18} /> 過去の記録を追加
                 </button>
                 <button onClick={() => { 
@@ -1174,7 +1198,7 @@ ${importText}`;
         <div className="mt-6 w-full">
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-               <Target size={16} className="text-indigo-500" /> プログラム管理 (β版)
+               <Target size={16} className="text-indigo-500" /> プログラム管理
             </h3>
           </div>
           
@@ -1285,13 +1309,6 @@ ${importText}`;
       <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
         <h2 className="text-lg font-bold text-slate-900 dark:text-white">{isManual ? '記録内容' : 'ワークアウト中'}</h2>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowPastExerciseModal(true)}
-            className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800 flex items-center gap-1 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors shadow-sm"
-          >
-            <Clock size={14} /> 過去データから種目追加
-          </button>
           {workoutItems.length > 1 && (
             <button onClick={() => setShowReorderModal(true)} className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800 flex items-center gap-1 hover:bg-emerald-100 dark:hover:bg-emerald-900 transition-colors shadow-sm">
               <ArrowUp size={14} /><ArrowDown size={14} className="-ml-2" /> 並び替え
@@ -1422,61 +1439,8 @@ ${importText}`;
           {isSubmitting ? <Activity className="animate-spin" size={20} /> : (isManual ? <><CalendarIcon size={20} /> 過去の記録を保存</> : <><Flame size={20} /> トレーニングを完了して保存</>)}
         </button>
 
-        <button onClick={() => setShowImportTextModal(true)} className="w-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold py-3 rounded-xl shadow-sm flex items-center justify-center gap-2 mb-4 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all border border-slate-200 dark:border-slate-700">
-          <Sparkles size={18} className="text-indigo-500" /> テキストから一括インポート
-        </button>
-        
         <button onClick={handleCancel} className="w-full text-slate-500 dark:text-slate-400 font-bold py-3 rounded-xl flex items-center justify-center gap-2 mt-2 mb-8 transition-all bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:text-rose-500 hover:border-rose-200 dark:hover:border-rose-800">記録を破棄して終了</button>
       </div>
-
-      {showImportTextModal && (
-        <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950/40">
-              <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                <Sparkles size={18} className="text-indigo-500"/> テキストからインポート
-              </h3>
-              <button onClick={() => setShowImportTextModal(false)} className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-full transition-colors">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="p-5 overflow-y-auto">
-              {aiErrorMsg && (
-                <div className="mb-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400">
-                  AI解析に失敗しました。以下のエラーを確認してください：<br/>
-                  <span className="font-normal opacity-80 break-all">{aiErrorMsg}</span>
-                </div>
-              )}
-              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-3">
-                コピーしたトレーニング記録を貼り付けてください。AIが自動でアプリの形式に変換し、一覧に追加します。
-              </p>
-              <textarea
-                value={importText}
-                onChange={e => { setImportText(e.target.value); setAiErrorMsg(null); }}
-                placeholder="例:&#10;■ 1. ベンチプレス [胸]&#10;Set 1: 50kg x 10回&#10;Set 2: 50kg x 8回"
-                className="w-full h-64 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:border-indigo-500 resize-none"
-              />
-            </div>
-            <div className="p-4 border-t border-slate-200 dark:border-slate-800">
-              {isSubmitting ? (
-                <div className="w-full">
-                  <div className="flex justify-between text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2">
-                    <span>AIが解析しています...</span>
-                    <span>{importProgress}%</span>
-                  </div>
-                  <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden shadow-inner">
-                    <div className="bg-indigo-500 h-2.5 rounded-full transition-all duration-300" style={{ width: `${importProgress}%` }}></div>
-                  </div>
-                </div>
-              ) : (
-                <button onClick={handleTextImportSubmit} disabled={!importText.trim()} className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-bold py-3.5 rounded-xl shadow-md transition-colors flex items-center justify-center gap-2">
-                  <Sparkles size={18} /> 解析して入力
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {showReorderModal && (
         <ReorderItemsModal 
@@ -1493,18 +1457,6 @@ ${importText}`;
           }}
         />
       )}
-
-      <PastExercisePickerModal
-        isOpen={showPastExerciseModal}
-        onClose={() => setShowPastExerciseModal(false)}
-        pastPosts={myPastPosts}
-        onSelectExerciseItem={(item, post) => {
-          if (onImportItem) {
-            onImportItem(item, post);
-          }
-          setShowPastExerciseModal(false);
-        }}
-      />
     </div>
   );
 }

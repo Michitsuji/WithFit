@@ -541,12 +541,12 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
           )}
         </div>
 
-        {/* 右側アクションボタン群 */}
-        <div className="flex items-center gap-1 shrink-0">
+        {/* 右側アクションボタン群（2x2グリッドで右詰めに配置） */}
+        <div className="grid grid-cols-2 gap-1.5 shrink-0 ml-auto self-center">
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setSelectedExerciseForChart(ex); }}
-            className="p-2 rounded-xl text-emerald-600 dark:text-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200/60 dark:border-emerald-800/60 transition-colors"
+            className="p-2 rounded-xl text-emerald-600 dark:text-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200/60 dark:border-emerald-800/60 transition-colors flex items-center justify-center"
             title="推移グラフを表示"
           >
             <TrendingUp size={15} />
@@ -554,7 +554,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); handleMuteExercise(ex.name); }}
-            className={`p-2 rounded-xl transition-colors border ${
+            className={`p-2 rounded-xl transition-colors border flex items-center justify-center ${
               isMuted
                 ? 'text-indigo-500 bg-indigo-50 border-indigo-200 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:border-indigo-800'
                 : 'text-slate-400 bg-slate-50 dark:bg-slate-800/80 border-slate-200/70 dark:border-slate-700/70 hover:bg-slate-100'
@@ -568,7 +568,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); startEdit(ex); }}
-                className="p-2 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 bg-slate-50 dark:bg-slate-800/80 hover:bg-emerald-50 dark:hover:bg-slate-700 rounded-xl transition-colors border border-slate-200/70 dark:border-slate-700/70"
+                className="p-2 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 bg-slate-50 dark:bg-slate-800/80 hover:bg-emerald-50 dark:hover:bg-slate-700 rounded-xl transition-colors border border-slate-200/70 dark:border-slate-700/70 flex items-center justify-center"
                 title="種目を編集"
               >
                 <Edit2 size={15} />
@@ -576,7 +576,7 @@ function ExercisesView({ gyms, exercises, posts, accountsInfo, currentUser, myIn
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); if (window.confirm(`${ex.name}を削除しますか？`)) handleDeleteExercise(ex.id); }}
-                className="p-2 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 bg-slate-50 dark:bg-slate-800/80 hover:bg-rose-50 dark:hover:bg-slate-700 rounded-xl transition-colors border border-slate-200/70 dark:border-slate-700/70"
+                className="p-2 text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 bg-slate-50 dark:bg-slate-800/80 hover:bg-rose-50 dark:hover:bg-slate-700 rounded-xl transition-colors border border-slate-200/70 dark:border-slate-700/70 flex items-center justify-center"
                 title="種目を削除"
               >
                 <Trash2 size={15} />

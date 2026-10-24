@@ -513,26 +513,13 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
                   </div>
                   {onImport && post.items && post.items.length > 0 && (
                     <div className="relative shrink-0 ml-auto">
-                      {!showImportOptions ? (
-                        <button
-                          onClick={() => setShowImportOptions(true)}
-                          className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/70 transition-colors border border-emerald-200/80 dark:border-emerald-800/80 shadow-sm"
-                        >
-                          <Copy size={12} /> 構成コピー
-                        </button>
-                      ) : (
-                        <div className="flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-150">
-                          <button onClick={() => { setShowImportOptions(false); onImport(post, false); }} className="flex items-center gap-1 text-[10px] font-bold text-white bg-emerald-500 px-2 py-1 rounded-md hover:bg-emerald-600 transition-colors shadow-sm">
-                            <Play size={9} fill="currentColor" /> 今から
-                          </button>
-                          <button onClick={() => { setShowImportOptions(false); onImport(post, true); }} className="flex items-center gap-1 text-[10px] font-bold text-slate-600 bg-white dark:bg-slate-800 dark:text-slate-300 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700 transition-colors shadow-sm">
-                            <CalendarIcon size={9} /> 過去
-                          </button>
-                          <button onClick={() => setShowImportOptions(false)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 bg-white dark:bg-slate-800 rounded-full">
-                            <X size={12} />
-                          </button>
-                        </div>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => onImport(post, false)}
+                        className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-white dark:bg-slate-900 px-2.5 py-1 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/70 transition-colors border border-emerald-200/80 dark:border-emerald-800/80 shadow-sm"
+                      >
+                        <Copy size={12} /> 構成コピー
+                      </button>
                     </div>
                   )}
                 </div>
@@ -720,15 +707,7 @@ function WorkoutCard({ post, currentUser, accountsInfo, onEdit, onDelete, onTogg
               </div>
             )}
 
-            {onImportItem && (
-              <button
-                type="button"
-                onClick={() => onImportItem(item, post)}
-                className="mt-3 w-full py-2 px-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/80 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/80 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
-              >
-                <Plus size={14} /> この種目を現在の記録に追加
-              </button>
-            )}
+
           </div>
         ))}
       </div>
